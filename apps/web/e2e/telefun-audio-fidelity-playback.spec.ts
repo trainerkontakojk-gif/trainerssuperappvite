@@ -13,7 +13,6 @@ import {
 } from "./helpers/telefunFixtures";
 import {
   AUDIO_RATE_HZ,
-  INPUT_RATE_HZ,
   LOW_TONE_HZ,
   HIGH_TONE_HZ,
   TAIL_MARKER_HZ,
@@ -30,8 +29,6 @@ import {
   measureAudioTaps,
   expectAudioResourcesReleased,
   pcmToneChunks,
-  rmsAtPcmFrequency,
-  type FallbackInputBlock,
   installAudioProbe,
   runCodecCalibration,
   saveJson,
@@ -737,172 +734,6 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
       "POST /api/v1/telefun/sessions",
       `PATCH /api/v1/telefun/sessions/${SESSION_ID}`,
     ]);
-  });
-
-  test("bounds a stalled AudioWorklet load and keeps 16 kHz fallback input packets", async ({
-    page,
-  }, testInfo) => {
-    test.setTimeout(60_000);
-    // Freeze the window before seeing signal strength. Never retry/select
-    // packets based on RMS, nor combine phases across independent callbacks.
-    const warmupBlocks = 2;
-    const measuredBlocks = 8;
-    const samplesPerBlock = 4096;
-    const requiredBlocks = warmupBlocks + measuredBlocks;
-    // AudioProcessingEvent timestamps can jitter by render quanta even when
-    // native sequence/sample counts are complete. Permit 8 * 128 = 1024
-    // samples (0.064 s), one quarter of a 4096-sample block. A skipped block
-    // deviates by about 0.256 s and still fails; sequence +1 and exact packet
-    // sample counts remain the primary guards. RMS is unchanged.
-    const clockToleranceSamples = 1024;
-    const clockToleranceSeconds = clockToleranceSamples / INPUT_RATE_HZ + 1e-6;
-    const expectedClockStepSeconds = samplesPerBlock / INPUT_RATE_HZ;
-    const { audit, call, clientMessages } = await prepareAudioCall(
-      page,
-      "fallback-worklet",
-    );
-    await expect
-      .poll(
-        () =>
-          clientMessages.filter((message) => getAudioPayload(message)?.data)
-            .length,
-        { timeout: 10_000 },
-      )
-      .toBeGreaterThanOrEqual(requiredBlocks);
-    const fallback = await page.evaluate(() => {
-      const probe = (window as any).__telefunAudioProbe;
-      return {
-        injected: probe.workletFailureInjected,
-        failures: probe.workletModuleFailures,
-        contexts: probe.contexts
-          .filter((entry: any) => entry.role === "telefun-input")
-          .map((entry: any) => entry.actualSampleRate),
-        blocks: probe.fallbackInputBlocks as FallbackInputBlock[],
-      };
-    });
-    const inputPackets = clientMessages
-      .map((message) => getAudioPayload(message))
-      .filter((audio) => audio?.data)
-      .slice(0, requiredBlocks);
-    // Match every sent packet to its native callback, including warm-up.
-    // Sequence + audio-clock deltas independently detect skipped blocks;
-    // energy aggregation alone would conceal those discontinuities.
-    let previousIndex = -1;
-    const packetEvidence = inputPackets.map((audio, packetIndex) => {
-      const previousSource = fallback.blocks[previousIndex] ?? null;
-      const sourceIndex = fallback.blocks.findIndex(
-        (block, index) =>
-          index > previousIndex && block.pcmBase64 === audio!.data,
-      );
-      if (sourceIndex >= 0) previousIndex = sourceIndex;
-      const source = fallback.blocks[sourceIndex] ?? null;
-      const clockStepSeconds =
-        source && previousSource
-          ? source.playbackTime - previousSource.playbackTime
-          : null;
-      const clockDeviationSeconds =
-        clockStepSeconds === null
-          ? null
-          : clockStepSeconds - expectedClockStepSeconds;
-      const frame = Buffer.from(audio!.data!, "base64");
-      const sampleCount = Math.floor(frame.byteLength / 2);
-      let energy = 0;
-      for (let i = 0; i < sampleCount; i += 1) {
-        energy += (frame.readInt16LE(i * 2) / 32768) ** 2;
-      }
-      return {
-        packetIndex,
-        source,
-        clockStepSeconds,
-        clockDeviationSeconds,
-        clockDeviationSamples:
-          clockDeviationSeconds === null
-            ? null
-            : clockDeviationSeconds * INPUT_RATE_HZ,
-        sampleCount,
-        totalRms: Math.sqrt(energy / sampleCount),
-        toneRms: rmsAtPcmFrequency([frame], INPUT_RATE_HZ, 440),
-      };
-    });
-    const measurementWindow = packetEvidence.slice(
-      warmupBlocks,
-      requiredBlocks,
-    );
-    const sampleCount = measurementWindow.reduce(
-      (total, block) => total + block.sampleCount,
-      0,
-    );
-    const weightedToneRms = Math.sqrt(
-      measurementWindow.reduce(
-        (total, block) => total + block.sampleCount * block.toneRms ** 2,
-        0,
-      ) / sampleCount,
-    );
-    await writeFile(
-      testInfo.outputPath("fallback-input-window.pcm"),
-      Buffer.concat(
-        inputPackets
-          .slice(warmupBlocks)
-          .map((audio) => Buffer.from(audio!.data!, "base64")),
-      ),
-    );
-    await saveJson(testInfo, "fallback-input-evidence.json", {
-      warmupBlocks,
-      measuredBlocks,
-      samplesPerBlock,
-      sampleRate: INPUT_RATE_HZ,
-      clockToleranceSamples,
-      clockToleranceSeconds,
-      expectedClockStepSeconds,
-      weightedToneRms,
-      sampleCount,
-      packetEvidence,
-      fallback,
-    });
-    expect(fallback.injected).toBe(true);
-    expect(fallback.failures).toBeGreaterThanOrEqual(1);
-    expect(fallback.contexts).toContain(INPUT_RATE_HZ);
-    expect(inputPackets).toHaveLength(requiredBlocks);
-    expect(
-      inputPackets.every((audio) => audio?.mimeType === "audio/pcm;rate=16000"),
-    ).toBe(true);
-    expect(sampleCount).toBe(measuredBlocks * samplesPerBlock);
-    for (const [index, block] of packetEvidence.entries()) {
-      expect(block.sampleCount, `packet ${index} sample count`).toBe(
-        samplesPerBlock,
-      );
-      expect(
-        block.source,
-        `packet ${index} matches a real native input block`,
-      ).not.toBeNull();
-      expect(block.source!.sampleRate).toBe(INPUT_RATE_HZ);
-      expect(block.source!.sampleCount).toBe(samplesPerBlock);
-      if (index >= warmupBlocks) {
-        expect(
-          block.totalRms,
-          `measured packet ${index} must not be zero`,
-        ).toBeGreaterThan(0);
-      }
-      if (index >= warmupBlocks) {
-        const previous = packetEvidence[index - 1].source!;
-        expect(block.source!.sequence, `packet ${index} native sequence`).toBe(
-          previous.sequence + 1,
-        );
-        expect(
-          Math.abs(block.clockDeviationSeconds!),
-          `packet ${index} audio-clock continuity`,
-        ).toBeLessThanOrEqual(clockToleranceSeconds);
-      }
-    }
-    expect(weightedToneRms).toBeGreaterThanOrEqual(0.02);
-
-    await endCall(page, call);
-    await expectAudioResourcesReleased(page);
-    await waitForMockedApi(audit, [
-      "POST /api/v1/telefun/sessions",
-      `PATCH /api/v1/telefun/sessions/${SESSION_ID}`,
-    ]);
-    expectHermetic(audit);
   });
 
   test("AI playback stops on hold and resumes after the user returns", async ({

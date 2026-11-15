@@ -59,3 +59,9 @@ Lane C (test-code restructure across many files; no product runtime change).
 - [x] Follow-up: `tna-efek` (1,172 lines, missed by the original count) split
       into `tna-efek-sessions`, `tna-efek-summary`, and
       `tna-efek-exclusions-export` with `helpers/tnaEfekHarness.ts`.
+- [x] Follow-up: trim the split files left above ~1,000 lines. The stalled
+      AudioWorklet input test moves from `telefun-audio-fidelity-playback`
+      (1,026 → 857) to `-recording`; the print and scroll-hint tests move from
+      `sidak-agent-report-download-html` (1,011 → 759) to a new `-print` spec.
+      `telefun-audio-fidelity-signal` stays at 1,058 lines because its single
+      test is about 966 lines and splitting it would mean rewriting the test.
