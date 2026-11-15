@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-15
 
+- test(e2e): expect Gemini 4 Hydrogen as the third KETIK and PDKT model choice, unselected by default, in the model-picker specs
+
 - test(e2e): split the 1,172-line EFEK spec into session, summary, and exclusion/export files with a shared harness
 
 - test(e2e): split the 14 E2E specs above 1,100 lines into focused files with one shared helper per original spec, keeping the listed tests identical and repeating file-level setup in each file

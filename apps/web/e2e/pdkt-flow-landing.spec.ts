@@ -679,7 +679,7 @@ test.describe("PDKT (hermetic)", () => {
 test.describe("PDKT pilihan model AI (hermetic)", () => {
   test.beforeAll(() => assertLocalDevOnlyTarget(APP_ORIGIN));
 
-  test("hanya Gemini 3.8 Flash dan 3.5 Flash Lite; Flash Lite lama tetap Flash Lite", async ({
+  test("hanya Gemini 4 Hydrogen, 3.8 Flash, dan 3.5 Flash Lite; Flash Lite lama tetap Flash Lite", async ({
     page,
   }) => {
     const audit = await openHermeticShell(page, {
@@ -710,7 +710,10 @@ test.describe("PDKT pilihan model AI (hermetic)", () => {
     const models = dialog
       .getByRole("radiogroup", { name: "Model AI" })
       .getByRole("radio");
-    await expect(models).toHaveCount(2);
+    await expect(models).toHaveCount(3);
+    await expect(
+      models.filter({ hasText: "Gemini 4 Hydrogen" }),
+    ).toHaveAttribute("aria-checked", "false");
     await expect(
       models.filter({ hasText: "Gemini 3.8 Flash" }),
     ).toHaveAttribute("aria-checked", "false");

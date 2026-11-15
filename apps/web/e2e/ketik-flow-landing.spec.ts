@@ -572,7 +572,7 @@ test.describe("KETIK pilihan model AI (hermetic)", () => {
     await assertLocalDevOnlyTarget(APP_ORIGIN);
   });
 
-  test("hanya Gemini 3.8 Flash dan 3.5 Flash Lite; model lama tersimpan pindah ke bawaan", async ({
+  test("hanya Gemini 4 Hydrogen, 3.8 Flash, dan 3.5 Flash Lite; model lama tersimpan pindah ke bawaan", async ({
     page,
   }) => {
     const { audit, dialog } = await openKetikSettings(page, {
@@ -583,9 +583,11 @@ test.describe("KETIK pilihan model AI (hermetic)", () => {
     const models = dialog
       .getByRole("radiogroup", { name: "Model AI" })
       .getByRole("radio");
-    await expect(models).toHaveCount(2);
+    await expect(models).toHaveCount(3);
+    const hydrogen = models.filter({ hasText: "Gemini 4 Hydrogen" });
     const flash = models.filter({ hasText: "Gemini 3.8 Flash" });
     const lite = models.filter({ hasText: "Gemini 3.5 Flash Lite" });
+    await expect(hydrogen).toHaveAttribute("aria-checked", "false");
     await expect(flash).toHaveAttribute("aria-checked", "true");
     await expect(lite).toHaveAttribute("aria-checked", "false");
 
