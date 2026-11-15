@@ -3,7 +3,7 @@
  *
  * Gap yang ditutup: spec mock-only (`sidak-temuan-dates.spec.ts`,
  * `sidak-temuan-import-dates.spec.ts`) dan spec route-level
- * (`sidak-heatmap-integration.spec.ts`, `sidak-temuan-dates-api.spec.ts`) masing
+ * (`sidak-heatmap-integration.spec.ts`, `sidak-temuan-dates-api-heatmap.spec.ts`) masing
  * -masing tidak membuktikan satu alur browser yang benar-benar menyimpan.
  *
  * Di sini katalog/auth UI di-mock (fixture), TETAPI semua request fitur

@@ -72,8 +72,8 @@ function renderChat(
   );
 }
 
-// Clock/composer/serial sends are covered by ketik-session-api.spec.ts and
-// ketik-server-chat.spec.ts. Keep the unrelated avatar checks below.
+// Clock/composer/serial sends are covered by ketik-session-api-*.spec.ts and
+// ketik-server-chat-*.spec.ts. Keep the unrelated avatar checks below.
 describe("KETIK ChatInterface consumer avatar", () => {
   afterEach(() => {
     vi.restoreAllMocks();

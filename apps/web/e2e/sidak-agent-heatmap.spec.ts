@@ -4,7 +4,7 @@
  * Backend `/api` di-mock lewat allowlist fail-closed milik harness detail agent,
  * jadi spec ini membuktikan perilaku UI: tab tampil, request membawa `agent_id`
  * + filter konteks, kalender dan insight ter-render. Kebenaran hitungan
- * per-tiket/agent_id/RLS dibuktikan di `sidak-temuan-dates-api.spec.ts`
+ * per-tiket/agent_id/RLS dibuktikan di `sidak-temuan-dates-api-heatmap.spec.ts`
  * terhadap DB lokal disposable.
  */
 

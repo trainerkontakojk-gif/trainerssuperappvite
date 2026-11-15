@@ -3,7 +3,7 @@
  * yang dipertahankan di Fase 5 untuk generator laporan agen.
  *
  * Semua kontrak lain dari generator ini sudah dipindahkan ke
- * `apps/web/e2e/sidak-agent-report-download.spec.ts` dan
+ * `apps/web/e2e/sidak-agent-report-download-*.spec.ts` dan
  * `apps/web/e2e/sidak-agent-html-export-parity.spec.ts`, yang mengukurnya dari
  * file yang benar-benar diunduh lewat menu. Test-test lama di sini dihapus
  * hanya SETELAH penggantinya lulus, dan matriks pemetaannya tercatat di

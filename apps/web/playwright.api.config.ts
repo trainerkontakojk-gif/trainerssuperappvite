@@ -34,12 +34,12 @@ export default defineConfig({
     },
     {
       name: "ketik-review-worker-real-backend",
-      testMatch: "ketik-review-worker-api.spec.ts",
+      testMatch: "ketik-review-worker-api-*.spec.ts",
     },
     {
       // Same spec, worker embedded in the real API process (see the spec header).
       name: "ketik-review-worker-embedded-real-backend",
-      testMatch: "ketik-review-worker-api.spec.ts",
+      testMatch: "ketik-review-worker-api-*.spec.ts",
     },
     {
       name: "ketik-history-real-backend",
@@ -71,7 +71,7 @@ export default defineConfig({
     },
     {
       name: "telefun-scoring-queue-real-backend",
-      testMatch: "telefun-scoring-queue-api.spec.ts",
+      testMatch: "telefun-scoring-queue-api-*.spec.ts",
     },
     {
       name: "scenario-attachments-real-backend",
@@ -115,7 +115,7 @@ export default defineConfig({
     },
     {
       name: "ketik-session-real-backend",
-      testMatch: "ketik-session-api.spec.ts",
+      testMatch: "ketik-session-api-*.spec.ts",
     },
     {
       name: "ketik-consumer-prompt-real-backend",
@@ -142,7 +142,10 @@ export default defineConfig({
       name: "db-guard-real-backend",
       testMatch: "exposed-function-guard-api.spec.ts",
     },
-    { name: "sidak-temuan-dates", testMatch: "sidak-temuan-dates-api.spec.ts" },
+    {
+      name: "sidak-temuan-dates",
+      testMatch: "sidak-temuan-dates-api-*.spec.ts",
+    },
     {
       name: "sidak-unmapped-indicator-real-backend",
       testMatch: "sidak-unmapped-indicator-api.spec.ts",
@@ -209,7 +212,7 @@ export default defineConfig({
     },
     {
       name: "monitoring-models-real-backend",
-      testMatch: "monitoring-models-api.spec.ts",
+      testMatch: "monitoring-models-api-*.spec.ts",
     },
     {
       name: "monitoring-riwayat-real-backend",

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-15
 
+- test(e2e): split the 14 E2E specs above 1,100 lines into focused files with one shared helper per original spec, keeping the listed tests identical and repeating file-level setup in each file
+
 - docs(skills): let the TDD skill use the read-only Explore and log-reader agents for broad searches and long logs without asking
 
 - docs(agents): move the auto-updated session learnings block out of AGENTS.md into the gitignored handoff notes

@@ -49,7 +49,7 @@ existing, agar bulan audit dan tanggal jatuh tempo tetap konsisten pada DB koson
 `apps/api/src/lib/env.ts` loads the root `.env.local` (production) and parses env once, at first
 import; `lib/supabase.ts` builds `supabaseAdmin` from it. A spec that imports in-process API modules
 must pin the loopback env first and load **every** `apps/api` module with a dynamic `import()` inside
-that pin, then assert `lib/env` is loopback (`loadApiModules()` in `sidak-temuan-dates-api.spec.ts`).
+that pin, then assert `lib/env` is loopback (`loadApiModules()` in `helpers/sidakTemuanDatesApiHarness.ts`).
 A static `import … from "../../api/src/…"` is hoisted above the pin and binds the whole worker to
 production. The fetch guard blocks the traffic, so the symptom is unexplained 400/500 responses,
 not egress. The `[API] Supabase client initialized for project …` log line shows which project won.
@@ -133,7 +133,7 @@ that mocks auth and then calls the real `/api` can never pass. Use the hermetic 
 ```bash
 pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project pdkt-resilience-real-backend --project pdkt-evaluation-errors-real-backend --project pdkt-privacy-real-backend --project pdkt-review-evidence-real-backend --workers=1 --trace on
 pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project pdkt-consumer-email-stub --workers=1
-pnpm --dir apps/web exec playwright test pdkt-flow.spec.ts pdkt-resilience.spec.ts --workers=1 --trace on
+pnpm --dir apps/web exec playwright test pdkt-flow- pdkt-resilience.spec.ts --workers=1 --trace on
 ```
 
 ## KETIK — riwayat penuh (paket D)
@@ -168,7 +168,7 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   Terapkan migration `20261015130000_ketik_configuration_assignments.sql` setelah
   migration history di atas. Rollback/reapply dilakukan eksternal pada DB disposable.
   Tidak ada panggilan provider atau test UI penugasan dalam tahap fondasi ini.
-- `ketik-session-api.spec.ts` (`ketik-session-real-backend`) membuktikan
+- `ketik-session-api-*.spec.ts` (`ketik-session-real-backend`) membuktikan
   snapshot, assignment wajib, strict input, append durable/idempoten, pemicu
   response terpisah, discard-and-retry satu kali, bounded supersede, usage setiap
   provider call, expiry, lease fencing, RLS/RPC denial, finalisasi atomik dan
@@ -176,7 +176,7 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   `20261015140000_ketik_server_sessions.sql`, lalu
   `20261020160000_ketik_durable_agent_messages.sql`. Provider hanya HTTP fixture
   deterministik; tidak ada request keluar/biaya AI.
-- `ketik-server-chat.spec.ts` membuktikan bubble lokal lalu append server segera,
+- `ketik-server-chat-*.spec.ts` membuktikan bubble lokal lalu append server segera,
   composer tetap aktif saat response AI, reload memakai transkrip durable,
   legacy failed resume/retry, expiry, assignment error/retry tanpa auto-start,
   serta dialog konflik/sukses 390px/1280px, keyboard/focus dan target 44px.
@@ -189,7 +189,7 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   `systemInstruction`, karena KETIK memaksa model ke Gemini. Guard menolak egress lain, provider
   hanya respons HTTP lokal, dan fixture/usage dihapus. Tanpa flag, tes di-skip;
   flag bukan pengganti guard env/target loopback. Trace berisi auth lokal: jangan commit.
-- `ketik-flow.spec.ts` membuktikan settings gagal dengan/tanpa backup tidak bisa
+- `ketik-flow-*.spec.ts` membuktikan settings gagal dengan/tanpa backup tidak bisa
   memulai simulasi, retry gagal tetap gagal, dan retry sukses tidak otomatis
   memulai chat. Screenshot error desktop/mobile disimpan pada output tes.
 
@@ -197,13 +197,13 @@ Jalankan serial:
 
 ```bash
 pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-integrity-real-backend --project ketik-errors-real-backend --project ketik-assignment-real-backend --project ketik-session-real-backend --workers=1 --trace on
-pnpm --filter @trainers/web exec playwright test ketik-flow.spec.ts ketik-server-chat.spec.ts --workers=1 --trace on
+pnpm --filter @trainers/web exec playwright test ketik-flow- ketik-server-chat- --workers=1 --trace on
 E2E_KETIK_LIVE=1 pnpm --filter @trainers/web exec playwright test ketik-session-browser.spec.ts --workers=1 --trace on
 ```
 
 ## Telefun — bukti bahasa
 
-`telefun-flow.spec.ts` memuat skenario kategori bahasa di Telaah: label
+`telefun-flow-telaah-analysis.spec.ts` memuat skenario kategori bahasa di Telaah: label
 Pengulangan/Efektivitas kalimat, navigasi dua arah berulang pada dua kutipan,
 dua kemunculan dalam satu baris, kutipan bertumpang tindih, dan catatan lama.
 Skenario menyimpan screenshot 390/1280px light/dark dan memeriksa overflow.
@@ -220,7 +220,7 @@ JWT/RLS, database produksi, audio model atau akurasi semantik model nyata.
 
 ```bash
 pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project telefun-language-evidence-stub --workers=1
-pnpm --dir apps/web exec playwright test telefun-flow.spec.ts --workers=1
+pnpm --dir apps/web exec playwright test telefun-flow- --workers=1
 ```
 
 ## Telefun — proxy egress dan idle orphan cleanup
@@ -251,12 +251,18 @@ Playwright run deletes its contents and used to dirty the tree on every invocati
 
 ## Layout
 
-One spec per module flow under `apps/web/e2e/`. Shared fixtures and harnesses live in
+Specs live under `apps/web/e2e/`. Keep each spec near or below ~1,000 lines: when a module
+flow outgrows that, split it into `<flow>-<area>.spec.ts` files (for example
+`pdkt-flow-mailbox.spec.ts`) and move the fixtures, mocks, and helper functions they share
+into one `apps/web/e2e/helpers/<flow>Harness.ts` module. Repeat file-level setup
+(`test.use`, top-level hooks, `test.describe.configure`) in every split file, keep tests that
+depend on an earlier serial test in the same file, and list the new files in any Playwright
+config whose `testMatch` names the spec. Shared fixtures and harnesses live in
 `apps/web/e2e/helpers/`; keep a harness free of feature-specific state when more than one spec uses it.
 
 ## KETIK — worker telaah persisten (paket E)
 
-`ketik-review-worker-api.spec.ts` berjalan di dua project: `ketik-review-worker-real-backend`
+`ketik-review-worker-api-*.spec.ts` berjalan di dua project: `ketik-review-worker-real-backend`
 (host standalone `ketik-review-worker-entrypoint.ts`) dan
 `ketik-review-worker-embedded-real-backend` (proses API asli `apps/api/src/index.ts`,
 `PORT=0`, worker embedded). Keduanya memakai JWT, Hono, Postgres/RLS asli pada
@@ -282,7 +288,7 @@ provenance legacy, queued/processing yang jujur, waktu berjalan + estimasi
 1–2/3 menit tanpa persen palsu, polling gagal/retry tanpa raw error atau timeout
 browser palsu, hasil rerun lama setelah reload, dan response polling terlambat.
 Screenshot 390/1280px serta assertion overflow disimpan di
-artifact ignored. `ketik-flow.spec.ts` memakai matriks izin baru; tidak ada
+artifact ignored. `ketik-flow-*.spec.ts` memakai matriks izin baru; tidak ada
 POST review saat membuka sesi atau finish chat. E2E JWT browser sesi menjalankan
 runtime worker produk terhadap DB/provider test yang sama, tanpa auto-review;
 worker child-process/restart dibuktikan oleh suite API terpisah.
@@ -290,7 +296,7 @@ worker child-process/restart dibuktikan oleh suite API terpisah.
 ```bash
 pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-review-worker-real-backend --workers=1 --trace on
 pnpm --filter @trainers/web exec playwright test --config playwright.api.config.ts --project ketik-review-worker-embedded-real-backend --workers=1 --trace on
-E2E_KETIK_LIVE=1 pnpm --filter @trainers/web exec playwright test ketik-review-worker-browser.spec.ts ketik-flow.spec.ts ketik-session-browser.spec.ts --workers=1 --trace on
+E2E_KETIK_LIVE=1 pnpm --filter @trainers/web exec playwright test ketik-review-worker-browser.spec.ts ketik-flow- ketik-session-browser.spec.ts --workers=1 --trace on
 ```
 
 Setelah coverage read-only polling/no-job/processing/missing-result lulus,

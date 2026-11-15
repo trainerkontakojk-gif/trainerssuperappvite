@@ -3,7 +3,7 @@
  *
  * Dipakai oleh dua spec yang mengukur dua permukaan berbeda dari fixture yang
  * SAMA, supaya "parity" punya arti:
- *   - `sidak-agent-report-download.spec.ts` — kontrak tiap format yang
+ *   - `sidak-agent-report-download-*.spec.ts` — kontrak tiap format yang
  *     diunduh lewat menu nyata.
  *   - `sidak-agent-html-export-parity.spec.ts` — apa yang dibaca pembaca di
  *     halaman live dibanding dokumen HTML yang diunduh dari fixture itu juga.

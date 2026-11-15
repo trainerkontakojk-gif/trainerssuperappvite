@@ -2,7 +2,7 @@
  * Harness E2E bersama untuk workspace `/sidak/jadwal-shifting`.
  *
  * Dipakai dua spec yang mengukur dua lapisan berbeda dari fixture yang SAMA:
- *   - `sidak-jadwal-shifting.spec.ts`     — apa yang dilihat pengguna di browser.
+ *   - `sidak-jadwal-shifting-*.spec.ts`     — apa yang dilihat pengguna di browser.
  *   - `sidak-jadwal-shifting-api.spec.ts` — role gate + kontrak respons pada
  *     router Hono yang SESUNGGUHNYA, dengan upstream WFM diganti stub lokal.
  *

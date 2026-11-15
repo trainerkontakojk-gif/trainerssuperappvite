@@ -473,7 +473,7 @@ yang dipecah per karakter.
 | `apps/web/src/utils/exportAgentReport.ts` | Utility `generateCSV()`, `generateMD()`, `generateHTML()`, dan `buildAgentReportFileName()`; union format laporan; re-export tipe kontrak laporan; `comparisonScopeLabel()` diekspor supaya PDF memakai kalimat cakupan benchmark yang sama; `csvEscape()` menetralisasi pemicu formula per sel dengan penanda `[teks] ` (angka dikecualikan) |
 | `apps/web/src/utils/agentReportHtml.ts` | **Sumber tunggal desain laporan HTML**: stylesheet, seluruh section builder, helper label cakupan (dipakai bersama CSV/MD/PDF), dan script interaktif untuk kedua varian |
 | `apps/web/src/utils/agentReportPdf.ts` | **Generator PDF**: mesin tata letak A4 (paragraf, tabel ber-header berulang, grafik tren vektor), sanitasi teks WinAnsi dengan penanda `[U+XXXX]` untuk karakter tak-tercetak, metadata, header/footer "Halaman X dari N" |
-| `apps/web/e2e/sidak-agent-report-download.spec.ts` | Bukti E2E unduhan nyata: menu → hook → Blob → file, incl. cakupan seksi, pengecualian sesi bersih, sanitasi nama file, kegagalan ekspor, kontrak PDF (magic bytes, tanpa BOM, metadata, jumlah halaman, teks ter-ekstrak di halaman awal/akhir, isi panjang lintas halaman, kegagalan async), serta kontrak data-integrity: penanda karakter tak-tercetak yang utuh + dapat dibalik di PDF, dan invarian "tidak ada sel formula di seluruh file" pada CSV yang diunduh |
+| `apps/web/e2e/sidak-agent-report-download-*.spec.ts` | Bukti E2E unduhan nyata: menu → hook → Blob → file, incl. cakupan seksi, pengecualian sesi bersih, sanitasi nama file, kegagalan ekspor, kontrak PDF (magic bytes, tanpa BOM, metadata, jumlah halaman, teks ter-ekstrak di halaman awal/akhir, isi panjang lintas halaman, kegagalan async), serta kontrak data-integrity: penanda karakter tak-tercetak yang utuh + dapat dibalik di PDF, dan invarian "tidak ada sel formula di seluruh file" pada CSV yang diunduh |
 
 ### HTML Export — Persyaratan Visual
 
@@ -741,7 +741,7 @@ sebagai pengganti E2E", bukan "unit test tidak pernah dipertahankan".
 - `docs/SIDAK_LOGIC_AND_SCORING.md` — kontrak clean session/phantom
 - `docs/rebuild-logs/phase-222-sidak-agent-report-export-readability.md` — ringkasan perubahan keterbacaan PDF/HTML dan verifikasinya
 - `.hermes/plans/2026-09-27_201056-sidak-agent-report-exports.md` — rencana export per fase (Fase 1-4 sudah dieksekusi; Fase 5 migrasi test legacy)
-- `apps/web/e2e/sidak-agent-report-download.spec.ts` — bukti regresi unduhan nyata per format
+- `apps/web/e2e/sidak-agent-report-download-*.spec.ts` — bukti regresi unduhan nyata per format
 - `apps/web/e2e/sidak-agent-html-export-parity.spec.ts` — paritas halaman live vs dokumen unduhan, plus review visual live/unduhan
 - `apps/web/e2e/helpers/sidakAgentReportFixture.ts` — harness E2E bersama: fixture, guard fail-closed, preflight target, dan pembaca offline `file://`
 

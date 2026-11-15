@@ -5,7 +5,7 @@
  * menerimanya per item parameter. Semua request going ke `/api` di-mock lewat
  * harness fail-closed, jadi spec ini tidak menyentuh database mana pun — bukan
  * DB nyata, bukan DB lokal. Persistence yang nyata dibuktikan di
- * `sidak-temuan-dates-api.spec.ts`, bukan di sini.
+ * `sidak-temuan-dates-api-*.spec.ts`, bukan di sini.
  */
 
 import { expect, test } from "@playwright/test";
