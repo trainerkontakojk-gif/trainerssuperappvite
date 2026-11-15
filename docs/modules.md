@@ -365,7 +365,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - Proper input APPK dianggap sesuai secara default dengan nilai 3; bobot dan sesi tetap dihitung, tetapi temuannya tidak masuk hitungan temuan. Toggle `Hitung proper input (APPK)` memakai `?proper_input=include` untuk mengembalikan skor SIDAK resmi. Mode yang sama dipakai rata-rata layanan, disimpan pada tautan ringkasan/rincian, dan dicantumkan pada ekspor. Snapshot parameter diawali `Proper Input` (Chat, Email, CSO) atau `Kemampuan Pencatatan` (Call) dikenali tanpa migrasi; rumus skor SIDAK tidak berubah.
 - Ringkasan program menyediakan `median_delta` dan `median_relative_delta`, dihitung dari peserta yang dievaluasi dan tidak dikecualikan, dengan pembulatan dua desimal.
 - Kartu ringkasan dan rincian menonjolkan median perubahan dibanding rata-rata layanan serta jumlah peserta yang dievaluasi. Formulir pengecualian berada di disclosure "Sesuaikan analisis"; daftar pengecualian dan pembanding semua peserta tetap terlihat. Grafik skor menjaga rentang minimal 10 poin (maksimal 100), sedangkan grafik temuan per sesi selalu berawal dari nol.
-- Bukti dan cakupan: [rencana implementasi](../plans/markdown/efek-agent-exclusions.md), Playwright `tna-efek-report-api.spec.ts` (backend/DB lokal nyata) dan `tna-efek.spec.ts` (browser hermetic, 390/1280px, ekspor, pemulihan dan kegagalan).
+- Bukti dan cakupan: [rencana implementasi](../plans/markdown/efek-agent-exclusions.md), Playwright `tna-efek-report-api.spec.ts` (backend/DB lokal nyata) dan `tna-efek-*.spec.ts` (browser hermetic, 390/1280px, ekspor, pemulihan dan kegagalan).
 
 ## 11. Kegiatan Trainers
 

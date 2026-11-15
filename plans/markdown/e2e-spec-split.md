@@ -56,3 +56,6 @@ Lane C (test-code restructure across many files; no product runtime change).
       `docs/modules.md`, `docs/SIDAK_LOGIC_AND_SCORING.md`, feature docs,
       helper comments).
 - [x] `thermo-nuclear` review, CHANGELOG entry, commit.
+- [x] Follow-up: `tna-efek` (1,172 lines, missed by the original count) split
+      into `tna-efek-sessions`, `tna-efek-summary`, and
+      `tna-efek-exclusions-export` with `helpers/tnaEfekHarness.ts`.

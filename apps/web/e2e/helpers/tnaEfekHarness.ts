@@ -1,0 +1,247 @@
+// Shared by the tna-efek-*.spec.ts files.
+import type {
+  EfekParticipantResult,
+  EfekProgram,
+  EfekProgramReport,
+  EfekProgramSummary,
+  EfekReport,
+  EfekSession,
+  EfekSessionSummary,
+} from "@trainers/types";
+import { ids } from "./tnaHarness";
+
+export const ok = (data: unknown) => ({ success: true, data });
+
+export const programs: EfekProgram[] = [
+  { code: "ketik", name: "KETIK", default_service_type: "chat", sort_order: 1 },
+  { code: "pdkt", name: "PDKT", default_service_type: "email", sort_order: 2 },
+  {
+    code: "telefun",
+    name: "Telefun",
+    default_service_type: "call",
+    sort_order: 3,
+  },
+  {
+    code: "ceriwis",
+    name: "CERIWIS",
+    default_service_type: "cso",
+    sort_order: 4,
+  },
+];
+
+export const sessionId = "8f3a2b1c-0d4e-4f5a-8b6c-7d8e9f0a1b2c";
+
+export const sessions: EfekSession[] = [
+  {
+    id: sessionId,
+    program_code: "ketik",
+    title: "Level Up Week Mei",
+    service_type: "chat",
+    start_date: "2026-05-12",
+    end_date: "2026-05-16",
+    participant_count: 2,
+    updated_at: "2026-10-19T10:00:00.000Z",
+    tna_plan: null,
+  },
+  {
+    id: "9a4b3c2d-1e5f-4a6b-9c7d-8e9f0a1b2c3d",
+    program_code: "pdkt",
+    title: "Level Up Week Juli",
+    service_type: "email",
+    start_date: "2026-07-14",
+    end_date: "2026-07-14",
+    participant_count: 4,
+    updated_at: "2026-10-19T10:00:00.000Z",
+    tna_plan: null,
+  },
+];
+
+export const summary = (
+  p: EfekProgram,
+  patch: Partial<EfekProgramSummary> = {},
+): EfekProgramSummary => ({
+  code: p.code,
+  name: p.name,
+  service_type: p.default_service_type,
+  participants: 0,
+  evaluated: 0,
+  pending: 0,
+  naik: 0,
+  stabil: 0,
+  turun: 0,
+  avg_delta: null,
+  avg_relative_delta: null,
+  median_delta: null,
+  median_relative_delta: null,
+  findings_per_session_before: null,
+  findings_per_session_after: null,
+  ...patch,
+});
+
+export const sessionSummaries: EfekSessionSummary[] = [
+  {
+    ...sessions[0]!,
+    participants: 2,
+    evaluated: 2,
+    avg_delta: 1.75,
+    status: "terukur",
+    months_after_closed: 3,
+    first_after: { year: 2026, month: 6 },
+  },
+  {
+    ...sessions[1]!,
+    participants: 4,
+    evaluated: 0,
+    avg_delta: null,
+    status: "menunggu",
+    months_after_closed: 0,
+    first_after: { year: 2026, month: 11 },
+  },
+];
+
+export const ketikSummary = summary(programs[0]!, {
+  participants: 2,
+  evaluated: 2,
+  naik: 1,
+  stabil: 1,
+  avg_delta: 1.75,
+  avg_relative_delta: 0.75,
+  median_delta: 2.5,
+  median_relative_delta: 2.4,
+  findings_per_session_before: 1.45,
+  findings_per_session_after: 0.64,
+});
+
+export const report: EfekReport = {
+  data_until: { year: 2026, month: 9 },
+  window: 3,
+  include_proper_input: false,
+  teams: ["Tim A", "Tim B"],
+  years: [2026],
+  programs: [
+    ketikSummary,
+    summary(programs[1]!, { participants: 4, pending: 4 }),
+    summary(programs[2]!),
+    summary(programs[3]!),
+  ],
+  sessions: sessionSummaries,
+};
+
+export const months = (scores: (number | null)[]) =>
+  scores.map((score, i) => ({
+    year: 2026,
+    month: i + 2,
+    offset: i - 3,
+    score,
+    sessions: score === null ? 0 : 3,
+    findings: score === null ? 0 : 2,
+    comparison_score: 82,
+  }));
+
+export const participant = (
+  patch: Partial<EfekParticipantResult>,
+): EfekParticipantResult => ({
+  session_id: sessionId,
+  peserta_id: ids.ana,
+  nama: "Ana Contoh",
+  tim: "Tim A",
+  session_title: "Level Up Week Mei",
+  service_type: "chat",
+  start_date: "2026-05-12",
+  end_date: "2026-05-16",
+  months_before: 3,
+  months_after: 3,
+  sessions_before: 9,
+  sessions_after: 9,
+  findings_before: 12,
+  findings_after: 3,
+  score_before: 91,
+  score_after: 95,
+  findings_per_session_before: 1.33,
+  findings_per_session_after: 0.33,
+  delta: 4,
+  comparison_delta: 1,
+  relative_delta: 3,
+  status: "naik",
+  thin: false,
+  months: months([90, 91, 92, 50, 94, 95, 96]),
+  ...patch,
+});
+
+export const programReport: EfekProgramReport = {
+  data_until: report.data_until,
+  window: 3,
+  include_proper_input: false,
+  teams: report.teams,
+  years: report.years,
+  program: ketikSummary,
+  sessions: [sessionSummaries[0]!],
+  chart: [-3, -2, -1, 0, 1, 2, 3].map((offset) => ({
+    offset,
+    score: 90 + offset,
+    comparison_score: 82,
+    findings_per_session: 1.4,
+    comparison_findings_per_session: 1,
+  })),
+  participants: [
+    participant({
+      peserta_id: ids.budi,
+      nama: "Budi Contoh",
+      months_before: 1,
+      months_after: 1,
+      score_before: 90,
+      score_after: 89.5,
+      delta: -0.5,
+      relative_delta: -1.5,
+      status: "stabil",
+      thin: true,
+      months: months([null, null, 90, null, 89.5, null, null]),
+    }),
+    participant({}),
+  ],
+};
+
+export const efekMocks = [
+  {
+    method: "GET" as const,
+    path: "/api/v1/tna/efek/programs",
+    body: ok(programs),
+  },
+  {
+    method: "GET" as const,
+    path: "/api/v1/tna/efek/report/ketik",
+    body: ok(programReport),
+  },
+  {
+    method: "GET" as const,
+    path: "/api/v1/tna/efek/report",
+    body: ok(report),
+  },
+  {
+    method: "GET" as const,
+    path: `/api/v1/tna/efek/sessions/${sessionId}`,
+    body: ok({
+      ...sessions[0],
+      participants: [
+        { peserta_id: ids.ana, nama: "Ana Contoh", tim: "Tim A" },
+        { peserta_id: ids.budi, nama: "Budi Contoh", tim: "Tim A" },
+      ],
+    }),
+  },
+  {
+    method: "POST" as const,
+    path: "/api/v1/tna/efek/sessions",
+    status: 201,
+    body: ok({ id: sessionId }),
+  },
+  {
+    method: "PUT" as const,
+    path: `/api/v1/tna/efek/sessions/${sessionId}`,
+    body: ok({ id: sessionId }),
+  },
+  {
+    method: "DELETE" as const,
+    path: `/api/v1/tna/efek/sessions/${sessionId}`,
+    body: ok({ id: sessionId }),
+  },
+];
