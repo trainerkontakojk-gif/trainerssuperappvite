@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-15
 
+- test(ci): align Telefun fixtures and isolate the idle database probe
+
 - fix(monitoring): derive active AI pricing and task choices from selectable models
 
 - feat(telefun): enable Hydrogen assessment and hide database errors

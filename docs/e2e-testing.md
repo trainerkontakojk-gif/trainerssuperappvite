@@ -223,6 +223,27 @@ pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --pro
 pnpm --dir apps/web exec playwright test telefun-flow.spec.ts --workers=1
 ```
 
+## Telefun — proxy egress dan idle orphan cleanup
+
+- `gemini-egress-proxy-api.spec.ts` / project `gemini-egress-proxy` hanya
+  memakai endpoint Supabase/proxy loopback fixture dan entrypoint API/Telefun
+  asli dengan preload fail-closed. Fixture policy kosong secara eksplisit
+  memicu code default. Kegagalan upstream anotasi menghasilkan
+  `GENERATION_ERROR`, bukan `NO_ANNOTATIONS` (yang berarti AI sukses tetapi
+  hasilnya kosong). Project ini tetap masuk gate CI tanpa backend.
+- `telefun-idle-orphans-api.spec.ts` / project
+  `telefun-idle-orphans-real-backend` mempertahankan probe Postgres nyata:
+  setelah Telefun idle empat detik, delta agregat panggilan
+  `claim_telefun_realtime_orphans` harus nol. Tes ini tidak masuk kelompok
+  CI tanpa backend dan tidak di-skip otomatis. Jalankan dengan
+  `E2E_SUPABASE_WORKDIR` disposable yang sudah direplay migrations, pada port
+  API 55321 / DB 55322; guard menolak workdir yang tidak tersedia atau port lain.
+
+```bash
+pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project gemini-egress-proxy --workers=1
+E2E_SUPABASE_WORKDIR=/path/to/disposable pnpm --dir apps/web exec playwright test --config playwright.api.config.ts --project telefun-idle-orphans-real-backend --workers=1
+```
+
 ## Repository hygiene
 
 `apps/web/test-results/` is run output: it is gitignored and no longer tracked, because every

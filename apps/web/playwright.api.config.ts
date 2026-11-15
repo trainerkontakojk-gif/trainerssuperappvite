@@ -88,6 +88,10 @@ export default defineConfig({
     { name: "gate-stub", testMatch: "access-matrix-api.spec.ts" },
     { name: "dev-database-guard", testMatch: "dev-database-guard-api.spec.ts" },
     {
+      name: "telefun-idle-orphans-real-backend",
+      testMatch: "telefun-idle-orphans-api.spec.ts",
+    },
+    {
       name: "gemini-egress-proxy",
       testMatch: "gemini-egress-proxy-api.spec.ts",
     },
