@@ -26,7 +26,7 @@ const INITIAL_MODELS = [
     eligible: [
       { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", provider: "gemini", hasPricing: true },
       { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", provider: "gemini", hasPricing: true },
-      { id: "gpt-5.4-mini", name: "GPT 5.4 Mini", provider: "openai", hasPricing: true },
+      { id: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen", provider: "gemini", hasPricing: true },
     ],
     updatedBy: null,
     updatedAt: null,

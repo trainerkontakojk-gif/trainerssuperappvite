@@ -4,6 +4,7 @@ import {
   AiModelInfo,
   AIProvider,
   AI_MODELS,
+  SELECTABLE_MODELS,
   AI_TASK_DEFINITIONS,
   DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
@@ -19,6 +20,7 @@ import type { AiModelModule } from "@trainers/types";
 type TextImageAIProvider = Extract<AIProvider, "gemini" | "openai">;
 export {
   AI_MODELS,
+  SELECTABLE_MODELS,
   DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
   KETIK_PDKT_MODELS,
@@ -115,11 +117,12 @@ export function getModelsForModule(
   module: AiModelModule = "default",
 ): AiModelInfo[] {
   if (module === "telefun") return [...TELEFUN_LIVE_MODELS];
-  if (module === "ketik" || module === "pdkt" || module === "qa-analyzer")
-    return module === "qa-analyzer"
-      ? TEXT_SIMULATION_MODELS
-      : KETIK_PDKT_MODELS;
-  return AI_MODELS;
+  if (module === "ketik" || module === "pdkt") return KETIK_PDKT_MODELS;
+  if (module === "qa-analyzer")
+    return SELECTABLE_MODELS.filter(
+      (model) => model.capabilities?.supportsText && !model.realtime,
+    );
+  return SELECTABLE_MODELS;
 }
 
 export function supportsImageGeneration(modelId: string): boolean {

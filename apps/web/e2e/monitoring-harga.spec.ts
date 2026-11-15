@@ -54,9 +54,9 @@ const PRICING = [
     ...NULL_RATES,
   },
   {
-    model_id: "gpt-5.4-mini",
-    model_name: "GPT-5.4 mini",
-    provider: "openai",
+    model_id: "gemini-3.5-flash-lite",
+    model_name: "Gemini 3.5 Flash Lite",
+    provider: "gemini",
     pricing_mode: "simple",
     input_price_usd_per_million: 0.75,
     output_price_usd_per_million: 4.5,
@@ -66,7 +66,7 @@ const PRICING = [
     ...NULL_RATES,
   },
   {
-    model_id: "gemini-3.0-flash-live",
+    model_id: "gemini-3.0-flash-live-preview",
     model_name: "Gemini 3.0 Flash Live",
     provider: "gemini",
     pricing_mode: "realtime",
@@ -160,7 +160,7 @@ test.describe("Monitoring Harga (hermetic)", () => {
 
     const table = page.getByRole("table", { name: "Harga per model" });
     await expect(table.getByRole("row", { name: /^Gemini$/ })).toBeVisible();
-    await expect(table.getByRole("row", { name: /^OpenAI$/ })).toBeVisible();
+    await expect(table.getByRole("row", { name: /^OpenAI$/ })).toHaveCount(0);
 
     const flash = table.getByRole("row", { name: /Gemini 3\.8 Flash/ });
     await expect(flash).toContainText("0,75");
@@ -198,11 +198,11 @@ test.describe("Monitoring Harga (hermetic)", () => {
       ]),
     });
     await waitForMockedApi(audit, ["/ai/monitoring/pricing"]);
-    const row = page.getByRole("row", { name: /GPT-5\.4 mini/ });
+    const row = page.getByRole("row", { name: /Gemini 3\.5 Flash Lite/ });
     await row.getByRole("button", { name: "Ubah" }).click({ timeout: 20000 });
 
     const dialog = page.getByRole("dialog", {
-      name: "Ubah harga GPT-5.4 mini",
+      name: "Ubah harga Gemini 3.5 Flash Lite",
     });
     await dialog.getByLabel("Input").fill("1.5");
     await dialog.getByLabel("Output").fill("9");
@@ -214,7 +214,7 @@ test.describe("Monitoring Harga (hermetic)", () => {
     );
     await dialog.getByRole("button", { name: "Jadwalkan" }).click();
     expect((await request).postDataJSON()).toMatchObject({
-      model_id: "gpt-5.4-mini",
+      model_id: "gemini-3.5-flash-lite",
       input_price_usd_per_million: 1.5,
       output_price_usd_per_million: 9,
       effective_from: "2027-02-01",
@@ -257,7 +257,7 @@ test.describe("Monitoring Harga (hermetic)", () => {
     await dialog.getByRole("button", { name: "Simpan" }).click();
     const body = (await request).postDataJSON();
     expect(body).toMatchObject({
-      model_id: "gemini-3.0-flash-live",
+      model_id: "gemini-3.0-flash-live-preview",
       input_text_price_usd_per_million: 0.5,
       cached_input_text_price_usd_per_million: 0.05,
       input_audio_price_usd_per_million: 3,
@@ -276,11 +276,11 @@ test.describe("Monitoring Harga (hermetic)", () => {
     });
     await waitForMockedApi(audit, ["/ai/monitoring/pricing"]);
     const edit = page
-      .getByRole("row", { name: /GPT-5\.4 mini/ })
+      .getByRole("row", { name: /Gemini 3\.5 Flash Lite/ })
       .getByRole("button", { name: "Ubah" });
     await edit.click({ timeout: 20000 });
     const dialog = page.getByRole("dialog", {
-      name: "Ubah harga GPT-5.4 mini",
+      name: "Ubah harga Gemini 3.5 Flash Lite",
     });
     await dialog.getByLabel("Input").fill("99");
     await dialog.getByRole("button", { name: "Batal" }).click();

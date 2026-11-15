@@ -165,7 +165,7 @@ snapshots are displayed for reconciliation/history; it is not a provider,
 scoring, retry, reconnect, or usage-emission instruction. No new Telefun OpenAI
 Realtime usage, scoring, provider call, fallback, or zero-cost substitute is
 emitted. Historical realtime pricing is display-only/read-only; direct OpenAI
-text model pricing remains editable without change.
+text model pricing is also historical/read-only once the model is outside the selectable allowlist.
 
 - A stored terminal `response.done` usage snapshot is deduplicated by its
   historical response identity; duplicate persisted evidence is not charged
@@ -218,12 +218,13 @@ Catatan:
 
 Editor pricing selalu dibangun dari dua sumber:
 
-- registry model kanonik di `AI_MODELS` (`apps/api/src/lib/ai-models.ts`) — hanya memuat runtime direct Gemini/OpenAI. Newly added text model IDs: `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Legacy `gemini-3.7-flash` / `gemini-3.6-flash` dinormalisasi ke `gemini-3.8-flash` via LEGACY_ALIASES. Telefun's realtime registry remains separate. Legacy OpenRouter/DeepSeek selections dinormalisasi sebelum masuk editor, jadi tidak tampil sebagai pilihan aktif.
+- `SELECTABLE_MODELS` di `packages/types/src/ai-models.ts`, diekspor melalui `apps/api/src/lib/ai-models.ts`: diturunkan dari pilihan KETIK/PDKT (Hydrogen, Flash 3.8, Flash Lite 3.5), tiga model Telefun Live, dan model gambar PDKT. `TEXT_MODELS`/`AI_MODELS` tetap menyimpan metadata legacy; penambahan metadata saja tidak menambah baris harga aktif. `/ai/models` dan pilihan kebijakan tugas memakai allowlist yang sama; tugas GenerateContent mengecualikan Live.
 - row yang sudah tersimpan di `ai_pricing_settings`
 
 Perilaku editor:
 
-- semua model di `AI_MODELS` selalu muncul, walau tabel pricing masih kosong
+- semua model di `SELECTABLE_MODELS` muncul dengan `editable: true`, walau tabel pricing masih kosong
+- baris tersimpan di luar allowlist hanya muncul di grup "Model lama, hanya untuk riwayat" dengan `historical: true`, `editable: false`; PUT ditolak. Harga dan snapshot biaya historis tidak dihapus atau dihitung ulang
 - nilai `0` berarti usage model tersebut belum dihitung biayanya secara bermakna
 
 Target editor mendukung dua mode kompatibel:
@@ -238,7 +239,7 @@ Baseline OpenAI resmi (USD per satu juta token):
 | `gpt-realtime-2.1`      |       4.00 |              0.40 |       24.00 |       32.00 |               0.40 |        64.00 |
 | `gpt-realtime-2.1-mini` |       0.60 |              0.06 |        2.40 |       10.00 |               0.30 |        20.00 |
 
-Historical seed rates are retained for display and reconciliation only; they are not an enablement path and cannot be edited. Stored usage rows keep their original modality snapshots. Direct OpenAI text pricing remains a normal writable pricing surface.
+Historical seed rates are retained for display and reconciliation only; they are not an enablement path and cannot be edited. Stored usage rows keep their original modality snapshots. Direct OpenAI text pricing is historical/read-only because those models are outside the active allowlist.
 
 ### Kurs USD/IDR
 

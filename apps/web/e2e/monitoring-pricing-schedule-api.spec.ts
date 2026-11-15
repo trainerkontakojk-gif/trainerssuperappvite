@@ -28,7 +28,7 @@ import {
 const env = readLoopbackEnv();
 const ns = randomUUID().slice(0, 8);
 const quoted = (value: string) => `'${value.replace(/'/g, "''")}'`;
-const KNOWN_MODEL = "gemini-3.1-flash-lite";
+const KNOWN_MODEL = "gemini-3.5-flash-lite";
 const FUTURE_DATE = "2031-05-01";
 const FAKE_MODEL = `e2e-sched-${ns}`;
 

@@ -5,8 +5,7 @@ import {
 } from "@trainers/types";
 import type { z } from "zod";
 import {
-  AI_MODELS,
-  TELEFUN_LIVE_MODELS,
+  SELECTABLE_MODELS,
   getHistoricalTelefunRealtimeModel,
 } from "../lib/ai-models";
 import type { createAdminClient } from "../lib/supabase";
@@ -43,10 +42,7 @@ export class PricingError extends Error {
   }
 }
 
-export const PRICING_MODELS = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
-  (model, index, models) =>
-    models.findIndex((candidate) => candidate.id === model.id) === index,
-);
+export const PRICING_MODELS = SELECTABLE_MODELS;
 const PRICING_MODEL_IDS = new Set(PRICING_MODELS.map((model) => model.id));
 
 const LEGACY_SELECT =
@@ -160,6 +156,7 @@ export async function listPricing(admin: AdminClient, now = new Date()) {
       model_id: model.id,
       model_name: model.name,
       provider: model.provider,
+      editable: true,
       pricing_mode: model.realtime ? "realtime" : "simple",
       image_output_price_usd_per_million:
         IMAGE_GENERATION_MODELS.find((image) => image.id === model.id)

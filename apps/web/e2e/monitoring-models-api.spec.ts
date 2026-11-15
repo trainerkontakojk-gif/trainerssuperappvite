@@ -13,6 +13,8 @@ import {
 } from "./helpers/sidakRealBackend";
 import {
   DEFAULT_KETIK_SETTINGS,
+  IMAGE_GENERATION_MODELS,
+  TELEFUN_LIVE_MODELS,
   AI_TASKS,
   AI_TASK_DEFINITIONS,
   AiModelPolicyListResponse,
@@ -262,6 +264,271 @@ test.describe("AI Model Policy API", () => {
   });
 });
 
+test("selectable pricing matches catalogs and policies without retired or realtime text choices", async () => {
+  const pricingRes = await call("GET", "/monitoring/pricing");
+  expect(pricingRes.status).toBe(200);
+  const pricing = (await pricingRes.json()).data as Array<{
+    model_id: string;
+    provider: string;
+    historical?: boolean;
+    editable?: boolean;
+  }>;
+  const policiesRes = await call("GET", "/monitoring/models");
+  expect(policiesRes.status).toBe(200);
+  const policies = (await policiesRes.json()).data as AiModelPolicyListResponse;
+  const expectedIds = new Set(IMAGE_GENERATION_MODELS.map((model) => model.id));
+  for (const module of ["ketik", "pdkt", "telefun"]) {
+    const response = await call("GET", `/models?module=${module}`);
+    expect(response.status).toBe(200);
+    for (const model of (await response.json()).data) expectedIds.add(model.id);
+  }
+  for (const item of policies.items) {
+    for (const model of item.eligible) {
+      expectedIds.add(model.id);
+      expect(pricing.find((row) => row.model_id === model.id)).toMatchObject({
+        editable: true,
+      });
+      expect(TELEFUN_LIVE_MODELS.some((live) => live.id === model.id)).toBe(
+        false,
+      );
+    }
+  }
+  const active = pricing.filter((row) => !row.historical);
+  expect(active.map((row) => row.model_id).sort()).toEqual(
+    [...expectedIds].sort(),
+  );
+  expect(active).toHaveLength(7);
+  expect(
+    active.every((row) => row.provider === "gemini" && row.editable === true),
+  ).toBe(true);
+  for (const path of ["/models", "/models?module=default"]) {
+    const response = await call("GET", path);
+    expect(response.status).toBe(200);
+    expect(
+      (await response.json()).data
+        .map((model: { id: string }) => model.id)
+        .sort(),
+    ).toEqual(active.map((row) => row.model_id).sort());
+  }
+  const qaResponse = await call("GET", "/models?module=qa-analyzer");
+  expect(qaResponse.status).toBe(200);
+  expect(
+    (await qaResponse.json()).data
+      .map((model: { id: string }) => model.id)
+      .sort(),
+  ).toEqual(
+    ["gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite"].sort(),
+  );
+  expect(
+    policies.items.find((item) => item.task === "ketik_review_fallback"),
+  ).toMatchObject({
+    codeDefault: "gemini-3.5-flash-lite",
+    modelId: "gemini-3.5-flash-lite",
+  });
+});
+
+test("retired pricing remains historical and cannot be edited or selected as fallback", async () => {
+  const modelId = "gpt-5.4-mini";
+  const before = await createAdmin(env)
+    .from("ai_pricing_settings")
+    .select("*")
+    .eq("model_id", modelId)
+    .maybeSingle();
+  expect(before.error).toBeNull();
+  const rates = {
+    model_id: modelId,
+    input_price_usd_per_million: 0.75,
+    output_price_usd_per_million: 4.5,
+  };
+  try {
+    expect(
+      (
+        await createAdmin(env)
+          .from("ai_pricing_settings")
+          .upsert(rates, { onConflict: "model_id" })
+      ).error,
+    ).toBeNull();
+    const response = await call("GET", "/monitoring/pricing");
+    expect(response.status).toBe(200);
+    expect(
+      (await response.json()).data.find(
+        (row: { model_id: string }) => row.model_id === modelId,
+      ),
+    ).toMatchObject({ ...rates, historical: true, editable: false });
+    const edit = await call("PUT", "/monitoring/pricing", rates);
+    expect(edit.status).toBe(400);
+    expect((await edit.json()).error.code).toBe("UNKNOWN_MODEL");
+    const select = await call(
+      "PUT",
+      "/monitoring/models/ketik_review_fallback",
+      { modelId },
+    );
+    expect(select.status).toBe(400);
+    expect((await select.json()).error.code).toBe("MODEL_NOT_ELIGIBLE");
+    runSql(
+      env,
+      `INSERT INTO ai_model_policy(task, model_id) VALUES ('ketik_review_fallback', '${modelId}');`,
+    );
+    const { resolveTaskModel, invalidateAiModelPolicyCache } =
+      await import("../../api/src/lib/ai-model-policy");
+    invalidateAiModelPolicyCache();
+    expect(await resolveTaskModel("ketik_review_fallback")).toEqual({
+      modelId: "gemini-3.5-flash-lite",
+      source: "code",
+    });
+  } finally {
+    if (before.data)
+      expect(
+        (await createAdmin(env).from("ai_pricing_settings").upsert(before.data))
+          .error,
+      ).toBeNull();
+    else
+      expect(
+        (
+          await createAdmin(env)
+            .from("ai_pricing_settings")
+            .delete()
+            .eq("model_id", modelId)
+        ).error,
+      ).toBeNull();
+  }
+});
+
+test("legacy KETIK snapshots and PDKT evaluation requests cannot call retired providers", async () => {
+  const guarded = globalThis.fetch;
+  const requestedModels: string[] = [];
+  const db = createAdmin(env);
+  let sessionId: string | undefined;
+  globalThis.fetch = (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    if (
+      ["generativelanguage.googleapis.com", "api.openai.com"].includes(
+        url.hostname,
+      )
+    ) {
+      requestedModels.push(
+        url.hostname === "api.openai.com" ? "openai" : url.pathname,
+      );
+      return Promise.resolve(
+        Response.json(
+          {
+            error: {
+              message: "e2e provider unavailable",
+              status: "INVALID_ARGUMENT",
+            },
+          },
+          { status: 400 },
+        ),
+      );
+    }
+    return guarded(request);
+  };
+  const request = (path: string, body: unknown) =>
+    tnaApiRequest(app, `http://localhost/api/v1/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${trainer.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  try {
+    expect(
+      (
+        await tnaApiRequest(app, "http://localhost/api/v1/ketik/settings", {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${trainer.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...DEFAULT_KETIK_SETTINGS,
+            responsePacingMode: "training_fast",
+          }),
+        })
+      ).status,
+    ).toBe(200);
+    const start = await request("ketik/sessions", { requestId: randomUUID() });
+    expect(start.status).toBe(200);
+    sessionId = (await start.json()).data.id;
+    runSql(
+      env,
+      `UPDATE ketik_sessions SET snapshot=jsonb_set(snapshot, '{config,selectedModel}', '"gpt-5.4-mini"') WHERE id=${quoted(sessionId!)};`,
+    );
+    const turn = await request(`ketik/sessions/${sessionId}/turns`, {
+      requestId: randomUUID(),
+      expectedVersion: 0,
+      text: "Selamat pagi.",
+    });
+    expect(turn.status).toBe(502);
+    expect(requestedModels).toHaveLength(1);
+    expect.soft(requestedModels[0]).toContain("gemini-3.8-flash");
+    expect(
+      runSql(
+        env,
+        `SELECT snapshot->'config'->>'selectedModel' FROM ketik_sessions WHERE id=${quoted(sessionId!)};`,
+      ),
+    ).toBe("gpt-5.4-mini");
+    requestedModels.length = 0;
+    const evaluation = await request("pdkt/mailbox/evaluate", {
+      config: {
+        scenarios: [
+          {
+            id: "s1",
+            category: "Pengaduan",
+            title: "Status laporan",
+            description: "Periksa laporan saya.",
+            isActive: true,
+          },
+        ],
+        consumerType: { id: "calm", name: "Tenang", description: "Tenang" },
+        identity: {
+          name: "Rina",
+          email: "rina@local.test",
+          city: "Bandung",
+          bodyName: "Rina",
+        },
+        enableImageGeneration: false,
+        selectedModel: "deepseek-v4-pro",
+      },
+      emails: [
+        {
+          id: "inbound",
+          from: "rina@local.test",
+          to: "konsumen@ojk.go.id",
+          subject: "Status laporan",
+          body: "Periksa laporan saya.",
+          timestamp: new Date().toISOString(),
+          isAgent: false,
+        },
+        {
+          id: "reply",
+          from: "agent@local.test",
+          to: "konsumen@ojk.go.id",
+          subject: "Re: Status laporan",
+          body: "Kami bantu periksa.",
+          timestamp: new Date().toISOString(),
+          isAgent: true,
+        },
+      ],
+    });
+    expect(evaluation.status).toBe(502);
+    expect(requestedModels).toHaveLength(1);
+    expect(requestedModels[0]).toContain("gemini-3.8-flash");
+  } finally {
+    globalThis.fetch = guarded;
+    if (sessionId)
+      expect(
+        (await db.from("ketik_sessions").delete().eq("id", sessionId)).error,
+      ).toBeNull();
+    expect(
+      (await db.from("ai_usage_logs").delete().eq("user_id", trainer.userId))
+        .error,
+    ).toBeNull();
+  }
+});
+
 test("Gemini-only tasks reject GPT and hide it from eligible options", async () => {
   for (const task of ["sidak_forecast", "telefun_assessment"]) {
     const res = await call("PUT", `/monitoring/models/${task}`, {
@@ -499,6 +766,16 @@ for (const selectedModel of ["gemini-3.5-flash-lite", "gemini-4-hydrogen"]) {
       expect(requestedModels.some((url) => url.includes(selectedModel))).toBe(
         true,
       );
+      // Flash Lite is now the default fallback; keep this primary distinct.
+      if (selectedModel === "gemini-3.5-flash-lite") {
+        expect(
+          (
+            await call("PUT", "/monitoring/models/ketik_review_fallback", {
+              modelId: "gemini-4-hydrogen",
+            })
+          ).status,
+        ).toBe(200);
+      }
       expect(
         (
           await call("PUT", "/monitoring/models/ketik_review", {
@@ -630,7 +907,7 @@ test("KETIK claims use the configured fallback timeout for the lease", async () 
     expect(
       (
         await call("PUT", "/monitoring/models/ketik_review_fallback", {
-          modelId: "gpt-5.6-luna",
+          modelId: "gemini-4-hydrogen",
         })
       ).status,
     ).toBe(200);

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-15
 
+- fix(monitoring): derive active AI pricing and task choices from selectable models
+
 - feat(telefun): enable Hydrogen assessment and hide database errors
 
 - fix(telefun): simplify annotation schema and verify Hydrogen replay annotations

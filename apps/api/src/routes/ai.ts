@@ -3,7 +3,7 @@ import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import { AI_MODELS, getModelsForModule } from "../lib/ai-models";
+import { getModelsForModule } from "../lib/ai-models";
 import type { AiModelModule } from "@trainers/types";
 import { requireCapability } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
@@ -86,7 +86,7 @@ function dbErrorResponse(
 
 ai.get("/models", requireCapability("ai.models.read"), (c) => {
   const module = c.req.query("module") as AiModelModule | undefined;
-  const models = module ? getModelsForModule(module) : AI_MODELS;
+  const models = getModelsForModule(module);
   return c.json({ success: true, data: models });
 });
 

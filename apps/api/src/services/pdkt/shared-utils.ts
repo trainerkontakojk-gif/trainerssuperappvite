@@ -1,3 +1,4 @@
+import { coerceKetikPdktModelId } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
@@ -16,7 +17,9 @@ export async function callAI(options: {
   usageContext?: UsageContext;
   userId?: string;
 }) {
-  const { modelId, provider } = resolveModelProvider(options.model);
+  const { modelId, provider } = resolveModelProvider(
+    coerceKetikPdktModelId(options.model),
+  );
 
   const payload = {
     model: modelId,

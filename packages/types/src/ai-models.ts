@@ -521,6 +521,22 @@ export const AI_MODELS: AiModelInfo[] = [
   ...IMAGE_GENERATION_MODELS,
 ];
 
+/** Active choices, not every model retained for legacy runtime metadata. */
+export const SELECTABLE_MODEL_IDS: readonly string[] = [
+  ...KETIK_PDKT_MODEL_IDS,
+  ...TELEFUN_LIVE_MODELS.map((model) => model.id),
+  ...IMAGE_GENERATION_MODELS.map((model) => model.id),
+];
+
+export const SELECTABLE_MODELS: AiModelInfo[] = [
+  ...AI_MODELS,
+  ...TELEFUN_LIVE_MODELS,
+].filter(
+  (model, index, models) =>
+    SELECTABLE_MODEL_IDS.includes(model.id) &&
+    models.findIndex((candidate) => candidate.id === model.id) === index,
+);
+
 export const TEXT_SIMULATION_MODELS = TEXT_MODELS.filter(
   (model) => !model.id.includes("tts"),
 );

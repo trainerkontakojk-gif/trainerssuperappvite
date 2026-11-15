@@ -1,4 +1,5 @@
 import {
+  coerceKetikPdktModelId,
   computeKetikIdentityCorrection,
   type KetikIdentity,
   KetikScenario,
@@ -420,7 +421,9 @@ ATURAN BALASAN:
 13. BATASAN KONTEKS SKENARIO: bahas hanya fakta, isu, produk, atau layanan yang ada di deskripsi skenario, skrip, keterangan lampiran, atau pertanyaan agen yang masih terkait masalah inti. JANGAN menambah isu, produk, atau topik baru (misalnya skenario penipuan tidak tiba-tiba membahas cetak SLIK atau pengajuan kredit). Detail tambahan yang masuk akal sebagai elaborasi masalah yang sama boleh, tetapi jangan mengarang riwayat yang tidak ada di skenario.
   `;
 
-  const { modelId, provider } = resolveModelProvider(config.selectedModel);
+  const { modelId, provider } = resolveModelProvider(
+    coerceKetikPdktModelId(config.selectedModel),
+  );
   const usesConservativeTemperature = provider === "openai";
 
   const providerSystemInstruction =

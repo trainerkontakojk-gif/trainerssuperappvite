@@ -258,7 +258,7 @@ test("enqueue does not call AI; claimed attempts use primary/fallback and pollin
   });
   expect(providerCalls).toHaveLength(2);
   expect(providerCalls[0]).toContain("gemini-3.8-flash");
-  expect(providerCalls[1]).toBe("gpt-5.4-mini");
+  expect(providerCalls[1]).toContain("gemini-3.5-flash-lite");
   // Legacy/raw job detail must never be returned by status polling.
   const admin = createAdmin(env);
   const history = await admin

@@ -1,5 +1,5 @@
 import {
-  AI_MODELS,
+  SELECTABLE_MODELS,
   AiModelInfo,
   AIProvider,
   DEFAULT_AI_MODEL_ID,
@@ -41,7 +41,7 @@ export const AI_TASK_DEFINITIONS: Record<AiTask, AiTaskDefinition> = {
     label: "Review KETIK (Fallback)",
     description:
       "Model cadangan bila model utama KETIK mengalami timeout atau kegagalan provider.",
-    codeDefault: "gpt-5.4-mini",
+    codeDefault: "gemini-3.5-flash-lite",
     requires: { supportsText: true },
   },
   telefun_assessment: {
@@ -81,7 +81,9 @@ export function eligibleModelsForTask(task: AiTask): AiModelInfo[] {
   const def = AI_TASK_DEFINITIONS[task];
   if (!def) return [];
 
-  return AI_MODELS.filter((model) => {
+  return SELECTABLE_MODELS.filter((model) => {
+    // System tasks use GenerateContent, not the realtime Live transport.
+    if (model.realtime) return false;
     const caps = model.capabilities;
     if (!caps) return false;
 
