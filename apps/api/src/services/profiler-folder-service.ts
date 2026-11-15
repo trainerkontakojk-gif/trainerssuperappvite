@@ -5,7 +5,7 @@
 
 import { supabaseAdmin } from "../lib/supabase";
 import { fetchAllPages } from "../lib/supabase-pagination";
-import { invalidateAgentDirectorySummary } from "./sidak/agent-directory";
+import { invalidateSidakTemuanCaches } from "./sidak/agent-directory";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -222,7 +222,7 @@ export async function renameFolder(
     .eq("batch_name", oldName);
   if (pesertaErr)
     console.error("Gagal update batch_name peserta:", pesertaErr.message);
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
 
   return data;
 }
@@ -243,7 +243,7 @@ export async function deleteFolder(id: string): Promise<void> {
     .eq("batch_name", folder.name);
   if (pesertaErr)
     throw new Error("Gagal menghapus data peserta: " + pesertaErr.message);
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
 
   // 3. Hapus folder
   const { error } = await supabaseAdmin
@@ -338,7 +338,7 @@ export async function duplicateFolder(
       newParticipants.push(...inserted);
     }
   }
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
 
   return { folder, participants: newParticipants };
 }

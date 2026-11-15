@@ -29,8 +29,6 @@ const env = readLoopbackEnv();
 const ns = randomUUID().slice(0, 8);
 const YEAR = 2094;
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
-const DIRECTORY_SELECT =
-  "peserta_id,indicator_id,nilai,no_tiket,service_type,period_id,created_at,is_phantom_padding";
 
 let app: Hono;
 let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
@@ -102,7 +100,6 @@ test.beforeAll(async () => {
     if (
       url.pathname === "/rest/v1/qa_temuan" &&
       (init?.method ?? "GET") === "GET" &&
-      url.searchParams.get("select") === DIRECTORY_SELECT &&
       url.searchParams.get("tahun") === `eq.${YEAR}`
     )
       directoryScans++;

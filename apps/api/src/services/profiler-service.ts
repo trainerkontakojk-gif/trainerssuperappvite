@@ -8,7 +8,7 @@ import {
   scopePesertaIds,
 } from "./access/scope";
 import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
-import { invalidateAgentDirectorySummary } from "./sidak/agent-directory";
+import { invalidateSidakTemuanCaches } from "./sidak/agent-directory";
 import type {
   AgentKtpSelf,
   ProfilerPeserta,
@@ -308,7 +308,7 @@ export async function createPeserta(
       .select()
       .single();
     if (error) throw error;
-    invalidateAgentDirectorySummary();
+    invalidateSidakTemuanCaches();
     return data;
   } catch (error: any) {
     if (error.code === "23505") {
@@ -351,7 +351,7 @@ export async function updatePeserta(
       .select()
       .single();
     if (error) throw error;
-    invalidateAgentDirectorySummary();
+    invalidateSidakTemuanCaches();
     return data;
   } catch (error: any) {
     if (error.code === "23505") {
@@ -377,7 +377,7 @@ export async function deletePeserta(id: string): Promise<void> {
     .delete()
     .eq("id", id);
   if (error) throw new Error(error.message);
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
 }
 
 export async function bulkCreatePeserta(
@@ -482,7 +482,7 @@ export async function bulkCreatePeserta(
     }
     throw new Error(error.message);
   }
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
   return data ?? [];
 }
 
@@ -575,7 +575,7 @@ export async function copyPesertaToFolder(
     }
     throw new Error(error.message);
   }
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
   return data ?? [];
 }
 
@@ -643,7 +643,7 @@ export async function movePesertaToBatch(
     .update({ batch_name: targetBatchName })
     .in("id", pesertaIds);
   if (error) throw new Error("Gagal memindahkan peserta: " + error.message);
-  invalidateAgentDirectorySummary();
+  invalidateSidakTemuanCaches();
   return pesertaIds.length;
 }
 

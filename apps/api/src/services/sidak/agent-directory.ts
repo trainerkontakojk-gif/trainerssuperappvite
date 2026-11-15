@@ -1,11 +1,13 @@
 import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
-import {
-  fetchAllPages,
-  PARALLEL_PAGE_CONCURRENCY,
-} from "../../lib/supabase-pagination";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
 import { createTtlCache } from "../../lib/ttl-cache";
+import {
+  getYearTemuanRows,
+  invalidateTemuanRowCache,
+  type CachedTemuanRow,
+} from "./temuan-row-cache";
 import {
   EXCLUDED_FOLDERS,
   EXCLUDED_JABATAN,
@@ -117,8 +119,12 @@ export async function getAgents(params: {
  */
 const directoryCache = createTtlCache<string, AgentDirectoryEntry[]>();
 
-/** Call after any write to `qa_temuan` or `profiler_peserta`. */
-export function invalidateAgentDirectorySummary(): void {
+/**
+ * Call after any write to `qa_temuan` or `profiler_peserta`: clears the
+ * shared year rows and the scored directory built on them.
+ */
+export function invalidateSidakTemuanCaches(): void {
+  invalidateTemuanRowCache();
   directoryCache.invalidate();
 }
 
@@ -153,6 +159,44 @@ export async function getAgentDirectorySummary(
   return { agents, batches };
 }
 
+const DIRECTORY_COLUMNS = [
+  "peserta_id",
+  "indicator_id",
+  "nilai",
+  "no_tiket",
+  "service_type",
+  "period_id",
+  "created_at",
+  "is_phantom_padding",
+] as const;
+
+/**
+ * The directory's former query on the shared year rows: allowed services
+ * only, newest first (`created_at` desc, then `id` desc), its own columns.
+ * Timestamps share one format and offset, so they compare as strings.
+ */
+function directoryRows(
+  rows: CachedTemuanRow[],
+  allowedServiceTypes?: ServiceType[],
+): any[] {
+  const allowed =
+    allowedServiceTypes && allowedServiceTypes.length > 0
+      ? new Set<string>(allowedServiceTypes)
+      : null;
+  const desc = (a = "", b = "") => (a < b ? 1 : a > b ? -1 : 0);
+  return rows
+    .filter(
+      (row) =>
+        !allowed || (row.service_type != null && allowed.has(row.service_type)),
+    )
+    .sort((a, b) => desc(a.created_at, b.created_at) || desc(a.id, b.id))
+    .map((row) =>
+      Object.fromEntries(
+        DIRECTORY_COLUMNS.map((column) => [column, row[column]]),
+      ),
+    );
+}
+
 async function buildAgentDirectory(
   year: number,
   allowedServiceTypes?: ServiceType[],
@@ -173,26 +217,9 @@ async function buildAgentDirectory(
           .order("id", { ascending: true })
           .range(from, to),
     }),
-    fetchAllPages<any>({
-      concurrency: PARALLEL_PAGE_CONCURRENCY,
-      build: ({ from, to }) => {
-        let query = supabaseAdmin
-          .from("qa_temuan")
-          .select(
-            "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
-          )
-          .eq("tahun", year)
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .range(from, to);
-
-        if (allowedServiceTypes && allowedServiceTypes.length > 0) {
-          query = query.in("service_type", allowedServiceTypes);
-        }
-
-        return query;
-      },
-    }),
+    getYearTemuanRows(year).then((rows) =>
+      directoryRows(rows, allowedServiceTypes),
+    ),
     getPeriods(),
     Promise.all(svcsToLoad.map((st) => getIndicators(st))),
   ]);

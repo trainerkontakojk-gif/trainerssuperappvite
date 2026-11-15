@@ -38,10 +38,14 @@ import {
   SIDAK_COMPLIANCE_TARGET,
 } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
+import { fetchAllByIdPartitions } from "../../lib/supabase-pagination";
 import {
-  fetchAllByIdPartitions,
-  fetchAllPages,
-} from "../../lib/supabase-pagination";
+  getDashboardPeserta,
+  getYearTemuanRows,
+  pesertaScopeFilter,
+  TEMUAN_ROW_COLUMNS,
+  type CachedTemuanRow,
+} from "./temuan-row-cache";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds, isAgentExcluded } from "./agent-directory";
@@ -55,41 +59,50 @@ import {
 
 const PAGINATION_STEP = 1000;
 
-// Only the columns the dashboard reads. Peserta are read once and attached in
-// memory: embedding them in every temuan row made the read ~40% slower.
-const DASHBOARD_TEMUAN_COLUMNS =
-  "id, peserta_id, period_id, indicator_id, rule_indicator_id, service_type, tahun, nilai, no_tiket, created_at, is_phantom_padding, is_countable";
-
-type DashboardPeserta = NonNullable<DashboardTemuanRow["profiler_peserta"]>;
-
-async function fetchAllTemuan(opts: {
+type TemuanFilter = {
   service_type?: string;
   period_ids?: string[];
   year?: number;
   peserta_id?: string;
   agent_ids?: string[];
-  folderNames?: string[] | null;
   excludedIds: string[];
   allowedSvcs?: ServiceType[] | null;
-}): Promise<DashboardTemuanRow[]> {
-  if (opts.service_type && opts.service_type !== "all") {
-    if (
-      opts.allowedSvcs &&
-      !opts.allowedSvcs.includes(opts.service_type as ServiceType)
-    ) {
-      return [];
-    }
-  }
+};
 
+/** The URL filters of `fetchTemuanRows`, applied to a cached year in memory. */
+function filterYearRows(
+  rows: CachedTemuanRow[],
+  opts: TemuanFilter,
+): DashboardTemuanRow[] {
+  const service =
+    opts.service_type && opts.service_type !== "all" ? opts.service_type : null;
+  const allowed =
+    !service && opts.allowedSvcs ? new Set<string>(opts.allowedSvcs) : null;
+  const periods = opts.period_ids?.length ? new Set(opts.period_ids) : null;
+  const inScope = pesertaScopeFilter(opts.agent_ids);
+  const excluded = new Set(opts.excludedIds);
+  return rows.filter(
+    (row) =>
+      (!service || row.service_type === service) &&
+      (!allowed ||
+        (row.service_type != null && allowed.has(row.service_type))) &&
+      (!periods || periods.has(row.period_id)) &&
+      inScope(row.peserta_id) &&
+      !excluded.has(row.peserta_id),
+  );
+}
+
+// Uncached path: a single agent (`peserta_id`) or no year.
+function fetchTemuanRows(opts: TemuanFilter): Promise<DashboardTemuanRow[]> {
   // Keyset pagination: each page starts after the last id, so later pages do
   // not rescan the rows earlier pages already returned (OFFSET does). The id
   // slices are walked in parallel to cut the sequential round trips.
-  const temuanPromise = fetchAllByIdPartitions<DashboardTemuanRow>({
+  return fetchAllByIdPartitions<DashboardTemuanRow>({
     pageSize: PAGINATION_STEP,
     build: ({ fromId, beforeId, afterId, limit }) => {
       let query = supabaseAdmin
         .from("qa_temuan")
-        .select(DASHBOARD_TEMUAN_COLUMNS)
+        .select(TEMUAN_ROW_COLUMNS)
         .gte("id", fromId)
         .order("id", { ascending: true })
         .limit(limit);
@@ -129,17 +142,36 @@ async function fetchAllTemuan(opts: {
       }>;
     },
   });
+}
 
+async function fetchAllTemuan(opts: {
+  service_type?: string;
+  period_ids?: string[];
+  year?: number;
+  peserta_id?: string;
+  agent_ids?: string[];
+  folderNames?: string[] | null;
+  excludedIds: string[];
+  allowedSvcs?: ServiceType[] | null;
+}): Promise<DashboardTemuanRow[]> {
+  if (opts.service_type && opts.service_type !== "all") {
+    if (
+      opts.allowedSvcs &&
+      !opts.allowedSvcs.includes(opts.service_type as ServiceType)
+    ) {
+      return [];
+    }
+  }
+
+  const temuanPromise =
+    opts.year && Number.isInteger(opts.year) && !opts.peserta_id
+      ? getYearTemuanRows(opts.year).then((rows) => filterYearRows(rows, opts))
+      : fetchTemuanRows(opts);
+  // Peserta are read once and attached in memory: embedding them in every
+  // temuan row made the read ~40% slower.
   const [rows, peserta] = await Promise.all([
     temuanPromise,
-    fetchAllPages<DashboardPeserta & { id: string }>({
-      build: ({ from, to }) =>
-        supabaseAdmin
-          .from("profiler_peserta")
-          .select("id, nama, batch_name, tim, jabatan")
-          .order("id", { ascending: true })
-          .range(from, to),
-    }),
+    getDashboardPeserta(),
   ]);
 
   const pesertaById = new Map(peserta.map((p) => [p.id, p]));

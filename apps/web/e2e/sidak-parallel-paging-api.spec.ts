@@ -304,6 +304,8 @@ test("direktori agen: halaman paralel dan agen di halaman terakhir tetap dinilai
 });
 
 test("dashboard SIDAK: halaman paralel dan total temuan sama dengan oracle", async () => {
+  // A cached year would skip the paging this test measures.
+  await resetSidakReferenceCache();
   const data = await get(
     `/sidak/dashboard?year=${YEAR}&service_type=chat&startMonth=1&endMonth=2`,
   );
@@ -312,6 +314,8 @@ test("dashboard SIDAK: halaman paralel dan total temuan sama dengan oracle", asy
 });
 
 test("tren dashboard: halaman paralel dan total temuan sama dengan oracle", async () => {
+  // A cached year would skip the paging this test measures.
+  await resetSidakReferenceCache();
   const data = await get(
     `/sidak/dashboard/trend?year=${YEAR}&startMonth=1&endMonth=2&service_type=chat`,
   );
@@ -364,12 +368,14 @@ test("tren dashboard: halaman paralel dan total temuan sama dengan oracle", asyn
 });
 
 test("Beranda perlu tindakan: halaman paralel, tidak partial", async () => {
+  await resetSidakReferenceCache();
   const data = await get("/home/attention");
   expect(inFlight.max).toBeGreaterThan(1);
   expect(data.partial).toBe(false);
 });
 
 test("dashboard SIDAK: tanpa embed peserta, filter tim tetap sama dengan oracle", async () => {
+  await resetSidakReferenceCache();
   const all = await get(`/sidak/dashboard?year=${YEAR}&service_type=chat`);
   const temuanUrls = requestLog
     .filter((r) => r.url.includes("/rest/v1/qa_temuan"))
@@ -396,6 +402,8 @@ test("dashboard SIDAK: tanpa embed peserta, filter tim tetap sama dengan oracle"
 });
 
 test("forecast cacheOnly: missing → hit → stale, snapshot dicari bersamaan dengan temuan", async () => {
+  // Each lookup must read the year rows, which the cache would skip.
+  await resetSidakReferenceCache();
   const missing = await forecast({ cacheOnly: true });
   expect(missing).toEqual({ status: "missing", snapshot: null });
   expect(
@@ -416,6 +424,7 @@ test("forecast cacheOnly: missing → hit → stale, snapshot dicari bersamaan d
     );
   expect(snapshotCount()).toBe("1");
 
+  await resetSidakReferenceCache();
   const hit = await forecast({ cacheOnly: true });
   expect(hit.status).toBe("fresh");
   expect(hit.snapshot?.cache.status).toBe("hit");
@@ -435,6 +444,7 @@ test("forecast cacheOnly: missing → hit → stale, snapshot dicari bersamaan d
      SELECT ${quoted(created.pesertaIds[0]!)}, ${quoted(created.periodIds[1]!)}, id, 'chat', ${quoted(`e2e-paging-${ns}-baru`)}, false, 0, NULL, ${YEAR}
      FROM qa_indicators WHERE service_type='chat' AND is_active LIMIT 1;`,
   );
+  await resetSidakReferenceCache();
   expect(await forecast({ cacheOnly: true })).toEqual({
     status: "stale",
     snapshot: null,

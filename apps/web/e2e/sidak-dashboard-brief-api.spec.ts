@@ -34,6 +34,11 @@ async function dashboard(
   query: Record<string, string> = {},
   token = trainer.token,
 ) {
+  // Fixtures change through SQL between reads, past the API's invalidation;
+  // only the temuan rows are cleared, the reference caches stay under test.
+  const { invalidateSidakTemuanCaches } =
+    await import("../../api/src/services/sidak/agent-directory");
+  invalidateSidakTemuanCaches();
   const response = await tnaApiRequest(
     app,
     `http://localhost/api/v1/sidak/dashboard?${new URLSearchParams({ year: String(YEAR), service_type: "call", folder_ids: folders[0]!, ...query })}`,

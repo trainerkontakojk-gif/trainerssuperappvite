@@ -164,6 +164,10 @@ export default defineConfig({
       testMatch: "sidak-agent-directory-cache-api.spec.ts",
     },
     {
+      name: "sidak-temuan-row-cache-real-backend",
+      testMatch: "sidak-temuan-row-cache-api.spec.ts",
+    },
+    {
       name: "sidak-dashboard-kpi-real-backend",
       testMatch: "sidak-dashboard-kpi-api.spec.ts",
     },

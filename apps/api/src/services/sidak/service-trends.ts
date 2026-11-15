@@ -5,6 +5,7 @@ import {
   PARALLEL_PAGE_CONCURRENCY,
 } from "../../lib/supabase-pagination";
 import { getPeriods, getIndicators } from "./period-indicator";
+import { getYearTemuanRows, pesertaScopeFilter } from "./temuan-row-cache";
 import { formatQAIndicatorName, type QAPeriod } from "@trainers/types";
 
 const MONTHS_SHORT = [
@@ -22,19 +23,46 @@ const MONTHS_SHORT = [
   "Des",
 ];
 
+const TREND_COLUMNS = [
+  "nilai",
+  "is_countable",
+  "period_id",
+  "service_type",
+  "peserta_id",
+  "no_tiket",
+  "indicator_id",
+  "tahun",
+] as const;
+
 export async function fetchPaginatedTrendData(
   pIds: string[],
   year?: number,
   agent_ids?: string[],
 ) {
+  if (year && Number.isInteger(year)) {
+    const periods = new Set(pIds);
+    const inScope = pesertaScopeFilter(agent_ids);
+    const rows = await getYearTemuanRows(year);
+    return rows
+      .filter(
+        (row) =>
+          periods.has(row.period_id) &&
+          row.is_phantom_padding === false &&
+          inScope(row.peserta_id),
+      )
+      .map((row) =>
+        Object.fromEntries(
+          TREND_COLUMNS.map((column) => [column, row[column]]),
+        ),
+      );
+  }
+
   return fetchAllPages<any>({
     concurrency: PARALLEL_PAGE_CONCURRENCY,
     build: ({ from, to }) => {
       let query = supabaseAdmin
         .from("qa_temuan")
-        .select(
-          "nilai, is_countable, period_id, service_type, peserta_id, no_tiket, indicator_id, tahun",
-        )
+        .select(TREND_COLUMNS.join(", "))
         .in("period_id", pIds)
         .eq("is_phantom_padding", false)
         .order("id", { ascending: true })
