@@ -13,7 +13,8 @@ overrides:
   dompurify: 3.4.17
   protobufjs: ^7.6.5
   # Security: transitive-only advisories (no upstream patched parent release)
-  hono: ^4.13.13
+  hono: ^4.13.16
+  "@hono/node-server": ^2.1.6
   "@modelcontextprotocol/sdk": ^1.31.0 # advisory >=1.31.0; found by pnpm 12 audit, missed by pnpm 11
   seroval: 1.6.11
   image-size: ^2.0.3

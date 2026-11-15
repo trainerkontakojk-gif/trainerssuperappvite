@@ -196,7 +196,8 @@ overrides:
   fast-uri: 3.1.9
   dompurify: 3.4.17
   protobufjs: ^7.6.5
-  hono: ^4.13.13
+  hono: ^4.13.16
+  '@hono/node-server': ^2.1.6
   '@modelcontextprotocol/sdk': ^1.31.0
   seroval: 1.6.11
   image-size: ^2.0.3
@@ -266,11 +267,11 @@ importers:
         specifier: ^2.29.0
         version: 2.30.0(@modelcontextprotocol/sdk@1.32.1(supports-color@7.2.0)(zod@4.6.7))(supports-color@7.2.0)
       '@hono/node-server':
-        specifier: ^2.1.5
-        version: 2.1.5(hono@4.13.13)
+        specifier: ^2.1.6
+        version: 2.1.8(hono@4.13.18)
       '@hono/zod-validator':
         specifier: ^0.9.1
-        version: 0.9.1(hono@4.13.13)(zod@4.6.7)
+        version: 0.9.1(hono@4.13.18)(zod@4.6.7)
       '@supabase/supabase-js':
         specifier: ^2.117.3
         version: 2.118.0
@@ -278,8 +279,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/types
       hono:
-        specifier: ^4.13.13
-        version: 4.13.13
+        specifier: ^4.13.16
+        version: 4.13.18
       sharp:
         specifier: 0.35.5
         version: 0.35.5(@types/node@22.19.19)
@@ -379,8 +380,8 @@ importers:
         specifier: ^14.1.0
         version: 14.3.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       hono:
-        specifier: ^4.13.13
-        version: 4.13.13
+        specifier: ^4.13.16
+        version: 4.13.18
       html2canvas:
         specifier: ^1.4.1
         version: 1.4.1
@@ -903,16 +904,16 @@ packages:
       '@modelcontextprotocol/sdk':
         optional: true
 
-  '@hono/node-server@2.1.5':
-    resolution: {integrity: sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==}
+  '@hono/node-server@2.1.8':
+    resolution: {integrity: sha512-jdf7FHh6A1lzjpHHQUgxsg2GeER2vMetnAOfeActzcoli6jamlK+NAwL6Dsr5Fl3BS3tYUQzCdtZjU8Qxv7bEA==}
     engines: {node: '>=20'}
     peerDependencies:
-      hono: ^4.13.13
+      hono: ^4.13.16
 
   '@hono/zod-validator@0.9.1':
     resolution: {integrity: sha512-iiv6w0qrIc0arfvCtUqBWsvl4fXjzaTcQcCJTTtCnkawF9HHGE+KjEl0ox3gQJ6rKZEgE3mLExlQCF72M+mNuw==}
     peerDependencies:
-      hono: ^4.13.13
+      hono: ^4.13.16
       zod: ^3.25.0 || ^4.0.0
 
   '@humanfs/core@0.19.2':
@@ -2621,8 +2622,8 @@ packages:
   hermes-parser@0.25.1:
     resolution: {integrity: sha512-6pEjquH3rqaI6cYAXYPcz9MS4rY6R4ngRgrgfDshRptUZIc3lw0MCIJIGDj9++mfySOuPTHB4nrSW99BCvOPIA==}
 
-  hono@4.13.13:
-    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
+  hono@4.13.18:
+    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -4425,13 +4426,13 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@hono/node-server@2.1.5(hono@4.13.13)':
+  '@hono/node-server@2.1.8(hono@4.13.18)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.18
 
-  '@hono/zod-validator@0.9.1(hono@4.13.13)(zod@4.6.7)':
+  '@hono/zod-validator@0.9.1(hono@4.13.18)(zod@4.6.7)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.18
       zod: 4.6.7
 
   '@humanfs/core@0.19.2':
@@ -4587,7 +4588,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.32.1(supports-color@7.2.0)(zod@4.6.7)':
     dependencies:
-      '@hono/node-server': 2.1.5(hono@4.13.13)
+      '@hono/node-server': 2.1.8(hono@4.13.18)
       ajv: 8.18.0
       ajv-formats: 3.0.1
       content-type: 1.0.5
@@ -4597,7 +4598,7 @@ snapshots:
       eventsource-parser: 3.1.1
       express: 5.2.1(supports-color@7.2.0)
       express-rate-limit: 8.7.0(express@5.2.1(supports-color@7.2.0))(supports-color@7.2.0)
-      hono: 4.13.13
+      hono: 4.13.18
       jose: 6.2.12
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -6097,7 +6098,7 @@ snapshots:
     dependencies:
       hermes-estree: 0.25.1
 
-  hono@4.13.13: {}
+  hono@4.13.18: {}
 
   hookified@1.15.1: {}
 
