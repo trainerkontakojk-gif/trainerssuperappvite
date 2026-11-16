@@ -532,6 +532,15 @@ untuk cleanup endpoint `/turns` lama; API lama tetap kompatibel dengan migrasi.
 3. Baru deploy API setelah schema siap. Verifikasi lokal ada di
    `ketik-session-api-transitions.spec.ts`; ini bukan klaim penerimaan production.
 
+**Status 2026-11-16:** migrasi ini sudah diterapkan ke target
+`ruosnjmtywcrghjgqugz` lewat `supabase db query --linked -f` lalu
+`supabase migration repair --linked --status applied 20261116160000`; history
+Local = Remote. Readback: delapan fungsi SECURITY INVOKER, hanya `service_role`
+yang punya EXECUTE, sembilan status UPDATE terpusat di helper, data tidak
+berubah. API belum di-push/deploy. Catatan operasional: jangan menjalankan dua
+`supabase db query --linked` bersamaan — keduanya bentrok di role login
+sementara CLI (`cli_login_postgres`) dan kena circuit breaker pooler.
+
 Rollback: hentikan chat writes, pulihkan versi API sebelumnya, lalu jalankan
 `rollback_20261116160000_ketik_session_status_transitions.sql` pada target yang
 sama setelah izin eksplisit. Rollback mengembalikan enam RPC lama dan menghapus
