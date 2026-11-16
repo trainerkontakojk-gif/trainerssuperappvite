@@ -13,6 +13,8 @@ export interface KetikWorkerConfig {
   idleMaxMs: number;
   shutdownMs: number;
   healthPort: number;
+  /** Test-only shortened processing deadline; never changes the DB lease. */
+  testDeadlineMs?: number;
 }
 export function parseKetikWorkerConfig(
   env: NodeJS.ProcessEnv,
@@ -41,9 +43,22 @@ export function parseKetikWorkerConfig(
   );
   if (idleMaxMs < intervalMs)
     throw new Error("INVALID_KETIK_REVIEW_WORKER_IDLE_MAX_MS");
+  const testDeadlineMs = env.KETIK_REVIEW_WORKER_DEADLINE_MS;
+  if (testDeadlineMs !== undefined && env.NODE_ENV !== "test")
+    throw new Error("INVALID_KETIK_REVIEW_WORKER_DEADLINE_MS");
   return {
     intervalMs,
     idleMaxMs,
+    ...(testDeadlineMs === undefined
+      ? {}
+      : {
+          testDeadlineMs: number(
+            "KETIK_REVIEW_WORKER_DEADLINE_MS",
+            1000,
+            250,
+            3600000,
+          ),
+        }),
     shutdownMs: number("KETIK_REVIEW_WORKER_SHUTDOWN_MS", 10000, 250, 30000),
     healthPort: number("KETIK_REVIEW_WORKER_HEALTH_PORT", 3014, 0, 65535),
   };
@@ -69,13 +84,91 @@ function transitionPoll(
   };
 }
 
+type HostWork =
+  | { phase: "waiting" | "claiming" | "release_timed_out" }
+  | { phase: "processing" | "releasing"; claim: KetikReviewClaim };
+type HostState =
+  | { status: "idle" }
+  | { status: "running"; work: HostWork }
+  | { status: "stopping"; work: HostWork }
+  | { status: "stopped" };
+type HostEvent =
+  | { type: "start" | "claim" | "cycle_finished" | "stop" | "loop_stopped" }
+  | {
+      type: "claimed" | "release" | "release_finished" | "release_timed_out";
+      claim: KetikReviewClaim;
+    };
+
+function transitionHost(state: HostState, event: HostEvent): HostState {
+  if (event.type === "start") {
+    if (state.status !== "idle") throw new Error("WORKER_ALREADY_STARTED");
+    return { status: "running", work: { phase: "waiting" } };
+  }
+  if (event.type === "stop") {
+    if (state.status === "idle") return { status: "stopped" };
+    return state.status === "running"
+      ? { ...state, status: "stopping" }
+      : state;
+  }
+  if (event.type === "loop_stopped") return { status: "stopped" };
+  if (state.status !== "running" && state.status !== "stopping") return state;
+  const work = state.work;
+  switch (event.type) {
+    case "claim":
+      return state.status === "running" &&
+        (work.phase === "waiting" || work.phase === "release_timed_out")
+        ? { ...state, work: { phase: "claiming" } }
+        : state;
+    case "claimed":
+      return work.phase === "claiming"
+        ? { ...state, work: { phase: "processing", claim: event.claim } }
+        : state;
+    case "release":
+    case "release_finished":
+    case "release_timed_out":
+      if (!("claim" in work) || work.claim !== event.claim) return state;
+      return {
+        ...state,
+        work:
+          event.type === "release"
+            ? { phase: "releasing", claim: event.claim }
+            : {
+                phase:
+                  event.type === "release_timed_out"
+                    ? "release_timed_out"
+                    : "waiting",
+              },
+      };
+    case "cycle_finished":
+      // Preserve the explicit timeout outcome until the next admission attempt.
+      return work.phase === "release_timed_out" || work.phase === "waiting"
+        ? state
+        : { ...state, work: { phase: "waiting" } };
+  }
+}
+
+function activeClaim(state: HostState): KetikReviewClaim | null {
+  return (state.status === "running" || state.status === "stopping") &&
+    "claim" in state.work
+    ? state.work.claim
+    : null;
+}
+
+class ReleaseTimeout extends Error {
+  override name = "ReleaseTimeout";
+  constructor() {
+    super("RELEASE_TIMEOUT");
+  }
+}
+
 export function createKetikReviewWorker(config: KetikWorkerConfig) {
   const workerId = `ketik-${randomUUID()}`;
-  let stopping = false;
-  let started = false;
-  let loopAlive = false;
-  let active: KetikReviewClaim | null = null;
-  let cycle: Promise<void> | null = null;
+  let host: HostState = { status: "idle" };
+  const transitionHostState = (event: HostEvent) => {
+    host = transitionHost(host, event);
+  };
+  // Resource handles only; lifecycle decisions come from HostState.
+  let releasePromise: Promise<boolean> | null = null;
   let loopPromise: Promise<void> | null = null;
   let wake: (() => void) | null = null;
   let unsubscribe: (() => void) | null = null;
@@ -88,16 +181,47 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
   let shutdownPromise: Promise<void> | null = null;
   const log = (event: string) => console.log(JSON.stringify({ event }));
 
+  function releaseWithin(
+    claim: KetikReviewClaim,
+    ms: number,
+  ): Promise<boolean> {
+    // Deadline and shutdown can meet while a release is in flight. Join that
+    // bounded attempt rather than issuing a second settlement RPC.
+    if (releasePromise) return releasePromise;
+    transitionHostState({ type: "release", claim });
+    releasePromise = (async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const released = await Promise.race([
+          releaseKetikReview(claim),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new ReleaseTimeout()), ms);
+          }),
+        ]);
+        transitionHostState({ type: "release_finished", claim });
+        return released;
+      } catch (error) {
+        if (error instanceof ReleaseTimeout)
+          transitionHostState({ type: "release_timed_out", claim });
+        throw error;
+      } finally {
+        if (timer) clearTimeout(timer);
+        releasePromise = null;
+      }
+    })();
+    return releasePromise;
+  }
+
   async function runCycle() {
+    transitionHostState({ type: "claim" });
     const claim = await claimKetikReview(workerId);
     lastPollAt = Date.now();
     errorClass = null;
     transition(claim ? "found-work" : "empty");
     if (!claim || claim.status !== "processing") return;
-    active = claim;
-    if (stopping) {
-      await releaseKetikReview(claim);
-      active = null;
+    transitionHostState({ type: "claimed", claim });
+    if (host.status !== "running") {
+      await releaseWithin(claim, Math.min(config.shutdownMs, 20_000));
       return;
     }
     let deadline: ReturnType<typeof setTimeout> | undefined;
@@ -112,35 +236,50 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         new Promise<"deadline">((resolve) => {
           deadline = setTimeout(
             () => resolve("deadline"),
-            ((claim.leaseSeconds ?? KETIK_REVIEW_LEASE_SECONDS) - 30) * 1000,
+            Math.min(
+              config.testDeadlineMs ?? Infinity,
+              ((claim.leaseSeconds ?? KETIK_REVIEW_LEASE_SECONDS) - 30) * 1000,
+            ),
           );
         }),
       ]);
       if (result === "deadline") {
-        await releaseKetikReview(claim);
-        log("ketik_review_worker.deadline_released");
+        try {
+          const released = await releaseWithin(
+            claim,
+            Math.min(config.shutdownMs, 20_000),
+          );
+          log(
+            released
+              ? "ketik_review_worker.deadline_released"
+              : "ketik_review_worker.lease_lost",
+          );
+        } catch (error) {
+          if (!(error instanceof ReleaseTimeout)) throw error;
+          errorClass = "ReleaseTimeout";
+          log("ketik_review_worker.deadline_release_timeout");
+          // Leave the old claim to expiry and keep admission alive. The next
+          // successful poll clears degraded health; late RPCs remain fenced.
+        }
       }
       lastPollAt = Date.now();
     } finally {
       if (deadline) clearTimeout(deadline);
-      if (active === claim) active = null;
     }
   }
   async function loop() {
-    loopAlive = true;
     try {
-      while (!stopping) {
-        cycle = runCycle();
+      while (host.status === "running") {
         try {
-          await cycle;
+          await runCycle();
         } catch (error) {
           errorClass = error instanceof Error ? error.name : "DatabaseError";
           transition("error");
           log("ketik_review_worker.cycle_failed");
         } finally {
-          cycle = null;
+          transitionHostState({ type: "cycle_finished" });
         }
-        if (stopping) break;
+        if (host.status !== "running") break;
         if (pollState.wakePending) {
           transition("consume-wake");
           continue;
@@ -159,23 +298,20 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         if (pollState.wakePending) transition("consume-wake");
       }
     } finally {
-      loopAlive = false;
+      transitionHostState({ type: "loop_stopped" });
     }
   }
   async function shutdown() {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
-      stopping = true;
+      const claimAtShutdown = activeClaim(host);
+      transitionHostState({ type: "stop" });
       unsubscribe?.();
       unsubscribe = null;
       wake?.();
-      if (!cycle) {
-        await loopPromise;
-        return;
-      }
       let timer: ReturnType<typeof setTimeout> | undefined;
       const settled = await Promise.race([
-        cycle.then(
+        (loopPromise ?? Promise.resolve()).then(
           () => true,
           () => true,
         ),
@@ -184,23 +320,14 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         }),
       ]);
       if (timer) clearTimeout(timer);
-      if (!settled && active) {
-        const claim = active;
-        let releaseTimer: ReturnType<typeof setTimeout> | undefined;
-        try {
-          await Promise.race([
-            releaseKetikReview(claim),
-            new Promise<never>((_, reject) => {
-              releaseTimer = setTimeout(
-                () => reject(new Error("RELEASE_TIMEOUT")),
-                config.shutdownMs,
-              );
-            }),
-          ]);
-          log("ketik_review_worker.shutdown_claim_fenced");
-        } finally {
-          if (releaseTimer) clearTimeout(releaseTimer);
-        }
+      // A deadline release may time out and finish the loop during this grace
+      // period. That is deferred recovery, not a successfully fenced shutdown.
+      if (claimAtShutdown && errorClass === "ReleaseTimeout")
+        throw new ReleaseTimeout();
+      const claim = activeClaim(host);
+      if (!settled && claim) {
+        await releaseWithin(claim, Math.min(config.shutdownMs, 20_000));
+        log("ketik_review_worker.shutdown_claim_fenced");
       } else if (!settled) {
         // A hung admission RPC may still acquire a lease; expiry is its bounded recovery backstop.
         log("ketik_review_worker.shutdown_recovery_deferred");
@@ -210,8 +337,7 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
   }
   return {
     start() {
-      if (started) throw new Error("WORKER_ALREADY_STARTED");
-      started = true;
+      transitionHostState({ type: "start" });
       unsubscribe = subscribeKetikReviewQueued(() => {
         transition("wake");
         wake?.();
@@ -220,6 +346,9 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     },
     shutdown,
     health() {
+      const loopAlive = host.status === "running" || host.status === "stopping";
+      const stopping = host.status === "stopping" || host.status === "stopped";
+      const active = activeClaim(host);
       const healthy =
         loopAlive &&
         !stopping &&

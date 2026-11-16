@@ -16,7 +16,7 @@ import {
 } from "../../lib/ai-model-policy";
 import { notifyKetikReviewQueued } from "./review-queue-signal";
 
-// Gemini can retry the developer-instruction incompatibility once, then OpenAI.
+// Budget one primary compatibility retry, the configured fallback, and persistence grace.
 export async function calculateKetikReviewLeaseSeconds(
   models?: KetikReviewModels,
 ): Promise<number> {

@@ -22,6 +22,10 @@ globalThis.fetch = async (input, init) => {
   if (!local(url.hostname)) throw new Error("Worker egress denied");
   return original(request);
 };
+// Exercise the real production config parser only after the test transport's
+// loopback/egress guards are installed. Never weakens those guards.
+if (process.env.KETIK_E2E_CONFIG_NODE_ENV === "production")
+  process.env.NODE_ENV = "production";
 // A task-owned signal advances only this child process clock for the lease-age health boundary.
 const realNow = Date.now;
 process.once("SIGUSR2", () => {

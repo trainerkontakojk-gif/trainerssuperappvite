@@ -939,17 +939,22 @@ Prasyarat aktivasi yang direview operator:
 
 Konfigurasi worker:
 
-| Env                               | Default                | Batas                                                        |
-| --------------------------------- | ---------------------- | ------------------------------------------------------------ |
-| `KETIK_REVIEW_WORKER_ENABLED`     | Tidak aktif            | Harus tepat `true`; proses standalone lain ditolak exit 1    |
-| `KETIK_REVIEW_WORKER_INTERVAL_MS` | 5000                   | Integer 250–60000                                            |
-| `KETIK_REVIEW_WORKER_IDLE_MAX_MS` | `max(30000, interval)` | Integer 250–300000, minimal interval                         |
-| `KETIK_REVIEW_WORKER_SHUTDOWN_MS` | 10000                  | Integer 250–30000                                            |
-| `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014                   | Integer 0–65535; 0 untuk port ephemeral tes; standalone saja |
+| Env                               | Default                | Batas                                                                          |
+| --------------------------------- | ---------------------- | ------------------------------------------------------------------------------ |
+| `KETIK_REVIEW_WORKER_ENABLED`     | Tidak aktif            | Harus tepat `true`; proses standalone lain ditolak exit 1                      |
+| `KETIK_REVIEW_WORKER_INTERVAL_MS` | 5000                   | Integer 250–60000                                                              |
+| `KETIK_REVIEW_WORKER_IDLE_MAX_MS` | `max(30000, interval)` | Integer 250–300000, minimal interval                                           |
+| `KETIK_REVIEW_WORKER_SHUTDOWN_MS` | 10000                  | Integer 250–30000                                                              |
+| `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014                   | Integer 0–65535; 0 untuk port ephemeral tes; standalone saja                   |
+| `KETIK_REVIEW_WORKER_DEADLINE_MS` | Tidak diset            | Khusus `NODE_ENV=test`, integer 250–3600000; ditolak di production/development |
 
 Concurrency per proses = 1. Lease dihitung dari registry timeout: dua percobaan kompatibilitas Gemini + satu fallback OpenAI + 120 detik grace, minimum 600 detik. Tiga claim maksimum per permintaan manual. Crash/timeout dapat mengulangi panggilan provider; tidak ada jaminan exactly-once billing. SDK yang terlambat selesai tidak boleh memublikasikan hasil setelah token lease hilang/kedaluwarsa.
 
 Saat antrean kosong atau polling gagal, jeda polling berlipat hingga batas idle; enqueue di proses yang sama segera membangunkan worker. Sinyal ini tidak lintas proses: enqueue dari API lain (misalnya Coolify dengan worker nonaktif) atau ke worker standalone menunggu polling berikutnya hingga `KETIK_REVIEW_WORKER_IDLE_MAX_MS`.
+
+Lifecycle host memakai status eksplisit `idle/running/stopping/stopped`, dengan fase kerja `waiting/claiming/processing/releasing/release_timed_out`. Deadline pemrosesan normal tetap 30 detik sebelum lease habis. Release pada deadline dan shutdown memakai helper yang sama, dibatasi `min(KETIK_REVIEW_WORKER_SHUTDOWN_MS, 20000)` ms. Release yang masih berjalan dibagi oleh kedua jalur, bukan dikirim ulang. Bila deadline release timeout, worker mencatat `ketik_review_worker.deadline_release_timeout`, meninggalkan claim untuk pemulihan lease, lalu tetap mengambil job lain. Health standalone turun dengan `errorClass=ReleaseTimeout` sampai poll DB berikutnya berhasil; embedded worker hanya menyediakan log, bukan endpoint health worker.
+
+Override `KETIK_REVIEW_WORKER_DEADLINE_MS` hanya untuk E2E lokal (`NODE_ENV=test`): memperpendek deadline tanpa mengubah lease DB dan tidak dapat memperpanjang deadline normal. Jangan set pada service production; parser menolak start bila override ini hadir di luar mode test. E2E menahan lock row history dari sesi PostgreSQL terpisah untuk membuktikan worker tetap maju saat release benar-benar macet. Timeout aplikasi tidak membatalkan RPC/provider yang sudah dikirim; hasil terlambat tetap dipagari token dan expiry.
 
 SIGTERM/SIGINT menutup admission dan menunggu pekerjaan aktif sampai deadline shutdown. Bila belum selesai, claim dilepas memakai token sebelum proses keluar; bila DB tidak merespons, expiry lease menjadi jalur pemulihan dan log `shutdown_recovery_deferred` harus diinvestigasi. Restart worker memulihkan queued atau lease expired tanpa pemicu browser. Endpoint GET `/api/v1/ketik/worker` retired (410), sehingga browser/request HTTP tidak menjadi worker kedua. Di proses API, SIGTERM menghentikan worker KETIK dan Telefun secara paralel, lalu menutup HTTP dan keluar (exit 1 bila klaim KETIK tidak sempat dilepas). Mematikan worker embedded cukup dengan menghapus `KETIK_REVIEW_WORKER_ENABLED` lalu redeploy API.
 

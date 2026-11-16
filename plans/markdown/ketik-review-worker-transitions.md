@@ -1,6 +1,6 @@
 # KETIK review worker: explicit transitions and bounded deadline release
 
-Status: **WS1 implemented, pushed (`cc8baf9c`), and applied to the authorized target on 2026-11-17. WS2/WS3 not started.** Original plan written from a read-only audit.
+Status: **WS1 implemented, pushed (`cc8baf9c`), and applied to the authorized target on 2026-11-17. WS2 implemented and locally verified; push held for separate deployment approval. WS3 deployment-debug edits not started; its code comment was fixed with WS2.** Original plan written from a read-only audit.
 Baseline: HEAD `3b511754` on `main`.
 
 ## Requirement
@@ -142,11 +142,13 @@ Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
 
 ### WS2: worker host (Lane C)
 
-- [ ] Ask Fajar the deadline-test decision gate question (above). Wait for the answer.
-- [ ] RED, if option 1: write the blocked-release E2E; it must fail on current code (the second job is never claimed while release hangs).
-- [ ] Implement the host union, `transitionHost`, `releaseWithin`, and the deadline-path bound (and the test-only override if approved).
-- [ ] GREEN: the new test, then both worker projects in full, plus SIGTERM/SIGKILL/health scenarios (already in `ketik-review-worker-api-publication.spec.ts` / `-host.spec.ts`).
-- [ ] `thermo-nuclear`, root gates, graphify update, changelog, commit `fix(ketik): bound deadline review release and make worker host lifecycle explicit`, push. Railway auto-deploys on push to `main`, so state that in the report.
+- [x] Ask Fajar the deadline-test decision gate question (above). Fajar approved option 1 on 2026-11-17: test-only deadline override rejected in production, real PostgreSQL history-row lock for blocked release. WS2 push is held pending separate approval because it triggers Railway auto-deploy.
+- [x] RED, option 1: blocked-release E2E reached the real PostgreSQL lock wait with only the approved seam enabled, then failed because the second job remained queued. Preserved trace/log below.
+- [x] Implement the host union, `transitionHost`, `releaseWithin`, and the deadline-path bound, plus the approved test-only override.
+- [x] GREEN: five new E2E scenarios and both worker projects in full, including the existing SIGTERM/SIGKILL/health/wake/backoff/publication scenarios.
+- [x] `thermo-nuclear` self-review, serial root gates, graphify update, scoped lint/format checks, changelog and task-owned cleanup; evidence below.
+- [ ] Commit `fix(ketik): bound deadline review release and make worker host lifecycle explicit` locally (outcome in final report).
+- [ ] **HOLD PUSH:** obtain separate approval before pushing WS2 to `main`, because it triggers Railway auto-deploy. No Railway mutation/deploy or remote DB action is authorized by this workstream.
 
 ## Risks and boundaries
 
@@ -211,7 +213,46 @@ Logs are under ignored `artifacts/ketik-review-transitions/`:
 
 Business-data row counts were unchanged before/after: history **74**, jobs **38**, reviews **38**, typos **44**, queued/processing jobs **0**. The migration contains no business-data DML; only the explicit migration-ledger repair changes a ledger row. No production behavioral acceptance or race reproduction is claimed. The existing global `ai_model_policy_*` allowlist drift remains open.
 
-This follow-up changes only this execution record and `CHANGELOG.md`: scoped Prettier and diff checks apply, not a rerun of local product tests/typecheck/lint/build. The previously recorded local WS1 gates still cover the unchanged implementation. No new documentation/code inconsistency was found during readback. WS2's test-strategy decision and deployment boundary remain unstarted.
+This apply follow-up changed only this execution record and `CHANGELOG.md`: scoped Prettier and diff checks applied, not a rerun of local product tests/typecheck/lint/build. The recorded local WS1 gates cover that unchanged implementation. No new documentation/code inconsistency was found during readback. At that point WS2 had not started; its later execution is recorded below.
+
+## WS2 execution evidence — 2026-11-17
+
+### Approved scope and implementation
+
+- Lane C, direct implementation; Fajar approved the test-only override before test coding. Baseline `78e4506b`; three unrelated untracked plans preserved. No delegation, independent reviewer, new dependency, schema/SQL migration, remote mutation or deployment.
+- Replaced runtime `started/stopping/loopAlive/active/cycle` with one host state union and pure `transitionHost`. Host status: idle/running/stopping/stopped; work phase: waiting/claiming/processing/releasing/release_timed_out. `transitionPoll` is unchanged. Promises, timers, wake/subscription callbacks remain resource handles; health fields and poll/backoff/wake semantics are preserved.
+- One `releaseWithin(claim, ms)` handles late admission during shutdown, deadline and shutdown release. All callers cap it at `min(shutdownMs, 20000)` ms; simultaneous shutdown/deadline share the bounded in-flight attempt. Timeout returns control without cancelling the underlying RPC/provider; late publication/release still relies on the existing SQL token/expiry fence. No second fallback.
+- Deadline timeout is an explicit phase/event, logs `ketik_review_worker.deadline_release_timeout`, and sets `errorClass=ReleaseTimeout`; the next successful admission poll clears it. Only standalone exposes worker health; embedded health was not invented for this test. Deadline/shutdown overlap preserves exit 1 and `shutdown_recovery_deferred` if the active claim cannot be fenced, rather than treating a completed-but-timed-out loop as successful shutdown.
+- `KETIK_REVIEW_WORKER_DEADLINE_MS` is accepted **only in NODE_ENV=test**, integer 250–3600000, and clamped to the normal lease-minus-30s deadline. It never changes the DB lease and is rejected in production/development. Config E2E sets the child to production only after installing the test transport's loopback egress guard, then exercises the actual host/parser before startup; it does not contact production.
+- New `ketik-review-worker-api-deadline.spec.ts` is automatically selected by both existing worker project globs, keeping the 902-line host spec below the size gate. Its task-owned psql sessions hold a real history row lock and cleanly rollback/exit. `pg_stat_activity` confirms settlement is truly waiting on that lock; no release RPC/fetch/service mock. Provider HTTP alone is stubbed.
+- Corrected the stale fallback comment in `review-lifecycle.ts` as planned, without changing its lease/model behavior. Canonical architecture and worker deployment/config documentation now describe the host graph, bound, test seam, health degradation and late-call fencing. WS3 debug steps 5–6 remain separate.
+
+### Executed verification
+
+All logs/traces below are ignored under `artifacts/ketik-review-host/`. Traces contain disposable-local auth data and must not be committed.
+
+- OrbStack was initially stopped; `open -a OrbStack` started the existing local Docker runtime. No concurrency/resource configuration was increased. `graphify query 'releaseKetikReview'` → **0** (`graph-query.log`), identified the runtime, claim/release callers and API host. Existing internal patterns sufficed; no external API/dependency adoption required Context7.
+- Fresh target: `scratch/ketik-review-host-20261117`, project `ketik-review-host-test-20261117`, API/DB **55521/55522**, canonical migration symlink, no seeds, no `.env*` edit. `supabase start --workdir "$PWD/scratch/ketik-review-host-20261117" --exclude studio,mailpit,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta` → **0** (`stack-start.log`). Only the task-owned minimum DB/Auth/PostgREST/Kong stack.
+- Initial missing-seam RED: `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-host-20261117" pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-deadline\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-review-worker-real-backend -g 'deadline release timeout' --reporter=line --workers=1 --trace on --output="$PWD/artifacts/ketik-review-host/red-without-seam-results"` → **1** (`red-without-seam.log`): deadline not reached; this alone is **not** proof of the release bug.
+- Config RED before seam implementation: same focused file/project with `-g 'test-only deadline config' --output="$PWD/artifacts/ketik-review-host/config-red-results"` → **1** (`config-red.log`); parser ignored the proposed override. After implementing only the approved seam/config rejection, same test with `config-green-results` → **0** (`config-green.log`).
+- **Decisive bug RED:** the deadline test command above, with only the seam implemented and `--output="$PWD/artifacts/ketik-review-host/red-blocked-results"` → **1** (`red-blocked.log`): actual PostgreSQL settlement lock wait confirmed, second job expected completed but remained queued for the entire 7s assertion budget. After host/bound implementation, identical scenario with `green-blocked-results` → **0** (`green-blocked.log`). This reproduces the hung-release bug, **not** the WS1 candidate-snapshot claim race.
+- Shutdown-overlap regression RED: same file/project with `-g 'shutdown bounds blocked release during deadline release' --output="$PWD/artifacts/ketik-review-host/shutdown-overlap-red-results"` → **1** (`shutdown-overlap-red.log`), expected exit 1 but got 0. Fixed the grace-period timeout outcome; subsequent focused and full suites passed. The test also proves only one settlement RPC waits on the lock while shutdown and deadline overlap.
+- Focused suite: same deadline spec/project without grep, adding `--max-failures=1 --output="$PWD/artifacts/ketik-review-host/focused-standalone-results"` → **0**, **5 passed** (`focused-standalone.log`); embedded project with `focused-embedded-results` → **0**, **5 passed** (`focused-embedded.log`). Distinct scenarios: production/invalid config rejection; blocked deadline release + health + second-job progress + late fencing; healthy deadline release; blocked shutdown during processing; blocked shutdown during deadline release. Both timeout cases recover through expired-lease reclaim after restart.
+- Full standalone regression: `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-host-20261117" pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-.*\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-review-worker-real-backend --reporter=line --workers=1 --trace on --max-failures=1 --output="$PWD/artifacts/ketik-review-host/standalone-results"` → **0**, **33 passed, 1 skipped** (`standalone.log`; embedded-only wake skipped).
+- Identical full regression with `--project=ketik-review-worker-embedded-real-backend --output="$PWD/artifacts/ketik-review-host/embedded-results"` → **0**, **33 passed, 1 skipped** (`embedded.log`; standalone-only health skipped). Includes WS1 guarded publication/rollback/authorization and all existing SIGTERM/SIGKILL/recovery/wake/backoff checks. No browser visual verification or production acceptance is claimed.
+- First `TURBO_CONCURRENCY=1 pnpm typecheck` → **1** (`typecheck.log`): only the new config-case array inferred an optional undefined field incompatible with the fixture's `Record<string,string>`. Added the same explicit case-array type used by the existing host spec; no runtime change. Re-ran the affected config E2E in both projects, serially: deadline spec with both `--project` arguments, `-g 'test-only deadline config' --workers=1 --trace on --max-failures=1 --output="$PWD/artifacts/ketik-review-host/final-config-results"` → **0**, **2 passed** (`final-config.log`). Full-suite runtime results above remain applicable; the subsequent change was that fixture-only type annotation and comment placement.
+- Final root checks, serial: `TURBO_CONCURRENCY=1 pnpm typecheck` → **0** (`typecheck-final.log`, 4 tasks/3 cached); `TURBO_CONCURRENCY=1 pnpm lint` → **0** (`lint.log`, 4 tasks/2 cached, **74 existing warnings**, zero errors); `TURBO_CONCURRENCY=1 pnpm build` → **0** (`build.log`, 3 tasks/1 cached). No non-E2E/unit suite ran.
+- Scoped `pnpm --dir apps/web exec eslint e2e/ketik-review-worker-api-deadline.spec.ts e2e/helpers/ketikWorkerTransport.mjs` and `pnpm --dir apps/api exec eslint src/workers/ketik-review-worker-runtime.ts src/services/ketik/review-lifecycle.ts` → **0** each, no warnings (`scoped-web-lint.log`, `scoped-api-lint.log`).
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .` → **0** (`graphify.log`), once after the final AST change, ignored cache only. Only the edited worker-config table needed Prettier alignment; final owned-file format/diff checks are scoped.
+- Local read-only cleanup counts → **0** (`cleanup-counts.log`): zero profiles/history/jobs/usage logs/fixture triggers/blocked settlements. `supabase stop --workdir "$PWD/scratch/ketik-review-host-20261117" --no-backup` → **0** (`stack-stop.log`); task-owned containers/volumes and worker/psql processes are gone. No unrelated stack/process was stopped.
+
+### Review and release boundary
+
+- Thermo-nuclear/lifecycle self-review: **implementation PASS; deployment HELD**. Single transition owner, explicit timeout outcome, late-claim shutdown bound, shared release resource, timer cleanup, stale-token publication, unchanged health JSON, and no success masking on shutdown/deadline overlap reviewed with the real-backend evidence above. No owned-code material finding remains; no independent review is claimed.
+- Existing wrapper-level flags in `ketik-review-worker-entrypoint.ts` (`stopping`) and `api-runtime.ts` (`shutdownStarted`) remain legacy and untouched; this workstream replaces only the runtime's five scoped flags/handles. No claim that all process hosts or Telefun lifecycles have been remodeled.
+- Remaining doc/code drift: WS3 deployment-debug steps still mention an OpenAI key/auto-failure polling; the worker lease-budget paragraph in the same deployment doc also still says OpenAI fallback although model policy is configurable and both defaults are Gemini. This additional stale sentence is reported, not silently folded into WS2's provider scope. Legacy unit-command/debug-pointer prose remains open. The code comment itself is now corrected.
+- WS1's pre-existing global `ai_model_policy_*` allowlist drift is unchanged; no global guard success is claimed and that unrelated gate was not rerun for WS2 (no SQL/signature change).
+- Commit is local-only; **do not push or deploy WS2 without separate Fajar approval**. No Railway CLI/MCP operation, Supabase remote command, production test or production variable change ran during WS2. WS3 remains a separate docs commit.
 
 ## Report back (required format)
 
