@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-16
+
+- docs(architecture): correct the frontend-to-Supabase edge to Auth plus the two legacy Storage uploads (no Realtime), drop the duplicated Gemini Live edge, and re-run Prettier on the rollback index and database doc
+
 ## 2026-11-15
 
 - test(e2e): bring the Telefun playback and SIDAK HTML report specs under 1,000 lines by moving the AudioWorklet input test and the print tests into focused files

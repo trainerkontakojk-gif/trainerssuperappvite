@@ -706,11 +706,11 @@ loses any stored NIK/email values. Deployment/replay is a separate local gate.
 ### AI Model Policy per Task (2026-11-13)
 
 Migration `20261113160000_ai_model_policy.sql` menambahkan tabel `ai_model_policy` dan `ai_model_policy_audit`, serta atomic RPC setter `public.ai_model_policy_set(p_task text, p_model_id text, p_actor uuid)`.
+
 - RLS aktif tanpa policy, REVOKE ALL dari PUBLIC, anon, dan authenticated; GRANT ALL / EXECUTE hanya kepada `service_role`.
 - Tabel kosong secara default: perilaku fallback otomatis kembali ke konstanta kode bawaan (`codeDefault`) sehingga aman diaplikasikan tanpa risiko downtime.
 - Audit mencatat `task`, `old_model_id`, `new_model_id`, `changed_by`, dan `changed_at`.
 - Rollback: `supabase/rollbacks/rollback_20261113160000_ai_model_policy.sql` menghapus RPC dan kedua tabel. Replay rollback telah diverifikasi pada Supabase lokal disposable.
-
 
 ### AI model policy atomic reset follow-up (2026-11-14)
 
@@ -730,13 +730,11 @@ Both policy migrations were applied to production on 2026-11-14 after Fajar's ex
 - Policy dan audit masing-masing 0 baris saat verifikasi: apply tidak mengganti pilihan model. Tidak ada pemanggilan AI, perubahan konfigurasi model, production E2E, atau deploy aplikasi manual.
 - Dry-run sesudah apply (exit 0): `Remote database is up to date.` Verifikasi ini membuktikan schema/history/ACL; alur UI prod tidak dijalankan.
 
-
 ### Gemini 4 Hydrogen pricing (applied to production 2026-11-14)
 
 `20261114130615_add_gemini_4_hydrogen_pricing.sql` inserts only `gemini-4-hydrogen` in `ai_pricing_settings`: USD 1.50 input / 7.50 output (including thinking) / 0.075 implicit cached input per million tokens (Standard paid tier, [official source](https://aistudio.google.com/docs/pricing#gemini-4-hydrogen)). `ON CONFLICT DO NOTHING` preserves existing custom pricing. No Flash pricing/schedules, policy choices, or historical usage are changed.
 
 Local apply, custom-price preservation, and rollback/forward replay were verified. Production application was explicitly authorized and completed on 2026-11-14; evidence is recorded below. Rollback removes only the unchanged default Hydrogen price row, preserves all Flash rows and usage logs, and rejects removal while a task policy references Hydrogen. Revert Hydrogen selections/API first; preserve pre-existing Hydrogen prices rather than running this rollback.
-
 
 #### Hydrogen production verification — 2026-11-14
 

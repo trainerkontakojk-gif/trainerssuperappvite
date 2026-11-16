@@ -32,10 +32,9 @@ graph TD
     User((User)) -->|Browser| ViteApp[Vite React SPA]
     ViteApp -->|"Hono RPC (fetch)"| HonoAPI[Hono API Server]
     HonoAPI -->|SQL / Auth| Supabase[(Supabase / PostgreSQL)]
-    ViteApp -->|Client SDK / Realtime| Supabase
+    ViteApp -->|"supabase-js: Auth + Storage upload"| Supabase
     ViteApp -->|WebSocket Voice| TelefunProxy[Telefun Node Proxy]
     TelefunProxy -->|Provider Adapter| RealtimeProvider[Realtime Provider]
-    RealtimeProvider -->|Gemini Live| GeminiLive[Gemini Live API]
     RealtimeProvider -->|Gemini Live only| GeminiLive[Gemini Live API]
     HonoAPI -->|AI Analysis| AIProviders[Gemini / OpenAI]
 ```
@@ -45,7 +44,7 @@ graph TD
 1. **Frontend (`apps/web`)**: Vite + React SPA dengan TanStack Router. Semua route di-lazy load via `React.lazy()`.
 2. **Backend (`apps/api`)**: Hono API server dengan route handlers di `src/routes/`. Business logic di `src/services/`.
 3. **Hono RPC**: Frontend mengonsumsi API via `hc<AppType>` dari Hono RPC — full type-safety tanpa perlu definisi API terpisah.
-4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage.
+4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage. Frontend memakai `supabase-js` langsung hanya untuk Auth dan dua upload Storage ber-JWT user yang dijaga RLS Storage: foto Profiler (`apps/web/src/lib/profilerPhotoStorage.ts`) dan rekaman Telefun (`apps/web/src/routes/telefun/sessionFinalizer.ts`, bucket `telefun-recordings`). Kedua upload ini adalah pengecualian legacy dari aturan backend-first di `AGENTS.md`; jangan menambah mutasi frontend baru. Supabase Realtime tidak dipakai (tidak ada `.channel()`/`postgres_changes`).
 5. **RLS (Row Level Security)**: Memastikan keamanan data di tingkat database berdasarkan role user (Admin, Trainer, Leader, Agent).
 6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio hanya ke Gemini Live. Metadata OpenAI Realtime yang tersisa adalah historical compatibility dan tidak menjadi provider adapter atau start path.
 7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang aktifnya hanya Gemini dan OpenAI direct. Semua AI calls dicatat ke `ai_usage_logs`.
@@ -423,6 +422,7 @@ Di Supabase Postgres 17.6.1.x, memanggil fungsi yang EXECUTE-nya di-revoke dari 
 ## AI Model Policy per Task & Fallback
 
 Kebijakan penentuan model AI untuk tugas sistem (`ketik_review`, `ketik_review_fallback`, `telefun_assessment`, `sidak_forecast`, `default_text`) diatur secara terpusat:
+
 - **Registry & Capabilities**: Didikte oleh `packages/types/src/ai-model-policy.ts` dan `ai-models.ts`. `SELECTABLE_MODEL_IDS` diturunkan dari pilihan KETIK/PDKT, Telefun Live, dan image generation; penambahan metadata legacy ke `TEXT_MODELS` tidak otomatis mengaktifkan model. Daftar `/ai/models`, pilihan kebijakan, dan harga aktif memakai allowlist yang sama. Setiap tugas tetap menyaring kapabilitas/provider dan menolak model realtime Live untuk tugas GenerateContent.
 - **Harga aktif vs historis**: Tujuh model selectable memiliki `editable: true` di `/monitoring/pricing`. Baris database di luar allowlist tetap tersedia sebagai `historical: true`, `editable: false`; PUT ditolak. Tidak ada penghapusan harga atau perhitungan ulang log lama.
 - **Penyimpanan Kebijakan**: Tabel `ai_model_policy` (backend-only, RLS enabled, no public access) dan audit log `ai_model_policy_audit`.
