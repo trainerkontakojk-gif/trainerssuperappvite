@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { ChatMessage, KetikServerSession } from "@trainers/types";
 import { KETIK_SESSION_ERRORS } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
+import { chatReducer, type ChatEvent, type ChatState } from "./chatLifecycle";
 import {
   boundedRandom,
   classifyTextBand,
@@ -131,10 +132,49 @@ export function useServerKetikChat(initial: KetikServerSession) {
   const hidden = useRef(new Set<string>());
   /** Slow-reply bookkeeping: a rarer, longer think per session. */
   const slow = useRef({ total: 0, consecutive: 0 });
-  const appendBusy = useRef(false);
-  const appendBlocked = useRef(false);
-  const responseBusy = useRef(false);
-  const responseBlocked = useRef(false);
+  const [state, dispatch] = useReducer(
+    chatReducer,
+    initial,
+    (session): ChatState => {
+      const pending = session.pendingResponse ?? session.pendingTurn;
+      return {
+        append: { status: "idle" },
+        response:
+          pending?.status === "processing"
+            ? "recovering"
+            : pending?.status === "failed"
+              ? "blocked"
+              : "idle",
+        phase:
+          session.consumerClosed || session.state !== "active"
+            ? "closed"
+            : Date.now() >= Date.parse(session.expiresAt)
+              ? "expired"
+              : "active",
+        messages: presentMessages(session.messages, {
+          open: session.state === "active",
+          queued: [],
+          read: new Set(),
+          hidden: new Set(),
+        }),
+        queuedCount: 0,
+        error:
+          pending?.status === "failed"
+            ? {
+                kind: "response",
+                message: KETIK_SESSION_ERRORS.SESSION_AI_FAILED,
+              }
+            : null,
+      };
+    },
+  );
+  // Synchronous mirror for reentrant timers/async guards. React and scheduler
+  // use the same pure transitions, not separate busy/blocked flags.
+  const lifecycle = useRef(state);
+  const transition = useCallback((event: ChatEvent) => {
+    lifecycle.current = chatReducer(lifecycle.current, event);
+    dispatch(event);
+  }, []);
   const legacyPending = useRef(initial.pendingTurn);
   const responseRequestId = useRef<string | null>(
     initial.pendingResponse?.requestId ?? null,
@@ -157,44 +197,22 @@ export function useServerKetikChat(initial: KetikServerSession) {
     latestAgent ? Date.parse(latestAgent.timestamp) || 0 : 0,
   );
 
-  const present = (list: ChatMessage[]) =>
-    presentMessages(list, {
-      open: current.current.state === "active",
-      queued: queued.current,
-      read: read.current,
-      hidden: hidden.current,
-    });
-
-  const [messages, setMessages] = useState(() =>
-    presentMessages(initial.messages, {
-      open: initial.state === "active",
-      queued: [],
-      read: new Set(),
-      hidden: new Set(),
-    }),
+  const refreshMessages = useCallback(
+    () =>
+      transition({
+        type: "present",
+        messages: presentMessages(current.current.messages, {
+          open: current.current.state === "active",
+          queued: queued.current,
+          read: read.current,
+          hidden: hidden.current,
+        }),
+        queuedCount: queued.current.length,
+      }),
+    [transition],
   );
-  const [appendLoading, setAppendLoading] = useState(false);
-  const [responseLoading, setResponseLoading] = useState(
-    initial.pendingResponse?.status === "processing" ||
-      initial.pendingTurn?.status === "processing",
-  );
-  const [typing, setTyping] = useState(
-    initial.pendingResponse?.status === "processing" ||
-      initial.pendingTurn?.status === "processing",
-  );
-  const [count, setCount] = useState(0);
-  const [error, setError] = useState(
-    initial.pendingResponse?.status === "failed" ||
-      initial.pendingTurn?.status === "failed"
-      ? KETIK_SESSION_ERRORS.SESSION_AI_FAILED
-      : "",
-  );
-  const [retryKind, setRetryKind] = useState<"append" | "response">("response");
   const expiresAt = Date.parse(initial.expiresAt);
-  const [expired, setExpired] = useState(() => Date.now() >= expiresAt);
-  const [closed, setClosed] = useState(
-    initial.consumerClosed || initial.state !== "active",
-  );
+  const expired = state.phase !== "active";
 
   const noteDraft = useCallback((text: string) => {
     const wasActive = agentDraft.current.active;
@@ -228,22 +246,21 @@ export function useServerKetikChat(initial: KetikServerSession) {
     if (expired) return;
     const timer = setTimeout(
       () => {
-        setExpired(true);
+        transition({ type: "expire" });
         scheduleResponseRef.current();
       },
       Math.max(0, expiresAt - Date.now()),
     );
     return () => clearTimeout(timer);
-  }, [expired, expiresAt]);
+  }, [expired, expiresAt, transition]);
 
   const scheduleResponse = useCallback(() => {
     if (responseTimer.current) clearTimeout(responseTimer.current);
     responseTimer.current = null;
     const session = current.current;
     if (
-      responseBusy.current ||
-      responseBlocked.current ||
-      appendBlocked.current ||
+      lifecycle.current.response !== "idle" ||
+      lifecycle.current.append.status === "blocked" ||
       queued.current.length > 0 ||
       session.state !== "active" ||
       session.consumerClosed
@@ -264,10 +281,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
     const texts = agentTextsSinceConsumer(session.messages, []);
     const dueAt =
       lastSendAt.current +
-      Math.max(
-        QUIET_WINDOW_MS[mode] * factor,
-        readingMs(texts, mode) * factor,
-      );
+      Math.max(QUIET_WINDOW_MS[mode] * factor, readingMs(texts, mode) * factor);
     const holdUntil = Math.min(
       dueAt + MAX_TYPING_HOLD_MS[mode],
       Date.parse(session.expiresAt),
@@ -304,24 +318,23 @@ export function useServerKetikChat(initial: KetikServerSession) {
 
   const processAppends = useCallback(async () => {
     if (
-      appendBusy.current ||
-      appendBlocked.current ||
+      lifecycle.current.append.status !== "idle" ||
       !mounted.current ||
       legacyPending.current
     )
       return;
-    appendBusy.current = true;
-    setAppendLoading(true);
-    setError("");
+    transition({ type: "append-start" });
     try {
       while (queued.current.length && mounted.current) {
         // The agent may still close politely after the time is up or the
         // consumer left; only an ended session stops saving.
         const session = current.current;
         if (session.state !== "active") {
-          setClosed(true);
-          setRetryKind("append");
-          setError("Chat sudah diakhiri. Pesan terakhir belum tersimpan.");
+          transition({ type: "session", closed: true });
+          transition({
+            type: "append-failed",
+            message: "Chat sudah diakhiri. Pesan terakhir belum tersimpan.",
+          });
           break;
         }
         const next = queued.current[0];
@@ -334,32 +347,33 @@ export function useServerKetikChat(initial: KetikServerSession) {
           if (!mounted.current) return;
           current.current = result;
           queued.current.shift();
-          setCount(queued.current.length);
-          setMessages(present(result.messages));
-          setClosed(result.consumerClosed || result.state !== "active");
-          // New durable context: a previously failed reply attempt may run again.
-          responseBlocked.current = false;
+          refreshMessages();
+          transition({
+            type: "session",
+            closed: result.consumerClosed || result.state !== "active",
+          });
+          transition({ type: "append-saved" });
         } catch {
-          appendBlocked.current = true;
-          setRetryKind("append");
-          setError("Pesan belum tersimpan. Coba kirim lagi.");
+          if (mounted.current)
+            transition({
+              type: "append-failed",
+              message: "Pesan belum tersimpan. Coba kirim lagi.",
+            });
           break;
         }
       }
     } finally {
-      appendBusy.current = false;
       if (mounted.current) {
-        setAppendLoading(false);
+        transition({ type: "append-finish" });
         if (!queued.current.length) scheduleResponseRef.current();
       }
     }
-  }, [initial.id]);
+  }, [initial.id, refreshMessages, transition]);
 
   const requestResponse = useCallback(async () => {
     if (
-      responseBusy.current ||
-      responseBlocked.current ||
-      appendBusy.current ||
+      lifecycle.current.response !== "idle" ||
+      lifecycle.current.append.status !== "idle" ||
       queued.current.length > 0 ||
       !mounted.current
     ) {
@@ -367,16 +381,13 @@ export function useServerKetikChat(initial: KetikServerSession) {
       return;
     }
     const session = current.current;
-    if (session.consumerClosed) return;
+    if (session.state !== "active" || session.consumerClosed) return;
     if (!needsResponse(session) && !owesClosing(session)) return;
     if (owesClosing(session)) closingAttempts.current++;
-    responseBusy.current = true;
-    setResponseLoading(true);
-    setError("");
+    transition({ type: "response-start" });
     for (const message of session.messages)
       if (message.sender === "agent") read.current.add(message.id);
-    setMessages((previous) => present(previous));
-    setTyping(true);
+    refreshMessages();
     // The consumer reads everything since its last reply before typing, so the
     // pacing clock starts there — not when the AI happens to finish.
     const mode = session.config.responsePacingMode;
@@ -435,7 +446,8 @@ export function useServerKetikChat(initial: KetikServerSession) {
         (message) => message.sender === "consumer" && !knownIds.has(message.id),
       );
       for (const reply of replies) hidden.current.add(reply.id);
-      setMessages(present(result.messages));
+      transition({ type: "response-published" });
+      refreshMessages();
       if (replies.length > 0) {
         const ranges =
           mode === "training_fast" ? TRAINING_FAST_RANGES : REALISTIC_RANGES;
@@ -487,40 +499,36 @@ export function useServerKetikChat(initial: KetikServerSession) {
           await waitForAgentIdle(revealHoldUntil);
           if (!mounted.current) return;
           hidden.current.delete(reply.id);
-          setMessages(present(current.current.messages));
+          refreshMessages();
           showAt = Math.max(showAt, Date.now());
         }
       }
-      setClosed(result.consumerClosed || result.state !== "active");
+      transition({
+        type: "session",
+        closed: result.consumerClosed || result.state !== "active",
+      });
     } catch {
       if (!mounted.current) return;
-      responseBlocked.current = true;
-      setRetryKind("response");
-      setError(KETIK_SESSION_ERRORS.SESSION_AI_FAILED);
+      transition({ type: "response-failed" });
     } finally {
-      responseBusy.current = false;
       hidden.current.clear();
       if (mounted.current) {
-        setTyping(false);
-        setResponseLoading(false);
+        transition({ type: "response-finish" });
         // Re-render from the authoritative session so an interrupted reveal
         // never leaves a published reply invisible.
-        setMessages(present(current.current.messages));
+        refreshMessages();
         // A message appended during the request/reveal still needs its reply.
         scheduleResponseRef.current();
       }
     }
-  }, [initial.id]);
+  }, [initial.id, refreshMessages, transition]);
   useEffect(() => {
     requestResponseRef.current = () => void requestResponse();
   }, [requestResponse]);
 
   // Recover a response (or a pre-deployment legacy turn) already in flight.
   useEffect(() => {
-    const processing =
-      initial.pendingResponse?.status === "processing" ||
-      initial.pendingTurn?.status === "processing";
-    if (!processing) {
+    if (state.response !== "recovering") {
       scheduleResponseRef.current();
       return;
     }
@@ -531,15 +539,17 @@ export function useServerKetikChat(initial: KetikServerSession) {
         const loaded = await ketikApi.getSession(initial.id);
         if (cancelled) return;
         current.current = loaded;
-        setMessages(present(loaded.messages));
-        setClosed(loaded.consumerClosed || loaded.state !== "active");
+        refreshMessages();
+        transition({
+          type: "session",
+          closed: loaded.consumerClosed || loaded.state !== "active",
+        });
         const stillProcessing =
           loaded.pendingResponse?.status === "processing" ||
           loaded.pendingTurn?.status === "processing";
         if (!stillProcessing) {
-          legacyPending.current = null;
-          setTyping(false);
-          setResponseLoading(false);
+          legacyPending.current = loaded.pendingTurn;
+          transition({ type: "response-finish" });
           responseRequestId.current =
             loaded.pendingResponse?.status === "failed"
               ? loaded.pendingResponse.requestId
@@ -548,9 +558,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
             loaded.pendingResponse?.status === "failed" ||
             loaded.pendingTurn?.status === "failed"
           ) {
-            responseBlocked.current = true;
-            setRetryKind("response");
-            setError(KETIK_SESSION_ERRORS.SESSION_AI_FAILED);
+            transition({ type: "response-failed" });
           } else if (queued.current.length) {
             void processAppends();
           } else {
@@ -561,10 +569,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
         timer = setTimeout(() => void poll(), 2000);
       } catch {
         if (!cancelled) {
-          setTyping(false);
-          setResponseLoading(false);
-          setRetryKind("response");
-          setError("Status balasan belum bisa dimuat. Coba lagi.");
+          transition({ type: "recovery-failed" });
         }
       }
     };
@@ -573,12 +578,14 @@ export function useServerKetikChat(initial: KetikServerSession) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [initial, initial.id, processAppends]);
+  }, [initial.id, state.response, processAppends, refreshMessages, transition]);
 
   const send = (text: string) => {
     if (current.current.state !== "active" || queued.current.length >= 20) {
-      setRetryKind("append");
-      setError("Antrean penyimpanan penuh atau chat sudah diakhiri.");
+      transition({
+        type: "send-refused",
+        message: "Antrean penyimpanan penuh atau chat sudah diakhiri.",
+      });
       return false;
     }
     if (responseTimer.current) clearTimeout(responseTimer.current);
@@ -588,57 +595,81 @@ export function useServerKetikChat(initial: KetikServerSession) {
       text,
       sentAt: new Date().toISOString(),
     });
-    setCount(queued.current.length);
-    setMessages((previous) => present(previous));
+    refreshMessages();
     void processAppends();
     return true;
   };
 
   const retry = () => {
-    setError("");
-    if (initial.pendingTurn?.status === "failed") {
-      setResponseLoading(true);
-      const { requestId, text, expectedVersion } = initial.pendingTurn;
+    if (lifecycle.current.append.status === "blocked") {
+      transition({ type: "append-retry" });
+      void processAppends();
+      return;
+    }
+    if (
+      ["recovering", "requesting", "revealing", "legacy-retrying"].includes(
+        lifecycle.current.response,
+      )
+    )
+      return;
+    if (lifecycle.current.response === "recovery-failed") {
+      transition({ type: "response-retry" });
+      return;
+    }
+    if (legacyPending.current?.status === "failed") {
+      transition({ type: "legacy-retry" });
+      const { requestId, text, expectedVersion } = legacyPending.current;
       void ketikApi
         .sendTurn(initial.id, { requestId, text, expectedVersion })
         .then((loaded) => {
+          if (!mounted.current) return;
           legacyPending.current = null;
           current.current = loaded;
-          setMessages(present(loaded.messages));
-          setResponseLoading(false);
+          refreshMessages();
+          transition({
+            type: "session",
+            closed: loaded.consumerClosed || loaded.state !== "active",
+          });
+          transition({ type: "response-finish" });
           if (queued.current.length) void processAppends();
           else scheduleResponseRef.current();
         })
         .catch(() => {
-          setResponseLoading(false);
-          setError(KETIK_SESSION_ERRORS.SESSION_AI_FAILED);
+          if (mounted.current) transition({ type: "response-failed" });
         });
       return;
     }
-    if (retryKind === "append") {
-      appendBlocked.current = false;
+    if (lifecycle.current.error?.kind === "append") {
+      transition({ type: "append-retry" });
       void processAppends();
     } else {
-      responseBlocked.current = false;
+      transition({ type: "response-retry" });
       void requestResponse();
     }
   };
 
   return {
-    messages,
-    isLoading: appendLoading || responseLoading,
-    isConsumerTyping: typing,
-    queuedCount: count,
-    error,
+    messages: state.messages,
+    isLoading:
+      state.append.status === "saving" ||
+      ["recovering", "requesting", "revealing", "legacy-retrying"].includes(
+        state.response,
+      ),
+    isConsumerTyping: ["recovering", "requesting", "revealing"].includes(
+      state.response,
+    ),
+    queuedCount: state.queuedCount,
+    error:
+      state.append.status === "blocked"
+        ? state.append.message
+        : (state.error?.message ?? ""),
     retry,
     retryLabel:
-      retryKind === "append" ? "Coba simpan lagi" : "Coba minta balasan lagi",
+      state.append.status === "blocked" || state.error?.kind === "append"
+        ? "Coba simpan lagi"
+        : "Coba minta balasan lagi",
     send,
     noteDraft,
-    sessionPhase: closed
-      ? ("closed" as const)
-      : expired
-        ? ("expired" as const)
-        : ("active" as const),
+    sessionPhase: state.phase,
   };
 }

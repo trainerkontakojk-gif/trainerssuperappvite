@@ -1,35 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type {
   KetikReviewDetail,
   KetikSessionHistoryItem,
-  KetikSessionReview,
-  KetikTypoFinding,
 } from "@trainers/types";
 import { ApiError } from "../../../lib/api";
 import { ketikApi } from "../ketikApi";
 
+import {
+  INITIAL_REVIEW,
+  reviewReducer,
+  type KetikReviewFailure,
+} from "./reviewLifecycle";
+export type {
+  KetikReviewPhase,
+  KetikReviewFailure,
+  KetikReviewState,
+} from "./reviewLifecycle";
+
 const POLL_INTERVAL_MS = 3_000;
-export type KetikReviewPhase =
-  "idle" | "reviewing" | "loading-result" | "ready" | "failed";
-export type KetikReviewFailure = "review" | "result";
-export interface KetikReviewState {
-  phase: KetikReviewPhase;
-  failure: KetikReviewFailure | null;
-  review: KetikSessionReview | null;
-  typos: KetikTypoFinding[];
-  rerunFailed: boolean;
-  queueStatus: "queued" | "processing" | null;
-  pollFailed: boolean;
-}
-const INITIAL: KetikReviewState = {
-  phase: "idle",
-  failure: null,
-  review: null,
-  typos: [],
-  rerunFailed: false,
-  queueStatus: null,
-  pollFailed: false,
-};
 function withScores(
   session: KetikSessionHistoryItem,
   scores: KetikReviewDetail["scores"],
@@ -51,10 +39,7 @@ export function useKetikReviewStatus(
   session: KetikSessionHistoryItem | null,
   onSessionChange: (session: KetikSessionHistoryItem) => void,
 ) {
-  const [state, setState] = useState<KetikReviewState>(INITIAL);
-  // Re-scores left for this reader (undefined = not known yet, null = no limit).
-  const [rerunsLeft, setRerunsLeft] = useState<number | null | undefined>();
-  const [rerunRefusal, setRerunRefusal] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(reviewReducer, INITIAL_REVIEW);
   const sessionRef = useRef(session);
   const onChangeRef = useRef(onSessionChange);
   const runRef = useRef(0);
@@ -76,7 +61,7 @@ export function useKetikReviewStatus(
   const fail = useCallback(
     (run: number, failure: KetikReviewFailure, confirmed = false) => {
       if (run !== runRef.current || !sessionRef.current) return;
-      setState({ ...INITIAL, phase: "failed", failure });
+      dispatch({ type: "failed", failure });
       if (confirmed) {
         requestRef.current = null;
         update({ ...sessionRef.current, reviewStatus: "failed" });
@@ -88,20 +73,17 @@ export function useKetikReviewStatus(
     async (run: number, known?: KetikReviewDetail) => {
       const current = sessionRef.current;
       if (!current || run !== runRef.current) return;
-      setState((prev) => ({ ...prev, phase: "loading-result", failure: null }));
+      dispatch({ type: "load-result" });
       try {
         const detail = known ?? (await ketikApi.getReviewDetail(current.id));
         if (run !== runRef.current) return;
         requestRef.current = null;
         update(withScores(current, detail.scores));
-        setState((prev) => ({
-          ...INITIAL,
-          phase: "ready",
-          review: detail.review,
-          typos: detail.typos ?? [],
-          rerunFailed: rerunFailedRun.current === run,
-          pollFailed: prev.pollFailed,
-        }));
+        dispatch({
+          type: "result",
+          detail,
+          previousKept: rerunFailedRun.current === run,
+        });
       } catch {
         fail(run, "result");
       }
@@ -115,8 +97,7 @@ export function useKetikReviewStatus(
       try {
         const data = await ketikApi.getReviewStatus(current.id);
         if (run !== runRef.current) return;
-        setRerunsLeft(data.rerunsLeft);
-        setState((prev) => ({ ...prev, pollFailed: false }));
+        dispatch({ type: "poll-ok", rerunsLeft: data.rerunsLeft });
         if (data.status === "failed" && data.previousKept && data.resultReady) {
           rerunFailedRun.current = run;
           await loadResult(run, data.detail);
@@ -131,16 +112,16 @@ export function useKetikReviewStatus(
           )
             update({ ...current, reviewStatus: "processing" });
           const queueStatus = data.status;
-          setState((prev) => ({ ...prev, phase: "reviewing", queueStatus }));
+          dispatch({ type: "queued", status: queueStatus });
         } else if (!initial) {
           // The server confirms no active request. Retrying can reuse the unacknowledged UUID.
           fail(run, "review");
         } else {
-          setState(INITIAL);
+          dispatch({ type: "idle" });
         }
       } catch {
         if (run !== runRef.current) return;
-        setState((prev) => ({ ...prev, pollFailed: true }));
+        dispatch({ type: "poll-failed" });
         if (initial && current.reviewStatus === "completed")
           await loadResult(run);
       }
@@ -152,16 +133,10 @@ export function useKetikReviewStatus(
     const run = invalidate();
     requestRef.current = null;
     rerunFailedRun.current = -1;
-    setRerunsLeft(undefined);
-    setRerunRefusal(null);
     const current = sessionRef.current;
-    if (!sessionId || !current) setState(INITIAL);
-    else if (current.reviewStatus === "completed") void checkStatus(run, true);
-    else if (current.reviewStatus === "processing")
-      setState({ ...INITIAL, phase: "reviewing" });
-    else if (current.reviewStatus === "failed")
-      setState({ ...INITIAL, phase: "failed", failure: "review" });
-    else setState(INITIAL);
+    dispatch({ type: "reset", status: current?.reviewStatus });
+    if (sessionId && current?.reviewStatus === "completed")
+      void checkStatus(run, true);
     return () => {
       invalidate();
     };
@@ -204,13 +179,13 @@ export function useKetikReviewStatus(
           ? requestRef.current
           : { sessionId: current.id, requestId: crypto.randomUUID(), rerun };
       requestRef.current = request;
-      setState({ ...INITIAL, phase: "reviewing" });
+      dispatch({ type: "submit" });
       try {
         const result = await ketikApi.startReview(current.id, {
           rerun,
           requestId: request.requestId,
         });
-        if (run !== runRef.current) return;
+        if (run !== runRef.current || requestRef.current !== request) return;
         if (result.status === "completed") await loadResult(run);
         else if (result.status === "failed") await checkStatus(run);
         else {
@@ -220,28 +195,27 @@ export function useKetikReviewStatus(
           )
             update({ ...current, reviewStatus: "processing" });
           const queueStatus = result.status;
-          setState((prev) => ({ ...prev, queueStatus }));
+          dispatch({ type: "enqueue-ack", status: queueStatus });
         }
       } catch (error) {
+        if (run !== runRef.current || requestRef.current !== request) return;
         if (error instanceof ApiError && error.code === "RERUN_LIMIT") {
           // Refused before anything changed: keep showing the current result.
           requestRef.current = null;
-          setRerunsLeft(0);
-          setRerunRefusal(error.message);
+          dispatch({ type: "rerun-refused", message: error.message });
           await loadResult(run);
           return;
         }
         // Acceptance may have succeeded despite a lost response; polling is the primary recovery path.
-        if (run === runRef.current)
-          setState((prev) => ({ ...prev, pollFailed: true }));
+        if (run === runRef.current) dispatch({ type: "poll-failed" });
       }
     },
     [state.phase, loadResult, checkStatus, update],
   );
   return {
     ...state,
-    rerunsLeft,
-    rerunRefusal,
+    rerunFailed: state.resultSource === "previous-after-failure",
+    pollFailed: state.polling === "failed",
     start: () => submit(false),
     rerun: () => submit(true),
     retryResult: () => {

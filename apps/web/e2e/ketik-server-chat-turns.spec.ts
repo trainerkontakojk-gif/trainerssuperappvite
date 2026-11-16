@@ -73,6 +73,106 @@ test("failed turn resumes without automatic generation; retry uses the same ID a
   expectHermetic(audit);
 });
 
+test("failed response resumes without automatic generation and retries the same request explicitly", async ({
+  page,
+}) => {
+  const requestId = "23000000-0000-4000-8000-000000000004";
+  const live = session({
+    version: 1,
+    agentVersion: 1,
+    awaitingResponse: true,
+    messages: [
+      {
+        id: "saved-agent",
+        sender: "agent",
+        text: "Pesan sudah tersimpan",
+        timestamp: new Date(Date.now() - 60000).toISOString(),
+      },
+    ],
+    pendingResponse: {
+      requestId,
+      status: "failed",
+      retryCount: 0,
+      leaseExpiresAt: null,
+    },
+  });
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${id}&tahap=chat`,
+    apiMocks: [
+      ...base,
+      {
+        method: "GET",
+        path: `/api/v1/ketik/sessions/${id}`,
+        body: { success: true, data: live },
+      },
+    ],
+    expectedThirdPartyHosts: ["randomuser.me"],
+  });
+  const calls: unknown[] = [];
+  await page.route(`**/api/v1/ketik/sessions/${id}/respond`, async (route) => {
+    calls.push(route.request().postDataJSON());
+    if (calls.length === 1) {
+      await route.fulfill({
+        status: 503,
+        json: {
+          success: false,
+          error: {
+            code: "SESSION_AI_FAILED",
+            message: "Balasan belum tersedia.",
+          },
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        success: true,
+        data: {
+          ...live,
+          version: 2,
+          pendingResponse: null,
+          awaitingResponse: false,
+          messages: [
+            ...live.messages,
+            {
+              id: "retried-response",
+              sender: "consumer",
+              text: "Balasan setelah retry eksplisit",
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        },
+      },
+    });
+  });
+  const room = page.getByRole("region", { name: "Ruang chat" });
+  await expect(room.getByRole("alert")).toContainText(
+    "Balasan konsumen belum tersedia",
+  );
+  // Covers both the immediate scheduler and the old pending-response recovery timer.
+  await page.waitForTimeout(3000);
+  expect(calls).toEqual([]);
+  const retry = room.getByRole("button", { name: "Coba minta balasan lagi" });
+  await retry.click();
+  await expect.poll(() => calls.length).toBe(1);
+  await expect(room.getByRole("alert")).toContainText(
+    "Balasan konsumen belum tersedia",
+  );
+  await retry.click();
+  await expect(
+    room.getByText("Balasan setelah retry eksplisit", { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  expect(calls).toEqual([{ requestId }, { requestId }]);
+  await expect(
+    room.getByText("Pesan sudah tersimpan", { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    room.getByRole("status", { name: "Konsumen sedang mengetik" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("response-retry.png") });
+  expectHermetic(audit);
+});
+
 test("text queued while a legacy turn resumes is saved as an agent message after the consumer closes", async ({
   page,
 }) => {

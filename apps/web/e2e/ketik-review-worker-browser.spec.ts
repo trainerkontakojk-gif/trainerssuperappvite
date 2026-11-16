@@ -394,6 +394,75 @@ test("late polling cannot replace completed results after an explicit status ref
   }
 });
 
+test("a late enqueue failure cannot downgrade a result already confirmed by polling", async ({
+  page,
+}) => {
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${id}&tahap=telaah`,
+    auth: { role: "agent" },
+    apiMocks: mocks(),
+  });
+  const result = page.getByRole("region", { name: "Hasil telaah" });
+  await expect(
+    result.getByRole("button", { name: "Mulai telaah" }),
+  ).toBeVisible({ timeout: 20000 });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let enqueues = 0;
+  await page.route("**/api/v1/ketik/review", async (route) => {
+    enqueues++;
+    await gate;
+    await route.fulfill({
+      status: 503,
+      json: {
+        success: false,
+        error: { code: "REVIEW_FAILED", message: "Coba lagi." },
+      },
+    });
+  });
+  await page.route(`**/api/v1/ketik/review/status/${id}`, (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: {
+          status: "completed",
+          resultReady: true,
+          previousKept: false,
+          scores,
+          detail,
+        },
+      },
+    }),
+  );
+  try {
+    await result.getByRole("button", { name: "Mulai telaah" }).click();
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("80", {
+      timeout: 10000,
+    });
+    const lateResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/ketik/review"),
+    );
+    release();
+    await lateResponse;
+    // Let the fetch rejection reach the hook before asserting its terminal state.
+    await page.waitForTimeout(500);
+    await expect(
+      result.getByText("Status telaah belum dapat diperbarui.", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
+    expect(enqueues).toBe(1);
+    expectHermetic(audit);
+  } finally {
+    release();
+  }
+});
+
 test("a lost enqueue response recovers from server polling and refreshes the landing summary without a second trigger", async ({
   page,
 }) => {

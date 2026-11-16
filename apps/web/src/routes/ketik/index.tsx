@@ -1,5 +1,5 @@
 import { can, normalizeRole } from "@trainers/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowRight, History, SlidersHorizontal } from "lucide-react";
@@ -7,13 +7,17 @@ import type {
   KetikAppSettings,
   KetikSessionHistoryItem,
   KetikHistorySummaryItem,
-  KetikServerSession,
   KetikAssignmentSnapshot,
   KetikQuickTemplate,
   SimulationSubjectSelection,
 } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS, KETIK_ERROR_MESSAGES } from "@trainers/types";
 import { ketikApi } from "./ketikApi";
+import {
+  sessionReducer,
+  type SessionEvent,
+  type SessionState,
+} from "./hooks/sessionLifecycle";
 import { KetikStageDemo } from "./components/KetikStageDemo";
 import {
   KetikLandingOverview,
@@ -90,13 +94,24 @@ export default function KetikLanding() {
       chatRequested ? undefined : requestedSessionId,
     );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
-  const [activeChat, setActiveChat] = useState<KetikServerSession | null>(null);
-  const [isStarting, setIsStarting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [flow, dispatchSession] = useReducer(
+    sessionReducer,
+    { sessionId: requestedSessionId, chat: chatRequested },
+    (route) => sessionReducer({ status: "home" }, { type: "route", ...route }),
+  );
+  const flowRef = useRef<SessionState>(flow);
+  const transitionSession = useCallback((event: SessionEvent) => {
+    flowRef.current = sessionReducer(flowRef.current, event);
+    dispatchSession(event);
+  }, []);
+  const activeChat =
+    flow.status === "chat" || flow.status === "finishing" ? flow.session : null;
+  const isStarting = flow.status === "starting";
+  const isSaving = flow.status === "finishing";
+  const showSubjectPicker = flow.status === "picking";
+  const resumeError = flow.status === "resume-failed";
+  const resumeId = flow.status === "resuming" ? flow.sessionId : null;
   const startRequest = useRef<{ id: string; subjectKey: string } | null>(null);
-  const [resumeError, setResumeError] = useState(false);
-  const [resumeAttempt, setResumeAttempt] = useState(0);
   const [assignment, setAssignment] = useState<{
     userId: string | undefined;
     state: KetikLoadState;
@@ -129,36 +144,37 @@ export default function KetikLanding() {
     };
   }, [userId, needsAssignment, assignmentAttempt]);
   useEffect(() => {
-    setActiveChat(null);
+    transitionSession({ type: "reset" });
     setAssignmentOpen(false);
     startRequest.current = null;
-    setIsStarting(false);
-    setIsSaving(false);
-  }, [userId]);
+  }, [userId, transitionSession]);
   useEffect(() => {
-    if (
-      !chatRequested ||
-      !requestedSessionId ||
-      activeChat?.id === requestedSessionId
-    )
-      return;
+    transitionSession({
+      type: "route",
+      sessionId: requestedSessionId,
+      chat: chatRequested,
+    });
+  }, [userId, requestedSessionId, chatRequested, transitionSession]);
+  useEffect(() => {
+    if (!resumeId) return;
     let cancelled = false;
-    setResumeError(false);
     void ketikApi
-      .getSession(requestedSessionId)
+      .getSession(resumeId)
       .then(async (loaded) => {
         if (cancelled) return;
         if (loaded.state === "active") {
-          setActiveChat(loaded);
+          transitionSession({ type: "resumed", session: loaded });
           return;
         }
         if (loaded.state === "discarded") {
+          transitionSession({ type: "finished", hasHistory: false });
           void navigate({ to: "/ketik", search: {}, replace: true });
           return;
         }
         const item = await ketikApi.finishSession(loaded.id);
         if (cancelled) return;
         if (!item) throw new Error("Finished session missing");
+        transitionSession({ type: "finished", hasHistory: true });
         loadHistory();
         void navigate({
           to: "/ketik",
@@ -167,20 +183,12 @@ export default function KetikLanding() {
         });
       })
       .catch(() => {
-        if (!cancelled) setResumeError(true);
+        if (!cancelled) transitionSession({ type: "resume-failed" });
       });
     return () => {
       cancelled = true;
     };
-  }, [
-    chatRequested,
-    requestedSessionId,
-    activeChat?.id,
-    resumeAttempt,
-    userId,
-    navigate,
-    loadHistory,
-  ]);
+  }, [resumeId, userId, navigate, loadHistory, transitionSession]);
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const usageBaselineRef = useRef<UsageSnapshot | null>(null);
@@ -208,8 +216,8 @@ export default function KetikLanding() {
   }, [loadSettings]);
 
   useEffect(() => {
-    setShowSubjectPicker(false);
-  }, [accountKey, canPickParticipant]);
+    transitionSession({ type: "cancel-pick" });
+  }, [accountKey, canPickParticipant, transitionSession]);
 
   const openSession = (item: KetikHistorySummaryItem) => {
     void navigate({ to: "/ketik", search: { sesi: item.id, tahap: "telaah" } });
@@ -257,12 +265,12 @@ export default function KetikLanding() {
       settingsState !== "ready" ||
       assignmentBlocked ||
       quota.blocked ||
-      isStarting
+      !["home", "picking"].includes(flowRef.current.status)
     )
       return;
     const account = userId;
-    setShowSubjectPicker(false);
-    setIsStarting(true);
+    transitionSession({ type: "start" });
+    const startingState = flowRef.current;
     const subjectKey = subject.type === "self" ? "self" : subject.participantId;
     if (startRequest.current?.subjectKey !== subjectKey)
       startRequest.current = { id: crypto.randomUUID(), subjectKey };
@@ -272,23 +280,25 @@ export default function KetikLanding() {
       // background instead of delaying the first message.
       void captureUsageBaseline();
       const started = await ketikApi.startSession(request.id, subject);
-      if (!isCurrentAccount(account)) return;
+      if (!isCurrentAccount(account) || flowRef.current !== startingState)
+        return;
       startRequest.current = null;
       setSessionDelta(null);
-      setActiveChat(started);
+      transitionSession({ type: "started", session: started });
       await navigate({
         to: "/ketik",
         search: { sesi: started.id, tahap: "chat" },
       });
     } catch (error) {
-      if (isCurrentAccount(account))
+      if (isCurrentAccount(account) && flowRef.current === startingState) {
+        transitionSession({ type: "start-failed" });
         notify.error(
           practiceQuotaMessage(error) ??
             "Sesi belum bisa dimulai. Periksa penugasan dan pengaturan, lalu coba lagi.",
         );
+      }
     } finally {
       void quota.refetch();
-      if (isCurrentAccount(account)) setIsStarting(false);
     }
   };
   const requestStartSimulation = () => {
@@ -299,19 +309,23 @@ export default function KetikLanding() {
       isStarting
     )
       return;
-    if (canPickParticipant) setShowSubjectPicker(true);
+    if (canPickParticipant) transitionSession({ type: "pick" });
     else void startSimulation({ type: "self" });
   };
   const endSession = async () => {
-    if (!activeChat || isSaving) return;
+    if (flowRef.current.status !== "chat") return;
+    const chat = flowRef.current.session;
     const account = userId;
-    setIsSaving(true);
+    transitionSession({ type: "finish" });
+    const finishingState = flowRef.current;
+    const stillFinishing = () =>
+      isCurrentAccount(account) && flowRef.current === finishingState;
     try {
-      const item = await ketikApi.finishSession(activeChat.id);
-      if (!isCurrentAccount(account)) return;
+      const item = await ketikApi.finishSession(chat.id);
+      if (!stillFinishing()) return;
       if (!item) {
         await navigate({ to: "/ketik", search: {} });
-        setActiveChat(null);
+        transitionSession({ type: "finished", hasHistory: false });
         return;
       }
       loadHistory();
@@ -320,14 +334,14 @@ export default function KetikLanding() {
         to: "/ketik",
         search: { sesi: item.id, tahap: "telaah" },
       });
-      setActiveChat(null);
+      transitionSession({ type: "finished", hasHistory: true });
     } catch {
-      if (isCurrentAccount(account))
+      if (stillFinishing()) {
+        transitionSession({ type: "finish-failed" });
         notify.error(
           "Percakapan belum tersimpan. Chat tetap terbuka, coba akhiri lagi.",
         );
-    } finally {
-      if (isCurrentAccount(account)) setIsSaving(false);
+      }
     }
   };
 
@@ -374,13 +388,13 @@ export default function KetikLanding() {
   );
 
   const view =
-    activeChat && chatRequested && activeChat.id === requestedSessionId
+    flow.status === "chat" || flow.status === "finishing"
       ? "chat"
-      : requestedSessionId
-        ? chatRequested
-          ? "resume"
-          : "telaah"
-        : "home";
+      : flow.status === "resuming" || flow.status === "resume-failed"
+        ? "resume"
+        : flow.status === "review"
+          ? "telaah"
+          : "home";
 
   return (
     <div className="min-h-screen font-sans">
@@ -604,7 +618,9 @@ export default function KetikLanding() {
             </p>
             {resumeError && (
               <div className="mt-3 flex flex-wrap gap-3">
-                <Button onClick={() => setResumeAttempt((n) => n + 1)}>
+                <Button
+                  onClick={() => transitionSession({ type: "retry-resume" })}
+                >
                   Coba muat sesi
                 </Button>
                 <Button
@@ -685,7 +701,7 @@ export default function KetikLanding() {
           accountKey={accountKey}
           canPickParticipant={canPickParticipant}
           onConfirm={(selection) => void startSimulation(selection)}
-          onCancel={() => setShowSubjectPicker(false)}
+          onCancel={() => transitionSession({ type: "cancel-pick" })}
         />
       )}
     </div>
