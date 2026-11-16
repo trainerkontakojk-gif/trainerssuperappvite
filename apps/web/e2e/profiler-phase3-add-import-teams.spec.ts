@@ -166,6 +166,59 @@ test.describe("Profiler tahap 3: tambah, impor, dan tim di workspace", () => {
     expectHermetic(audit);
   });
 
+  test("foto peserta baru diunggah lewat API, bukan langsung ke Storage", async ({
+    page,
+  }) => {
+    const writes = collectWrites(page);
+    const fotoUrl =
+      "http://127.0.0.1:9/storage/v1/object/public/profiler-foto/x/1-y.png";
+    const audit = await openHermeticShell(page, {
+      path: "/profiler?batch=Batch%20Pagi&view=tambah",
+      waitForUrl: /\/profiler/,
+      apiMocks: [
+        {
+          method: "POST",
+          path: "/api/v1/profiler/foto",
+          status: 201,
+          body: { success: true, data: { url: fotoUrl } },
+        },
+        ...MOCKS,
+      ],
+    });
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Tambah peserta" }),
+    ).toBeVisible({ timeout: 20000 });
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "avatar.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    });
+    await page.getByLabel("Nama lengkap *").fill("Andi");
+    await page.getByRole("button", { name: "Simpan peserta" }).first().click();
+
+    await expect.poll(() => writes.length).toBe(2);
+    expect(writes[0]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/profiler/foto",
+      body: {
+        peserta_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        image: expect.stringMatching(/^data:image\/png;base64,iVBORw0KGgo/),
+      },
+    });
+    expect(writes[1]).toMatchObject({
+      method: "POST",
+      path: "/api/v1/profiler/peserta",
+      body: { nama: "Andi", foto_url: fotoUrl },
+    });
+
+    console.log("[audit]", formatAudit(audit));
+    expectHermetic(audit);
+  });
+
   test("impor: periksa per baris dulu, lalu simpan hanya baris yang siap", async ({
     page,
   }) => {

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- feat(profiler): upload participant photos through a validated API route instead of writing to Supabase Storage from the browser, and record the Telefun recording upload as the one approved direct frontend Storage write
+
 - docs(deployment): bring the deployment guide under Prettier (table padding only) and spell out a prose "+" that Prettier would have turned into a list item
 
 - docs(architecture): correct the frontend-to-Supabase edge to Auth plus the two legacy Storage uploads (no Realtime), drop the duplicated Gemini Live edge, and re-run Prettier on the rollback index and database doc

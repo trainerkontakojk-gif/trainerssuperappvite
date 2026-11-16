@@ -1,5 +1,4 @@
 import { profilerClient, unwrapResponse } from "./api";
-import { uploadProfilerPhoto } from "./profilerPhotoStorage";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -7,6 +6,18 @@ import type {
   ProfilerTim,
   ProfilerUpcomingBirthday,
 } from "@trainers/types";
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Foto gagal dibaca."));
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Foto gagal dibaca."));
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export const profilerApi = {
   // Years
@@ -120,5 +131,12 @@ export const profilerApi = {
     unwrapResponse(profilerClient.teams[":id"].$delete({ param: { id } })) as Promise<void>,
 
   // File Upload
-  uploadFoto: uploadProfilerPhoto,
+  // The API validates and stores the photo; the browser never writes to Storage.
+  uploadFoto: async (file: File, pesertaId: string): Promise<string> => {
+    const image = await readFileAsDataUrl(file);
+    const { url } = (await unwrapResponse(
+      profilerClient.foto.$post({ json: { peserta_id: pesertaId, image } }),
+    )) as { url: string };
+    return url;
+  },
 };

@@ -131,6 +131,10 @@ export default defineConfig({
       testMatch: "profiler-import-api.spec.ts",
     },
     {
+      name: "profiler-photo-real-backend",
+      testMatch: "profiler-photo-api.spec.ts",
+    },
+    {
       name: "practice-quota-real-backend",
       testMatch: "practice-quota-api.spec.ts",
     },

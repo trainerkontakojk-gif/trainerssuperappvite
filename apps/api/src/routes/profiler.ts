@@ -7,6 +7,11 @@ import * as profilerService from "../services/profiler-service";
 import { logActivity } from "../services/activity-log-service";
 import { getPesertaAccount } from "../services/admin-user-service";
 import { getUserClient } from "./pdkt/route-utils";
+import {
+  ProfilerPhotoUploadError,
+  ProfilerPhotoValidationError,
+  uploadProfilerPhoto,
+} from "../services/profiler-photo-upload";
 
 type Variables = { user: User; profile: any };
 
@@ -446,6 +451,39 @@ profiler.post("/peserta", requireCapability("profiler.write"), async (c) => {
     return c.json(
       { success: false, error: { code: "CREATE_ERROR", message: e.message } },
       400,
+    );
+  }
+});
+
+// Photos go through the API; the browser never writes to Storage.
+profiler.post("/foto", requireCapability("profiler.write"), async (c) => {
+  const parsed = z
+    .object({ peserta_id: z.string().uuid(), image: z.string() })
+    .safeParse(await c.req.json().catch(() => null));
+  try {
+    if (!parsed.success) throw new ProfilerPhotoValidationError();
+    const url = await uploadProfilerPhoto(
+      parsed.data.peserta_id,
+      parsed.data.image,
+    );
+    return c.json({ success: true, data: { url } }, 201);
+  } catch (e) {
+    if (e instanceof ProfilerPhotoValidationError)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: e.message },
+        },
+        400,
+      );
+    if (!(e instanceof ProfilerPhotoUploadError)) throw e;
+    console.error("[profiler] photo upload failed", e.cause);
+    return c.json(
+      {
+        success: false,
+        error: { code: "PROFILER_PHOTO_UPLOAD_FAILED", message: e.message },
+      },
+      503,
     );
   }
 });
