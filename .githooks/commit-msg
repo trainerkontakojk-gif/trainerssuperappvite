@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Verification trailer gate (docs/AGENT_WORKFLOW.md §4 "Verification trailer").
+# Every non-merge commit states how it was verified in a `Verified:` trailer in
+# the last paragraph of the message, for example:
+#   Verified: e2e ketik-flow-chat.spec.ts "sends a turn"; pnpm typecheck; pnpm lint
+#   Verified: none - docs-only wording change
+# `none` must carry a reason. Query later with:
+#   git log --format='%h %s%n  %(trailers:key=Verified,valueonly,separator=; )'
+# Mode: `git config trainers.verifyGate off|observe|enforce` (default observe).
+# observe warns and logs to <git-common-dir>/verify-gate.log; enforce blocks.
+set -u
+msg_file="$1"
+
+mode=$(git config --get trainers.verifyGate || true)
+case "${mode:-observe}" in
+  off) exit 0 ;;
+  observe | enforce) mode=${mode:-observe} ;;
+  *)
+    echo "commit-msg: unknown trainers.verifyGate '$mode'; using observe" >&2
+    mode=observe
+    ;;
+esac
+
+# Merge commits carry the verification of the commits they merge.
+[[ -f "$(git rev-parse --git-dir)/MERGE_HEAD" ]] && exit 0
+
+clean=$(git stripspace --strip-comments <"$msg_file")
+subject=$(printf '%s\n' "$clean" | sed -n '1p')
+# fixup!/squash! commits are folded into a commit that carries its own trailer.
+case "$subject" in "fixup! "* | "squash! "* | "amend! "*) exit 0 ;; esac
+
+values=$(printf '%s\n' "$clean" | git interpret-trailers --parse |
+  sed -n 's/^[Vv]erified:[[:space:]]*//p')
+
+problem=""
+if [[ -z "$values" ]]; then
+  problem="no 'Verified:' trailer"
+else
+  while IFS= read -r value; do
+    if [[ -z "${value//[[:space:]]/}" ]]; then
+      problem="empty 'Verified:' trailer"
+    elif printf '%s' "$value" | grep -qiE '^none[[:space:][:punct:]—–]*$'; then
+      problem="'Verified: none' without a reason"
+    fi
+  done <<<"$values"
+fi
+
+[[ -z "$problem" ]] && exit 0
+
+log="$(git rev-parse --git-common-dir)/verify-gate.log"
+printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$mode" "$problem" "$subject" >>"$log" 2>/dev/null || true
+
+cat >&2 <<EOF
+commit-msg: $problem.
+  Add a trailer to the last paragraph of the message, next to Co-Authored-By:
+    Verified: <checks that ran, e.g. e2e <spec> "<test>"; pnpm typecheck>
+    Verified: none - <why no check applies>
+  Policy: docs/AGENT_WORKFLOW.md §4 "Verification trailer".
+EOF
+
+if [[ "$mode" == enforce ]]; then
+  echo "commit-msg: blocked (trainers.verifyGate=enforce)." >&2
+  exit 1
+fi
+echo "commit-msg: allowed (trainers.verifyGate=observe); logged to $log." >&2
+exit 0

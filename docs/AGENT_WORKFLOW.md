@@ -104,6 +104,7 @@ Planning size is proportional; spec-driven thinking and mandatory evidence for b
 ### Skill gates
 
 - `trainers-superapp-tdd` is the primary TDD workflow for repository behavior changes. Load it at task start before lane classification for any Lane B/C/D behavior work — do not edit first and load later. TDD is required for behavior, bug fixes, regression tests, security, permissions, auth/RLS, schema/migration, and API-contract work. Do not load overlapping TDD workflows unless one supplies a missing capability.
+- `verify` (Claude Code project skill; other harnesses follow §7 directly) runs the changed surface through its focused local E2E, checks the outcome, and writes the `Verified:` trailer. Use it before committing any Lane B/C/D runtime change.
 - `thermo-nuclear` is required after implementation and before final verification for Lane C/D code changes. Lane B may use a self-review/checklist; Lane A skips it.
 - `ui-ux-pro-max` is required before a new interface or significant redesign. It is not required for copy-only, invisible, or a known design-token correction.
 - `impeccable` is required before the final gate for layout, interaction, responsive, accessibility, or meaningful visual changes. It is not required for documentation or invisible refactors.
@@ -122,6 +123,12 @@ Keep summaries in their owning document. Do not copy a test matrix, route invent
 Every commit in every lane, Lane A included, adds one entry to the root [`CHANGELOG.md`](../CHANGELOG.md) in the same commit. Put it under a `## YYYY-MM-DD` heading for the commit date (create the heading at the top if it is missing) as `- type(scope): summary`, matching the commit subject. Do not add the commit's own hash; backfilled entries carry one only because they predate the policy. Merge commits need no entry of their own. Commits authored by Dependabot (including squash-merges of its PRs) are exempt, because Dependabot cannot write an entry and its PR title already names each bump.
 
 Enforcement: `.githooks/pre-commit` rejects a commit whose staged diff adds no changelog bullet (`pnpm install` sets `core.hooksPath`; run `git config core.hooksPath .githooks` in an existing clone), and the CI `changelog` job runs `node scripts/check-changelog.mjs <base>` over every non-merge commit in the push or PR. Never bypass the hook with `--no-verify`.
+
+### Verification trailer
+
+Every non-merge commit states how it was verified in a `Verified:` trailer in the last paragraph of the message, next to `Co-Authored-By:`. List only checks that ran and passed for that commit, for example `Verified: e2e ketik-flow-chat.spec.ts "sends a turn"; pnpm typecheck; pnpm lint`. When no check applies, write `Verified: none - <reason>` (for example `none - docs-only wording change`); `none` without a reason does not count. The trailer makes unverified work queryable: `git log --format='%h %s%n  %(trailers:key=Verified,valueonly,separator=; )'`.
+
+Enforcement: `.githooks/commit-msg` checks the trailer. Its mode comes from `git config trainers.verifyGate` — `off`, `observe` (default: warn and append to `<git-common-dir>/verify-gate.log`), or `enforce` (block). Run `observe` first, review the log for false positives, then switch the clone to `enforce`. Merge and `fixup!`/`squash!`/`amend!` commits are exempt. Never bypass the hook with `--no-verify`.
 
 ### Wiki gate
 
@@ -202,6 +209,23 @@ Expected evidence is the focused E2E result, applicable lint/build success, and 
 
 Any verification failure is unresolved until independently explained; do not weaken a gate or change unrelated product code to make it pass.
 
+### Flaky tests
+
+A test that passes and fails on the same code is flaky, and a flaky test trains agents to rerun instead of fixing. Every Playwright config uses `retries: 0`, so a flaky test fails visibly.
+
+- Never make a test green by retrying or rerunning until it passes, adding `waitForTimeout`/sleep, raising timeouts, `test.skip`/`test.fixme`, or loosening an assertion. A conditional skip that names a missing prerequisite (for example `auth-magic-link.spec.ts` without `E2E_TEST_EMAIL`) is not a flaky-test workaround.
+- Find the root cause (an unawaited state change, shared fixture or port, leaked env, real timing) and fix the test or the code; wait on an observable condition, not on time.
+- If the root cause is still unknown at the three-round limit, escalate. Propose deleting the test, with the reason recorded in the commit message, instead of keeping a test that cannot be trusted. Deleting it needs Fajar's OK, because it removes coverage.
+- Existing `waitForTimeout`/`skip` calls in legacy specs are not rewritten wholesale; fix them when a task touches that spec or they flake.
+
+### Do not edit the judge
+
+A change must not modify the check that judges it. Do not edit a test, its fixture, a Playwright/lint/TypeScript config, a hook, or review criteria (`thermo-nuclear`, this section) to make the current change pass. Do it only when changing that check is the task itself, and then say so in the report and the commit.
+
+### Three-round escalation
+
+Fix a failing check yourself, but cap the attempts. One round is one change plus a rerun of the same failing command. If the same failure remains after three rounds, stop. Report to Fajar the command, the failing excerpt, the three hypotheses tried, and what is needed. Do not start a fourth round, and do not switch to weakening the check.
+
 ### Lane-specific stop points
 
 - Lane A: relevant syntax/format/structural checks, stale-rule checks where applicable, and `git diff --check`.
@@ -228,6 +252,7 @@ Any verification failure is unresolved until independently explained; do not wea
 - [ ] Required TDD, specialist, skill, documentation, and Wiki gates completed or explicitly not applicable.
 - [ ] Applicable checks actually ran and their exit codes are recorded.
 - [ ] Each commit adds its `CHANGELOG.md` entry (Changelog gate).
+- [ ] Each commit carries a `Verified:` trailer listing only checks that ran (Verification trailer).
 - [ ] Formatting and `git diff --check` pass.
 - [ ] No secrets, credentials, raw provider responses, or generated graph artifacts were added by a docs/config task.
 - [ ] The report states blockers instead of weakening a gate.

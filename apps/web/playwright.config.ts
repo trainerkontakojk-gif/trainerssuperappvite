@@ -21,13 +21,17 @@ export default defineConfig({
   },
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // No retries: a test that passes only on a retry is flaky and must fail
+  // visibly (docs/AGENT_WORKFLOW.md §7 "Flaky tests").
+  retries: 0,
   workers: 1,
   reporter: "list",
   use: {
     baseURL: "http://localhost:3005",
-    trace: "on-first-retry",
-    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+    // E2E_SCREENSHOT=on keeps a final-state screenshot of every test, passing
+    // ones included, so the `verify` skill can look at the changed screen.
+    screenshot: process.env.E2E_SCREENSHOT === "on" ? "on" : "only-on-failure",
   },
   projects: [
     {

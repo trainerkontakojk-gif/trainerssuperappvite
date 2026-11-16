@@ -12,6 +12,7 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 - `impeccable` — user-level skill; Supabase — the connected Supabase MCP (conditional on task need).
 - Context7 MCP — registered in `.mcp.json`; Graphify — local `graphify` CLI via Bash.
 - `supabase-migration` and `push-ready` — project skills that sequence the migration and pre-push gates; they defer to `docs/AGENT_WORKFLOW.md`.
+- `verify` — project skill that runs the changed surface through its focused local E2E, checks the screenshot or log, and writes the `Verified:` trailer; `push-ready` calls it.
 
 ## Claude Code hooks
 
@@ -24,4 +25,5 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 - `block-no-verify.sh` refuses Git commands that skip hooks (`--no-verify`, `git commit -n`, or a `core.hooksPath` override).
 - `format-changed.sh` runs Prettier on a touched `.ts`/`.tsx`/`.md` file only when that file is new or was already Prettier-clean, so legacy files are not reformatted wholesale.
 - `.githooks/pre-commit` (a Git hook, not a Claude hook) rejects commits that add no `CHANGELOG.md` entry; CI runs `scripts/check-changelog.mjs`.
+- `.githooks/commit-msg` (a Git hook) checks the `Verified:` trailer; `git config trainers.verifyGate` selects `off`, `observe` (default, warns and logs), or `enforce` (blocks).
 - `migration-rollback.sh` warns when a migration has no `supabase/rollbacks/rollback_<name>.sql`; CI enforces the same rule for new migrations.

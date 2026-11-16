@@ -15,6 +15,8 @@ Canonical gates live in `docs/AGENT_WORKFLOW.md` §7–8. This skill runs them i
 
 ## 2. Checks (stop at the first unexplained failure)
 
+For Lane B/C/D runtime changes, run the `verify` skill first: it drives the changed surface, checks the result, and drafts the `Verified:` trailer. A failing check follows its rules (no retries, skips, or edits to the judge; three rounds, then escalate to Fajar).
+
 | Lane | Run                                                                                                                                                                              |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A    | Format/structure checks for touched files, `git diff --check`                                                                                                                    |
@@ -38,7 +40,7 @@ Run one Playwright job at a time. Never run unit suites (`test:fast`, `test:core
 
 ## 3. Commit, push, report
 
-1. Commit with a subject matching the changelog entry; never bypass hooks (`--no-verify` is blocked).
+1. Commit with a subject matching the changelog entry and a `Verified:` trailer next to `Co-Authored-By:` listing only the checks from step 2 that ran and passed (or `Verified: none - <reason>`); never bypass hooks (`--no-verify` is blocked).
 2. `git push origin main` (or the branch Fajar named).
 3. Check CI once with `gh run list --limit 3` after it has had time to finish; do not leave a long-running watcher.
 

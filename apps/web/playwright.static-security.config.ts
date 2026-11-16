@@ -20,7 +20,8 @@ export default defineConfig({
     // security fixes. Return to the bundled build once a release ships a patched one.
     channel: "chrome",
     baseURL,
-    trace: "on-first-retry",
+    // retries stay 0, so "on-first-retry" would never record a trace.
+    trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
   webServer: {
