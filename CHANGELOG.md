@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-17
+
+- docs(ketik): record authorized target apply of the review job transition migration
+
 ## 2026-11-16
 
 - refactor(ketik): centralize review job status transitions with guarded SQL updates

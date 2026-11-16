@@ -1,6 +1,6 @@
 # KETIK review worker: explicit transitions and bounded deadline release
 
-Status: **WS1 implemented and locally verified (2026-11-16); remote apply pending explicit authorization. WS2/WS3 not started.** Original plan written from a read-only audit.
+Status: **WS1 implemented, pushed (`cc8baf9c`), and applied to the authorized target on 2026-11-17. WS2/WS3 not started.** Original plan written from a read-only audit.
 Baseline: HEAD `3b511754` on `main`.
 
 ## Requirement
@@ -137,8 +137,8 @@ Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
 - [x] Rollback → reapply → re-run the focused tests. Verify that the rollback restores the prior three bodies byte-for-byte (md5 of `pg_get_functiondef`) and leaves data unchanged.
 - [x] Structural check on the local catalog: every status UPDATE on the two tables lives in the helper and has an expected-status predicate.
 - [x] `thermo-nuclear` self-review; serial root typecheck/lint/build with `TURBO_CONCURRENCY=1` on each command; `GRAPHIFY_MAX_WORKERS=1 graphify update .`; changelog and diff review. See executed evidence and the explicitly open pre-existing global RPC gate below.
-- [ ] Commit `refactor(ketik): centralize review job status transitions with guarded SQL updates`, then push (outcome reported after execution, not pre-claimed in this commit).
-- [ ] **Stop.** Remote apply needs Fajar's explicit authorization. When granted, follow the "Target apply" procedure in the previous plan: preflight `migration list --linked`, apply only this file, `migration repair`, catalog readback, and serial CLI commands only.
+- [x] Commit `refactor(ketik): centralize review job status transitions with guarded SQL updates`, then push: `cc8baf9c` on `main`.
+- [x] Stop for explicit authorization, then apply only this migration with preflight, ledger repair and catalog readback. Fajar authorized the WS1 target apply on 2026-11-17; completed serially as recorded below.
 
 ### WS2: worker host (Lane C)
 
@@ -153,7 +153,7 @@ Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
 - WS1 touches result publication (`settle`). Any change to its fence or publish order can lose or duplicate scores. Keep business writes byte-identical apart from moving the status writes out.
 - The claim predicate re-check must not turn "no work" into an error. Workers treat `NULL` as idle, and errors as `cycle_failed` plus back-off.
 - Do not weaken the global `exposed-function-guard` precondition. Its pre-existing `ai_model_policy_*` drift stays reported, not fixed.
-- No remote DB command, no production deploy, no E2E against production.
+- No remote DB commands outside the explicitly authorized WS1 target apply recorded below. No production API deploy or E2E against production.
 
 ## WS1 execution evidence — 2026-11-16
 
@@ -165,7 +165,7 @@ Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
 - Helper events are closed; all six live status UPDATE statements are in the helper (three job UPDATEs and three mirrored history UPDATEs). Job predicates compare expected status; nullable history status uses `IS NOT DISTINCT FROM` as the null-safe CAS. Every status write checks ROW_COUNT. The helper and all three delegates are SECURITY INVOKER with empty search_path, anon/authenticated denied, service_role allowed (`catalog-review.log`).
 - Settle completes the fenced transition before its unchanged business writes, in the same transaction: a fence miss returns false without publication; later review/typo/score failures roll back both transition and results. Existing real-worker failure-injection E2E passed under the fixture-only call-stack guard.
 - **Claim race not reproduced.** Tests prove live/completed/future-queue rejection, helper CAS, null/expired lease reclaim, attempt exhaustion, stale-token denial and unchanged data on misses. They do not force the narrow candidate-snapshot window; the locked-row recheck was reviewed structurally. The original RED proves centralized mutation, not that concurrency race.
-- Thermo-nuclear/lifecycle/SQL-security self-review: **owned implementation PASS**; remote application is blocked pending authorization. The known unrelated global RPC-inventory gate remains red and is not represented as successful.
+- Thermo-nuclear/lifecycle/SQL-security self-review: **owned implementation PASS**; at local completion, remote application was blocked pending authorization (subsequently granted; see target apply below). The known unrelated global RPC-inventory gate remains red and is not represented as successful.
 - Graphify `graphify query 'claimKetikReview'` exited 0 and identified both claim/release callers and the two worker hosts; live code/migrations remained authoritative. Context7 was not repeated: this internal refactor reuses the existing PostgreSQL call-stack/CAS fixture and changes no external API usage or dependencies.
 
 ### Disposable target and commands
@@ -191,10 +191,27 @@ All logs below are under ignored `artifacts/ketik-review-transitions/`; traces m
 
 ### Remaining boundaries and drift
 
-- Remote apply is **not authorized and was not run**. Commit/push outcome belongs in the executor's final report, not a pre-claimed checklist item. WS2/WS3 remain separate changes/commits.
+- At local completion, remote apply was not authorized or run. Implementation was subsequently committed/pushed as `cc8baf9c`; the later authorized target apply is recorded below. WS2/WS3 remain separate changes/commits.
 - `docs/deployment.md` steps 5–6 and the `review-lifecycle.ts` fallback comment remain the planned WS3 drift. Existing legacy unit-command instructions and the old `ketik-service.ts` debug pointer remain report-only, as required.
 - Canonical `docs/database.md` now describes this migration and compatible rollback. The rollback index adds only the owned catalog row; its existing reverse-order usage example/blanket verification-query prose are not repaired by WS1.
 - A tooling-only invocation `node scripts/check-migration-rollbacks.mjs --help` exited 1 because that script accepts a base ref, not a help flag. The actual committed-migration check is run with the baseline ref after commit; no product or test gate was weakened.
+
+## WS1 target apply — 2026-11-17 (authorized)
+
+Fajar explicitly authorized applying WS1 after the implementation report. The linked project was verified as `ruosnjmtywcrghjgqugz`; no project relinking, API deployment, remote E2E or remote business-RPC invocation was performed. All remote CLI commands ran strictly serially, avoiding the temporary-login-role collision documented in the preceding session-transition plan.
+
+Logs are under ignored `artifacts/ketik-review-transitions/`:
+
+1. `supabase migration list --linked` → **0** (`remote-migration-preflight-20261117.log`). Of 127 local rows, only `20261116170000` was unapplied remotely; all 126 earlier rows matched. No `db push`.
+2. `supabase db query --linked -f artifacts/ketik-review-transitions/remote-catalog-20261117.sql` → **0** (`remote-catalog-before-20261117.log`). Read-only catalog/count preflight confirmed the helper was absent and all three prior `pg_get_functiondef` MD5s matched the disposable baseline: claim `d144627c6c7360ebba2f3b79997e1bfe`, enqueue `231cdee2b926b584676bbf172b3799a4`, settle `d6f62f94777f628c0ec2dfb5b3803956`. No queued/processing job was present.
+3. `supabase db query --linked -f supabase/migrations/20261116170000_ketik_review_job_transitions.sql` → **0** (`remote-apply-20261117.log`), applied exactly once; only this transactional DDL file.
+4. `supabase migration repair --linked --status applied 20261116170000` → **0** (`remote-repair-20261117.log`), recording only this version in the migration ledger.
+5. The same read-only catalog command → **0** (`remote-catalog-after-20261117.log`). All four functions are SECURITY INVOKER with empty search_path; ACL is postgres (owner) plus service_role only, no PUBLIC/anon/authenticated EXECUTE. All three existing RPCs delegate to the helper. The helper is the only live status writer on the two tables: **six status UPDATEs, all with expected-status predicates**. Definition MD5s: claim `ee79a48775753bb9e92f4d2497b85769`, enqueue `098127a61e60ff2bc38afb30f1510246`, settle `8eec24d68953ac215fb324f5bf75a9ea`, helper `f736331b1a86480cb15ff75e26002182`.
+6. `supabase migration list --linked` → **0** (`remote-migration-after-20261117.log`): all **127** local/remote versions match, including `20261116170000`.
+
+Business-data row counts were unchanged before/after: history **74**, jobs **38**, reviews **38**, typos **44**, queued/processing jobs **0**. The migration contains no business-data DML; only the explicit migration-ledger repair changes a ledger row. No production behavioral acceptance or race reproduction is claimed. The existing global `ai_model_policy_*` allowlist drift remains open.
+
+This follow-up changes only this execution record and `CHANGELOG.md`: scoped Prettier and diff checks apply, not a rerun of local product tests/typecheck/lint/build. The previously recorded local WS1 gates still cover the unchanged implementation. No new documentation/code inconsistency was found during readback. WS2's test-strategy decision and deployment boundary remain unstarted.
 
 ## Report back (required format)
 
