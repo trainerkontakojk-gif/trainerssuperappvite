@@ -88,6 +88,7 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.consume_practice_quota(uuid,text,text)",
   "public.enqueue_ketik_review(uuid,uuid,uuid,boolean)",
   "public.fail_ketik_session_response(uuid,uuid,uuid,uuid)",
+  "public.fail_ketik_session_turn(uuid,uuid,uuid,uuid)",
   "public.fail_telefun_scoring_permanently(uuid,text,text)",
   "public.finish_ketik_session(uuid,uuid)",
   "public.ketik_history_page(uuid,integer,text,text,timestamp with time zone,uuid)",
@@ -110,6 +111,7 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.settle_ketik_review(uuid,uuid,jsonb,boolean)",
   "public.settle_ketik_session_response(uuid,uuid,uuid,uuid,jsonb,boolean,integer)",
   "public.start_ketik_session(uuid,uuid,jsonb,text,uuid)",
+  "public.transition_ketik_session_status(uuid,uuid,text,uuid,uuid,integer)",
 ] as const;
 
 let env: LoopbackEnv;

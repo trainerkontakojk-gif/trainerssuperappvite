@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- refactor(ketik): centralize backend chat status transitions with guarded SQL updates
+
 - docs(agents): allow subagents whenever the agent judges them needed instead of only on explicit request
 
 - fix(ketik): preserve pending goodbye responses during expired chat resume

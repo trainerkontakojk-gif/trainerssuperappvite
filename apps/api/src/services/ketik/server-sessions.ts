@@ -71,6 +71,7 @@ type RpcName =
   | "start_ketik_session"
   | "claim_ketik_session_turn"
   | "publish_ketik_session_turn"
+  | "fail_ketik_session_turn"
   | "append_ketik_session_message"
   | "claim_ketik_session_response"
   | "settle_ketik_session_response"
@@ -447,14 +448,14 @@ export async function sendServerKetikTurn(
     });
     return rowToSession(published);
   } catch (error) {
-    const failed = await createAdminClient()
-      .from("ketik_session_turns")
-      .update({ status: "failed", lease: null, lease_expires_at: null })
-      .eq("session_id", id)
-      .eq("request_id", request.requestId)
-      .eq("lease", claimed.lease)
-      .eq("status", "processing");
-    if (failed.error) throw failed.error;
+    // As with split responses, stale/best-effort cleanup must not hide the
+    // original provider or publish error. Status changes share the SQL graph.
+    await rpc<boolean>("fail_ketik_session_turn", {
+      p_user_id: userId,
+      p_session_id: id,
+      p_request_id: request.requestId,
+      p_lease: claimed.lease,
+    }).catch(() => false);
     throw error;
   }
 }

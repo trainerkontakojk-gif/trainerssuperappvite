@@ -105,10 +105,42 @@ jaminan exactly-once biaya provider ketika crash/reclaim.
 Finalisasi atomik menulis history ber-ID sama tanpa skor, lalu mengosongkan
 `ketik_sessions.messages`; replay finish membaca history yang sama. Sesi kosong
 discarded. Menghapus history menghapus metadata sesi/turn lewat FK; menghapus
-metadata operasional tidak menghapus history. Rollback menolak adanya sesi aktif,
-mempertahankan history/skor, tetapi menghapus metadata sesi dan label provenance.
+metadata operasional tidak menghapus history. Rollback fondasi sesi
+`20261015140000` menolak adanya sesi aktif, mempertahankan history/skor, tetapi
+menghapus metadata sesi dan label provenance.
 Hentikan writes dahulu; pengujian apply/rollback/reapply hanya pada DB lokal
 (disposable, ledger CLI tidak diperbarui), bukan izin apply remote.
+
+### KETIK — transisi status chat terpusat
+
+Migration `20261116160000_ketik_session_status_transitions.sql` mengarahkan seluruh
+UPDATE status sesi/legacy-turn/response ke `transition_ketik_session_status`.
+Status tetap CHECK-constrained, tanpa enum/state baru:
+
+- Sesi: `active → ended | discarded`.
+- Turn: `failed → processing`, reclaim `processing → processing` hanya setelah
+  lease kedaluwarsa, lalu `processing → completed | failed`.
+- Response: `failed → processing | completed` (completed bila tidak ada balasan
+  yang masih diperlukan); `processing → completed | superseded | failed`.
+  Satu refresh konteks mempertahankan processing dengan retry count 0 → 1;
+  reclaim lebih dahulu menandai processing yang expired sebagai failed.
+
+Fungsi SECURITY INVOKER/service-role-only ini mengunci sesi milik user terlebih
+dahulu. Setiap UPDATE status memakai expected `state/status`; publish/refresh tetap
+memeriksa lease dan expiry, sedangkan failure hanya boleh memakai token lease
+request yang sama. Bulk expire/cancel hanya menyentuh processing. Transisi wajib
+yang tidak cocok mengembalikan PT409 dan me-rollback transaksi pemanggil;
+failure/cancel tanpa row yang cocok adalah no-op. INSERT di start/append/claim
+hanya menginisialisasi row, bukan mengubah status row lama. Replay terminal tidak
+membuka ulang row. Pembuatan history dan publikasi transkrip tetap atomik.
+
+`fail_ketik_session_turn` menggantikan UPDATE langsung pada cleanup endpoint
+`/turns` lama, tanpa menutupi error provider bila cleanup gagal. Tidak ada
+perubahan RLS/kolom data, worker review, model, kuota atau pencatatan pemakaian AI.
+Rollback khusus migrasi ini mengembalikan enam definisi RPC sebelumnya dan
+menghapus dua fungsi baru, tanpa menghapus/mengubah data sesi/history. Terapkan
+migrasi sebelum API baru; saat rollback hentikan writes dan pulihkan API lama
+sebelum rollback DB. Semua operasi remote tetap perlu izin eksplisit.
 
 ## ER Diagram (Overview)
 

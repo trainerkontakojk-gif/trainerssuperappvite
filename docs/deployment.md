@@ -516,6 +516,29 @@ pnpm --filter @trainers/web test -- ketik                     # KETIK landing pa
 supabase migration up
 ```
 
+### KETIK chat status transitions — schema-first (`20261116160000`)
+
+`20261116160000_ketik_session_status_transitions.sql` menambah fungsi transisi
+status terpusat dan RPC `fail_ketik_session_turn`. API baru memanggil RPC ini
+untuk cleanup endpoint `/turns` lama; API lama tetap kompatibel dengan migrasi.
+
+1. Setelah izin eksplisit pemilik target, terapkan **hanya migrasi ini** dan
+   verifikasi dua fungsi baru tetap SECURITY INVOKER/service-role-only. Jangan
+   menjalankan semua migrasi pending yang tidak terkait atau mengubah remote
+   hanya karena verifikasi lokal lulus.
+2. Migrasi target harus siap sebelum API baru di-deploy atau commit API di-push
+   ke `main`. Jika izin migrasi belum ada, tahan integrasi/push; jangan mengandalkan
+   cleanup best-effort sebagai pengganti RPC yang belum tersedia.
+3. Baru deploy API setelah schema siap. Verifikasi lokal ada di
+   `ketik-session-api-transitions.spec.ts`; ini bukan klaim penerimaan production.
+
+Rollback: hentikan chat writes, pulihkan versi API sebelumnya, lalu jalankan
+`rollback_20261116160000_ketik_session_status_transitions.sql` pada target yang
+sama setelah izin eksplisit. Rollback mengembalikan enam RPC lama dan menghapus
+kedua fungsi baru, tanpa menghapus sesi/history/ledger. Jangan rollback DB saat
+API baru masih melayani traffic. Apply/rollback/reapply pada DB disposable tidak
+mencatat history migrasi CLI dan tidak mengizinkan apply remote.
+
 ### SIDAK business dates — bounded rollout (`20261001120000`)
 
 Perubahan tanggal bisnis SIDAK (heatmap) adalah **schema-first**: migrasi harus

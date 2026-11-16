@@ -174,8 +174,20 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   provider call, expiry, lease fencing, RLS/RPC denial, finalisasi atomik dan
   penolakan legacy 410. Terapkan migration
   `20261015140000_ketik_server_sessions.sql`, lalu
-  `20261020160000_ketik_durable_agent_messages.sql`. Provider hanya HTTP fixture
+  `20261020160000_ketik_durable_agent_messages.sql`, migration closing
+  `20261021090000_ketik_post_expiry_closing.sql`, dan
+  `20261116160000_ketik_session_status_transitions.sql`. Provider hanya HTTP fixture
   deterministik; tidak ada request keluar/biaya AI.
+- Harness sesi memasang trigger **fixture saja** yang memeriksa call stack
+  PL/pgSQL setiap UPDATE state/status. Semua alur HTTP nyata harus melewati
+  `transition_ketik_session_status`; trigger dilepas saat cleanup dan tidak masuk
+  migration produk. `ketik-session-api-transitions.spec.ts` menambah batas stale
+  failure/reclaim, noop untuk request gagal yang sudah dipulihkan klien lain,
+  kegagalan cleanup tanpa menutupi error provider, cancellation pada finish,
+  denial anon/JWT serta apply/rollback/reapply tanpa kehilangan data. Rollback
+  hanya berjalan bila `E2E_SUPABASE_WORKDIR` dipilih eksplisit; tidak ada HTTP
+  writes selama versi API/DB sementara tidak cocok. E2E tetap memanggil Hono,
+  Auth/PostgREST dan PostgreSQL asli, bukan service mock.
 - `ketik-server-chat-*.spec.ts` membuktikan bubble lokal lalu append server segera,
   composer tetap aktif saat response AI, reload memakai transkrip durable,
   legacy failed resume/retry, expiry, assignment error/retry tanpa auto-start,

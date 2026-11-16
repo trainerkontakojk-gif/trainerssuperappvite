@@ -159,11 +159,39 @@ export async function setupKetikSessionSuite() {
     },
   });
   expect(saved.status).toBe(200);
+
+  // Disposable-only instrumentation: every actual HTTP status UPDATE must run
+  // inside the canonical transition function. INSERTs initialize rows. Keep a
+  // separate name so tests can still install their own failure-injection trigger.
+  fixtureSql(`
+    CREATE FUNCTION public.${triggerName}_status() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = '' AS $$
+    DECLARE stack text;
+    BEGIN
+      GET DIAGNOSTICS stack = PG_CONTEXT;
+      IF position('transition_ketik_session_status(' IN stack) = 0 THEN
+        RAISE EXCEPTION 'e2e-transition-bypass';
+      END IF;
+      RETURN NEW;
+    END; $$;
+    CREATE TRIGGER ${triggerName}_status AFTER UPDATE OF state
+      ON public.ketik_sessions FOR EACH ROW
+      EXECUTE FUNCTION public.${triggerName}_status();
+    CREATE TRIGGER ${triggerName}_status AFTER UPDATE OF status
+      ON public.ketik_session_turns FOR EACH ROW
+      EXECUTE FUNCTION public.${triggerName}_status();
+    CREATE TRIGGER ${triggerName}_status AFTER UPDATE OF status
+      ON public.ketik_session_responses FOR EACH ROW
+      EXECUTE FUNCTION public.${triggerName}_status();
+  `);
 }
 
 export async function teardownKetikSessionSuite() {
   globalThis.fetch = guardedFetch;
-  fixtureSql(`DROP FUNCTION IF EXISTS public.${triggerName}() CASCADE;`);
+  fixtureSql(`
+    DROP FUNCTION IF EXISTS public.${triggerName}_status() CASCADE;
+    DROP FUNCTION IF EXISTS public.${triggerName}() CASCADE;
+  `);
   for (const identity of [trainer, agent].filter(Boolean)) {
     const logs = await createAdmin(env)
       .from("ai_usage_logs")
