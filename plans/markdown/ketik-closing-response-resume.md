@@ -1,0 +1,49 @@
+# KETIK: preserve the closing response during resume
+
+## Requirement
+
+Fix audit finding #1 only at baseline `f3657dd4`: an active, expired chat still owes a consumer goodbye even when its last conversational message came from the consumer. `rowToSession()` must expose that outstanding response's processing/failed state so reload/resume recovers it rather than generating a fresh request or auto-retrying a failed goodbye.
+
+Lane D: backend API projection/async lifecycle contract. No new fields, migrations, model/provider logic, usage accounting or permissions. Audit finding #2 (centralizing RPC state transitions/WHERE guards), review worker and unrelated quota issues are explicitly out of scope.
+
+## Design
+
+- Preserve the existing `awaitingResponse` contract for an active chat whose agent spoke last.
+- Include an active, not-consumer-closed session whose server expiry has passed in the same pending-response projection, regardless of last speaker. Expiry is determined in backend time, not supplied by the browser.
+- Ended/discarded/consumer-closed sessions must not project awaiting/pending closing responses.
+- Keep the existing browser reducer recovery/manual-retry behavior and response request ID/lease semantics. No implicit client workaround or new fallback.
+- Smallest production change stays in `apps/api/src/services/ketik/server-sessions.ts`. E2E uses the real Hono service and local disposable Supabase/PostgreSQL, with provider responses/gates at the existing fixture boundary; browser coverage may reuse that same target if needed.
+
+## Tasklist
+
+- [x] Inspect live service/RPC/schema, route, existing API/browser E2E harnesses, workflow and Git state.
+- [x] Establish a safe disposable loopback target without touching existing stopped stacks or `.env*` files.
+- [x] Add/run RED E2E for pending/failed closing projection while the consumer spoke last, and terminal/non-expired boundaries.
+- [x] Implement smallest backend projection fix; rerun GREEN and relevant API/browser regression serially.
+- [x] Focused lifecycle/lease review plus thermo-nuclear self-review; serial root typecheck/lint/build; Graphify update; format/diff check.
+- [x] Record exact evidence, add changelog; ready to integrate only owned files after passing gates.
+
+## Disposable verification target
+
+Docker daemon is available; all existing Supabase containers are stopped and belong to previous work. Do not start/reset/delete those containers or volumes. Create a new task-owned CLI workdir under ignored `scratch/ketik-closing-resume-20261116`, with project ID `ketik-closing-resume-test-20261116`, API port 55321 and DB port 55322 after checking both ports and the named volume are unused. Use canonical repository migrations via a symlink, no fixture/production data, seed disabled, and only DB/Auth/PostgREST/Kong services required for real JWT/Hono tests. `E2E_SUPABASE_WORKDIR` lets the existing harness resolve local credentials in memory; never print them or edit `.env.integration`. Stop only the task-owned stack after verification.
+
+The legacy `scripts/integration/supabase-bootstrap.sh` is not suitable here: it starts the root developer stack and overwrites `.env.integration`, prohibited by current rules. It will not be run. No remote Supabase commands, deployments or real provider calls.
+
+Commands/evidence will be recorded below. E2E uses `pnpm --dir apps/web exec playwright test '<anchored spec>' --config=playwright.api.config.ts --project=ketik-session-real-backend -g '<test>' --reporter=line --workers=1 --trace on`. Put the file selector first and use `--project=...`: the space-separated project option is variadic and otherwise consumes the file selector. Verification must confirm the actual target identity and required migrations before fixtures run. If a disposable target cannot be established, stop and ask; do not substitute unit tests.
+
+## Evidence and review
+
+- Disposable startup: the first attempt failed because disabling the Storage schema left canonical migration `005_carbon_copy_parity.sql` without `storage.buckets`. Kept the schema enabled while still excluding the Storage runtime; the next start succeeded. Root config/bootstrap and all `.env*` files stayed untouched. Verified task API/DB URLs are loopback at 55321/55322, exactly 125 canonical migrations applied (including the three session/response/expiry migrations), and zero initial profiles. Only four task-owned services ran: DB, Auth, PostgREST, Kong.
+- RED: `E2E_SUPABASE_WORKDIR=$PWD/scratch/ketik-closing-resume-20261116 pnpm --dir apps/web exec playwright test '(^|/)ketik-session-api-lifecycle\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-session-real-backend -g 'expired closing response stays observable' --reporter=line --workers=1 --trace on`: exit 1, expected `awaitingResponse=true` but received false during the provider gate (`red.log`). Preserved trace at ignored `artifacts/ketik-closing-resume/red-trace.zip`. A prior CLI argument parsing failure occurred before tests and is not counted as RED.
+- GREEN: identical focused API command after the seven-line projection change: exit 0, 1 passed (`green.log`). It proves ordinary non-expired consumer-last stays false, expired processing/failed keeps the same response request ID, status reads make no provider calls, manual retry closes once, replay is idempotent, and ended sessions are not awaiting. Added a separate terminal-agent-last boundary case.
+- API regression: `E2E_SUPABASE_WORKDIR=$PWD/scratch/ketik-closing-resume-20261116 pnpm --dir apps/web exec playwright test '(^|/)ketik-session-api-(turns|lifecycle|integrity)\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-session-real-backend --grep-invert 'historical attachments use' --reporter=line --workers=1 --trace on --max-failures=1`: exit 0, **19 passed** (`api-regression.log`). Covers session ownership/RLS/RPC denial, lease reclaim/fencing, response context retry/supersede, idempotency, provider failure and finalization. The unrelated historical-attachment/Storage integration case was deliberately not selected: this minimum target had no Storage runtime. No full-Storage-suite claim.
+- Real browser: `E2E_KETIK_LIVE=1 E2E_SUPABASE_WORKDIR=$PWD/scratch/ketik-closing-resume-20261116 pnpm --dir apps/web exec playwright test '(^|/)ketik-closing-resume-browser\.spec\.ts$' --reporter=line --workers=1 --trace on --max-failures=1`: exit 0, **1 passed** (`browser-reload-ready.log`). Uses an actual Supabase session/JWT, real Auth/profile responses, real Hono/RPC/Postgres and the existing local provider fixture. Reload during processing sends no new respond POST; reload after failure stays manual for a scheduler/poll interval; clicking retry sends the original ID exactly once and displays the goodbye. It does not use mockAuth's fake JWT.
+- A combined UI run exposed slow real-auth/cold-start readiness exceeding the 5s default assertion; explicitly wait for the chat region with the existing 20s readiness budget before checking typing/error. Another existing expiry fixture began its 6s window before page startup and could already be expired at the first UI assertion. Fixed that owning expiry fixture to start its unchanged 6s window when the session is delivered, and added explicit region readiness to its adjacent failed-response case. No product UI/pacing changes and no weaker timing assertions.
+- Hermetic regression: `pnpm --dir apps/web exec playwright test '(^|/)(ketik-server-chat-turns|ketik-server-chat-pacing|ketik-client-lifecycle)\.spec\.ts$' --timeout=60000 --reporter=line --workers=1 --trace on --max-failures=1`: exit 0, **15 passed** (`hermetic-regression-final.log`). The initial 30s total-test cap was insufficient for an unchanged pacing case that deliberately types for 18.7s plus page startup. Only the invocation's total wall-clock budget was raised to 60s; the 17–19s response-delay bound and every other pacing/assertion limit remain unchanged. Earlier partial failures are not claimed as passes. Total distinct selected scenarios verified across separate commands: **35**, not one combined 35-test run.
+- Cleanup: before stopping, the task DB had zero remaining profiles and zero usage logs. `supabase stop --workdir $PWD/scratch/ketik-closing-resume-20261116 --no-backup` exited 0 (`stack-stop.log`), removing only task-owned containers/data volumes. No existing stopped stack/volume was started or deleted. Disposable target no longer runs; no lingering task dev server/test process.
+- Final serial gates: `TURBO_CONCURRENCY=1 pnpm typecheck`, `TURBO_CONCURRENCY=1 pnpm lint`, `TURBO_CONCURRENCY=1 pnpm build`: all exit 0 (`typecheck.log`, `lint.log`, `build.log`). API and web tasks executed; unchanged workspaces reused Turbo cache. Root web lint retains the pre-existing 74 warnings, zero errors. Scoped ESLint for the API service and three owned E2E files: exit 0/no warnings (`scoped-*-lint.log`).
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .`: exit 0, one AST worker, ignored local graph only (`graphify.log`). No external API/dependency changes, so no Context7 lookup needed.
+- Focused backend lifecycle/lease and thermo-nuclear self-review: PASS. Production delta is solely `rowToSession()` awaiting-response projection: active + not closed + (last agent OR server expiry). Existing SQL locks/leases/status writes, JWT authorization, usage logging, provider behavior and worker are untouched. No independent/delegated review claimed. `git diff --check` passed.
+- Docs now record the expired pending-goodbye resume contract and its opt-in browser reproduction. No new migration, production database operation or deployment command. Audit finding #2 remains open/out of scope.
+
+Unrelated untracked plans preserved: cloudflare-security-audit-partial-2026-11-04.md, sidak-temuan-row-cache.md, supabase-egress-reduction.md.

@@ -189,6 +189,7 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   `systemInstruction`, karena KETIK memaksa model ke Gemini. Guard menolak egress lain, provider
   hanya respons HTTP lokal, dan fixture/usage dihapus. Tanpa flag, tes di-skip;
   flag bukan pengganti guard env/target loopback. Trace berisi auth lokal: jangan commit.
+- `ketik-closing-resume-browser.spec.ts` opt-in dengan `E2E_KETIK_LIVE=1` memakai JWT/Hono/Postgres nyata dari target disposable `E2E_SUPABASE_WORKDIR`, mengikuti transport browser sesi yang sama. Reload saat pesan pamit processing tetap polling tanpa request AI baru; reload setelah pamit gagal tetap menunggu retry eksplisit dengan request ID yang sama. Provider hanya fixture lokal. Pasangan API di `ketik-session-api-lifecycle.spec.ts` membuktikan proyeksi expired/processing/failed/terminal; tidak ada perubahan SQL atau worker review.
 - `ketik-flow-*.spec.ts` membuktikan settings gagal dengan/tanpa backup tidak bisa
   memulai simulasi, retry gagal tetap gagal, dan retry sukses tidak otomatis
   memulai chat. Screenshot error desktop/mobile disimpan pada output tes.

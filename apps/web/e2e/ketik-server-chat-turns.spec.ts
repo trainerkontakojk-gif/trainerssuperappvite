@@ -146,6 +146,7 @@ test("failed response resumes without automatic generation and retries the same 
     });
   });
   const room = page.getByRole("region", { name: "Ruang chat" });
+  await expect(room).toBeVisible({ timeout: 20000 });
   await expect(room.getByRole("alert")).toContainText(
     "Balasan konsumen belum tersedia",
   );
@@ -293,9 +294,6 @@ test("at expiry the consumer says goodbye once and the agent can still send clos
   let live = session({
     version: 2,
     agentVersion: 1,
-    // Real time, not page.clock: a faked clock stalls the typing indicator's
-    // exit animation.
-    expiresAt: new Date(now + 6000).toISOString(),
     messages: [
       {
         id: "agent-1",
@@ -316,9 +314,14 @@ test("at expiry the consumer says goodbye once and the agent can still send clos
     apiMocks: base,
     expectedThirdPartyHosts: ["randomuser.me"],
   });
-  await page.route(`**/api/v1/ketik/sessions/${id}`, (route) =>
-    route.fulfill({ json: { success: true, data: live } }),
-  );
+  let deadline: string | undefined;
+  await page.route(`**/api/v1/ketik/sessions/${id}`, (route) => {
+    // Start the six-second window when the browser receives the session, not
+    // before cold Vite/auth startup. Keep real time: page.clock stalls animation.
+    deadline ??= new Date(Date.now() + 6000).toISOString();
+    live = { ...live, expiresAt: deadline };
+    return route.fulfill({ json: { success: true, data: live } });
+  });
   let responseCalls = 0;
   await page.route(`**/api/v1/ketik/sessions/${id}/respond`, async (route) => {
     responseCalls++;

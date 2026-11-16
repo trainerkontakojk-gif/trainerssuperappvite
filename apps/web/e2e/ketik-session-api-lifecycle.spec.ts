@@ -131,6 +131,162 @@ test("after expiry the consumer closes once with a reason and the agent can stil
   suite.providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
 });
 
+test("expired closing response stays observable while processing and failed, then retries the same request", async () => {
+  const session = await start();
+  const db = createAdmin(env);
+  expect(
+    (
+      await api(trainer, `/sessions/${session.id}/messages`, "POST", {
+        requestId: randomUUID(),
+        expectedAgentVersion: 0,
+        text: "Ada yang bisa dibantu?",
+      })
+    ).status,
+  ).toBe(200);
+  suite.providerText = "Tagihan saya ganda.";
+  expect(
+    (
+      await api(trainer, `/sessions/${session.id}/respond`, "POST", {
+        requestId: randomUUID(),
+      })
+    ).status,
+  ).toBe(200);
+  const ordinary = (
+    await (await api(trainer, `/sessions/${session.id}`)).json()
+  ).data;
+  expect(ordinary.messages.at(-1).sender).toBe("consumer");
+  expect(ordinary.awaitingResponse).toBe(false);
+  expect(ordinary.pendingResponse).toBeNull();
+  expect(
+    (
+      await db
+        .from("ketik_sessions")
+        .update({ expires_at: new Date(Date.now() - 1000).toISOString() })
+        .eq("id", session.id)
+    ).error,
+  ).toBeNull();
+
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  suite.providerGate = async () => {
+    entered();
+    await gate;
+  };
+  suite.failProvider = true;
+  const requestId = randomUUID();
+  const closing = api(trainer, `/sessions/${session.id}/respond`, "POST", {
+    requestId,
+  });
+  try {
+    await started;
+    const calls = suite.providerCalls;
+    const response = await api(trainer, `/sessions/${session.id}`);
+    expect(response.status).toBe(200);
+    const resumed = (await response.json()).data;
+    expect(resumed.messages.at(-1).sender).toBe("consumer");
+    expect(resumed.awaitingResponse).toBe(true);
+    expect(resumed.pendingResponse).toMatchObject({
+      requestId,
+      status: "processing",
+    });
+    expect(resumed.pendingResponse.leaseExpiresAt).not.toBeNull();
+    expect(suite.providerCalls).toBe(calls); // Reading status never claims/generates.
+
+    release();
+    expect((await closing).status).toBe(502);
+    suite.providerGate = null;
+    const failed = (
+      await (await api(trainer, `/sessions/${session.id}`)).json()
+    ).data;
+    expect(failed.awaitingResponse).toBe(true);
+    expect(failed.pendingResponse).toMatchObject({
+      requestId,
+      status: "failed",
+      leaseExpiresAt: null,
+    });
+    const failedCalls = suite.providerCalls;
+    expect((await api(trainer, `/sessions/${session.id}`)).status).toBe(200);
+    expect(suite.providerCalls).toBe(failedCalls);
+
+    suite.failProvider = false;
+    suite.providerText =
+      "Saya ada urusan dulu, nanti saya hubungi lagi ya kak.";
+    const retry = await api(
+      trainer,
+      `/sessions/${session.id}/respond`,
+      "POST",
+      { requestId },
+    );
+    expect(retry.status).toBe(200);
+    const closed = (await retry.json()).data;
+    expect(closed.consumerClosed).toBe(true);
+    expect(closed.awaitingResponse).toBe(false);
+    expect(closed.pendingResponse).toBeNull();
+    expect(
+      closed.messages.filter(
+        (message: { text: string }) => message.text === suite.providerText,
+      ),
+    ).toHaveLength(1);
+    const settledCalls = suite.providerCalls;
+    expect(
+      (
+        await api(trainer, `/sessions/${session.id}/respond`, "POST", {
+          requestId,
+        })
+      ).status,
+    ).toBe(200);
+    expect(suite.providerCalls).toBe(settledCalls);
+    expect(
+      (await api(trainer, `/sessions/${session.id}/finish`, "POST", {})).status,
+    ).toBe(200);
+    const ended = (await (await api(trainer, `/sessions/${session.id}`)).json())
+      .data;
+    expect(ended.state).toBe("ended");
+    expect(ended.awaitingResponse).toBe(false);
+    expect(ended.pendingResponse).toBeNull();
+  } finally {
+    suite.providerGate = null;
+    suite.failProvider = false;
+    suite.providerText = "Tagihan saya ganda.[BREAK]Mohon dibantu.";
+    release();
+    await closing;
+  }
+});
+
+test("terminal sessions do not await a response when the final message came from the agent", async () => {
+  const session = await start();
+  const calls = suite.providerCalls;
+  const appended = await api(
+    trainer,
+    `/sessions/${session.id}/messages`,
+    "POST",
+    {
+      requestId: randomUUID(),
+      expectedAgentVersion: 0,
+      text: "Saya akhiri percakapan ini.",
+    },
+  );
+  expect(appended.status).toBe(200);
+  expect((await appended.json()).data.awaitingResponse).toBe(true);
+  expect(
+    (await api(trainer, `/sessions/${session.id}/finish`, "POST", {})).status,
+  ).toBe(200);
+  const loaded = (await (await api(trainer, `/sessions/${session.id}`)).json())
+    .data;
+  expect(loaded.state).toBe("ended");
+  expect(loaded.consumerClosed).toBe(false);
+  expect(loaded.messages.at(-1).sender).toBe("agent");
+  expect(loaded.awaitingResponse).toBe(false);
+  expect(loaded.pendingResponse).toBeNull();
+  expect(suite.providerCalls).toBe(calls);
+});
+
 test("a closing after the consumer already said goodbye adds no message", async () => {
   const session = await start();
   const db = createAdmin(env);

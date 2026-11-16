@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- fix(ketik): preserve pending goodbye responses during expired chat resume
+
 - refactor(ketik): make usage display and PDF download lifecycles explicit and fence stale session results
 
 - refactor(ketik): make assignment, history actions, CSV export, and replay playback lifecycles explicit

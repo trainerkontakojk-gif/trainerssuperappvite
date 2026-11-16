@@ -135,8 +135,13 @@ async function rowToSession(
   const lastConversationalMessage = [...messages]
     .reverse()
     .find((message) => message.sender !== "system");
+  // An expired active chat owes one goodbye even if the consumer spoke last.
+  // Keep its processing/failed response visible to resume and manual retry.
   const awaitingResponse =
-    !row.consumer_closed && lastConversationalMessage?.sender === "agent";
+    row.state === "active" &&
+    !row.consumer_closed &&
+    (lastConversationalMessage?.sender === "agent" ||
+      Date.parse(row.expires_at) <= Date.now());
   return {
     id: row.id,
     state: row.state,
