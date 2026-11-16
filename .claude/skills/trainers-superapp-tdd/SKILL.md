@@ -14,8 +14,8 @@ Use for this repository, especially `apps/telefun`, `apps/api`, `apps/web`, and 
 - `AGENTS.md` and `docs/AGENT_WORKFLOW.md` take precedence over this skill. For runtime behavior/regressions, use focused Playwright E2E as the default regression test, RED-first when applicable, against a verified local or explicitly test-only disposable target.
 - If E2E cannot prove a distinct invariant, stop and ask Fajar (use `AskUserQuestion`) before adding or running any non-E2E test. Never add unit tests to `scripts/test-core.json` or `scripts/test-fast.json`.
 - Write the focused failing test first (RED), run it, then implement the minimum (GREEN), then refactor.
-- Default execution is direct implementation in this Claude Code session. Edits, reviews, verdicts, and every test, dev-server, or Supabase run stay in the main session; do not spawn subagents for them unless the user explicitly asks.
-- Standing exception (Fajar, 2026-11-15): the read-only `Explore` and `log-reader` agents may be used without asking — `Explore` for a broad search whose location is unknown, `log-reader` for a long log or test output that already exists on disk. Go straight to `rg`/Read when the file or symbol is known, and open the reported lines yourself before acting on them.
+- Subagents (Fajar, 2026-11-16): use them whenever you judge they are needed, without asking first. Pick the model by task kind — haiku for search, file finding, and log reading; sonnet for reading or comparing diffs against a plan; opus for edits, security, database/RLS, lifecycle reasoning, or any verdict that decides a commit. Open the lines a subagent reports and verify its key claims before acting on or reporting them.
+- Machine limit still applies across the main session and all subagents: at most one Playwright run or dev server at a time (the `one-test-run.sh` hook enforces Playwright).
 - Keep tests in the app they exercise. Do not modify unrelated files.
 - Knowledge tools: follow the Graphify/Context7 matrix in `docs/AGENT_WORKFLOW.md` §5 using the project `graphify` and `context7` skills.
 

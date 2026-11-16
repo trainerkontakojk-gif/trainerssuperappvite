@@ -21,7 +21,7 @@ This runbook complements [`AGENTS.md`](../AGENTS.md) and the canonical lane/gate
 
 ## Delegation
 
-Direct work is the default; delegate only when the user explicitly requests it. The parent/orchestrator is gate and advisor only for delegated work; workers own implementation. Verify the exact provider, model, and thinking level from live inventory, and give each worker a small scoped brief; do not spawn status-only workers. Continue a same-owner repair in a persistent session only if the original worker session was persisted, ownership is identical, and loaded changes are verified; otherwise use a fresh worker with scoped findings. Keep independent reviewers fresh and read-only; never warm-share implementer history with a reviewer. See the installed `orchestrator-mode` skill at `~/.pi/agent/skills/orchestrator-mode/SKILL.md` for the detailed workflow.
+Delegate whenever the orchestrator judges it needed; an explicit user request is not required. The parent/orchestrator is gate and advisor only for delegated work; workers own implementation. Verify the exact provider, model, and thinking level from live inventory, and give each worker a small scoped brief; do not spawn status-only workers. Continue a same-owner repair in a persistent session only if the original worker session was persisted, ownership is identical, and loaded changes are verified; otherwise use a fresh worker with scoped findings. Keep independent reviewers fresh and read-only; never warm-share implementer history with a reviewer. See the installed `orchestrator-mode` skill at `~/.pi/agent/skills/orchestrator-mode/SKILL.md` for the detailed workflow.
 
 ## Cache facts and caveats
 
