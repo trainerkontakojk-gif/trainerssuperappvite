@@ -438,6 +438,54 @@ for (const status of ["pending", "processing", "failed"])
     if (await button.count()) await expect(button).toBeDisabled();
     expectHermetic(audit);
   });
+test("PDF generation stays single-flight and allows another download after completion", async ({
+  page,
+}) => {
+  const audit = await open(page);
+  const button = page.getByRole("button", { name: "Unduh PDF" });
+  await expect(button).toBeEnabled({ timeout: 20000 });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started = false;
+  let downloads = 0;
+  page.on("download", () => {
+    downloads++;
+  });
+  await page.route(
+    "**/src/routes/ketik/utils/ketikReviewPdf.ts*",
+    async (route) => {
+      started = true;
+      await gate;
+      await route.fallback();
+    },
+  );
+  try {
+    const first = page.waitForEvent("download");
+    await button.click();
+    await expect.poll(() => started).toBe(true);
+    await expect(button).toBeDisabled();
+    await page.keyboard.press("Enter");
+    expect(downloads).toBe(0);
+    release();
+    const file = await first;
+    expect(
+      (await readFile((await file.path())!)).subarray(0, 5).toString(),
+    ).toBe("%PDF-");
+    await expect(button).toBeEnabled();
+    expect(downloads).toBe(1);
+    const second = page.waitForEvent("download");
+    await button.click();
+    expect((await second).suggestedFilename()).toBe(`ketik_telaah_${id}.pdf`);
+    await expect(button).toBeEnabled();
+    expect(downloads).toBe(2);
+    expectHermetic(audit);
+  } finally {
+    release();
+  }
+});
+
 test("gagal memuat generator menampilkan error dan tidak mengunduh", async ({
   page,
 }) => {
@@ -460,6 +508,65 @@ test("gagal memuat generator menampilkan error dan tidak mengunduh", async ({
   await expect(button).toBeEnabled();
   expect(downloads).toBe(0);
   expectHermetic(audit);
+});
+
+test("late PDF module failure after leaving the review has no stale error or download", async ({
+  page,
+}) => {
+  const audit = await open(page);
+  const button = page.getByRole("button", { name: "Unduh PDF" });
+  await expect(button).toBeEnabled({ timeout: 20000 });
+  // Resolve the independent downloader import first, so the delayed generator
+  // failure is the only outstanding asset when the review is left.
+  await page.evaluate(async () => {
+    const path = "/src/utils/sessionReviewPdf.ts";
+    await import(path);
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let started = false;
+  let downloads = 0;
+  page.on("download", () => {
+    downloads++;
+  });
+  await page.route(
+    "**/src/routes/ketik/utils/ketikReviewPdf.ts*",
+    async (route) => {
+      started = true;
+      await gate;
+      await route.fulfill({
+        contentType: "text/javascript",
+        body: "globalThis.__ketikPdfAssetEvaluated = true; throw new Error('PDF_ASSET_FAILED');",
+      });
+    },
+  );
+  try {
+    await button.click();
+    await expect.poll(() => started).toBe(true);
+    await expect(button).toBeDisabled();
+    await page.getByRole("button", { name: "KETIK", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: /Pahami konsumennya/ }),
+    ).toBeVisible();
+    const late = page.waitForResponse((response) =>
+      response.url().includes("/src/routes/ketik/utils/ketikReviewPdf.ts"),
+    );
+    release();
+    await late;
+    await page.waitForFunction(
+      () => Reflect.get(globalThis, "__ketikPdfAssetEvaluated") === true,
+    );
+    await page.waitForTimeout(1000);
+    await expect(
+      page.getByText("PDF belum bisa dibuat. Coba lagi.", { exact: true }),
+    ).toHaveCount(0);
+    expect(downloads).toBe(0);
+    expectHermetic(audit);
+  } finally {
+    release();
+  }
 });
 
 test("gagal memuat jsPDF tidak menghasilkan unduhan", async ({ page }) => {

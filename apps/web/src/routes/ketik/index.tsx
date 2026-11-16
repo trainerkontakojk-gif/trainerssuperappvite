@@ -40,13 +40,8 @@ import { notify } from "../../lib/toast";
 import { practiceQuotaMessage } from "../../lib/practice-quota";
 import { usePracticeQuota } from "../../hooks/usePracticeQuota";
 import { QuotaLine } from "../../components/simulation/QuotaLine";
-import {
-  pollUsageDelta,
-  formatUsageDeltaLabel,
-  type UsageDelta,
-  type UsageSnapshot,
-} from "../../lib/usage-snapshot";
-import { fetchUsageSummary } from "../../lib/usage-summary";
+import { formatUsageDeltaLabel } from "../../lib/usage-snapshot";
+import { useKetikUsageDelta } from "./hooks/useKetikUsageDelta";
 import { KetikAssignmentDialog } from "./components/KetikAssignmentDialog";
 
 /** Kepanjangan KETIK dari metadata modul kanonik (`lib/app-config.ts`). */
@@ -189,9 +184,12 @@ export default function KetikLanding() {
       cancelled = true;
     };
   }, [resumeId, userId, navigate, loadHistory, transitionSession]);
-  const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
-  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
-  const usageBaselineRef = useRef<UsageSnapshot | null>(null);
+  const usage = useKetikUsageDelta(userId, requestedSessionId);
+  const {
+    sessionDelta,
+    sessionDeltaPending,
+    compute: computeUsageDelta,
+  } = usage;
 
   const loadSettings = useCallback(async () => {
     const request = ++settingsRequestRef.current;
@@ -227,39 +225,6 @@ export default function KetikLanding() {
     void navigate({ to: "/ketik/history" });
   };
 
-  const captureUsageBaseline = async () => {
-    try {
-      usageBaselineRef.current = await fetchUsageSummary("ketik");
-    } catch {
-      usageBaselineRef.current = null;
-    }
-  };
-
-  /**
-   * Selisih pemakaian sejak chat dimulai (simulasi + telaah). Pemberitahuan
-   * hanya muncul setelah telaah selesai, saat kedua biaya sudah tercatat.
-   */
-  const computeUsageDelta = async (notifyUser: boolean) => {
-    const baseline = usageBaselineRef.current;
-    if (!baseline) return;
-    setSessionDeltaPending(true);
-    try {
-      const delta = await pollUsageDelta(
-        () => fetchUsageSummary("ketik"),
-        baseline,
-      );
-      setSessionDelta(delta);
-      if (notifyUser && delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
-        notify.info(`Pemakaian AI sesi ini: ${formatUsageDeltaLabel(delta)}`);
-        usageBaselineRef.current = null;
-      }
-    } catch (error) {
-      console.warn("[Ketik] Failed to compute usage delta:", error);
-    } finally {
-      setSessionDeltaPending(false);
-    }
-  };
-
   const startSimulation = async (subject: SimulationSubjectSelection) => {
     if (
       settingsState !== "ready" ||
@@ -275,15 +240,16 @@ export default function KetikLanding() {
     if (startRequest.current?.subjectKey !== subjectKey)
       startRequest.current = { id: crypto.randomUUID(), subjectKey };
     const request = startRequest.current;
+    // Starting makes no AI call: capture usage in the background, never block chat.
+    const usageScope = usage.begin();
     try {
-      // Starting makes no AI call, so the monthly usage baseline loads in the
-      // background instead of delaying the first message.
-      void captureUsageBaseline();
       const started = await ketikApi.startSession(request.id, subject);
-      if (!isCurrentAccount(account) || flowRef.current !== startingState)
+      if (!isCurrentAccount(account) || flowRef.current !== startingState) {
+        usage.cancel(usageScope);
         return;
+      }
+      usage.bind(usageScope, started.id);
       startRequest.current = null;
-      setSessionDelta(null);
       transitionSession({ type: "started", session: started });
       await navigate({
         to: "/ketik",
@@ -291,6 +257,7 @@ export default function KetikLanding() {
       });
     } catch (error) {
       if (isCurrentAccount(account) && flowRef.current === startingState) {
+        usage.cancel(usageScope);
         transitionSession({ type: "start-failed" });
         notify.error(
           practiceQuotaMessage(error) ??

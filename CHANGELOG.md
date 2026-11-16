@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- refactor(ketik): make usage display and PDF download lifecycles explicit and fence stale session results
+
 - refactor(ketik): make assignment, history actions, CSV export, and replay playback lifecycles explicit
 
 - refactor(ketik): centralize client session, chat, and review lifecycles in explicit reducers and keep failed response recovery manual and idempotent

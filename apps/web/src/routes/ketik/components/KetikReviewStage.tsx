@@ -17,6 +17,7 @@ import { cn } from "cn";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { Button } from "../../../components/ui/button";
 import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
+import { useKetikReviewPdf } from "../hooks/useKetikReviewPdf";
 import { notify } from "../../../lib/toast";
 import { normalizeMessagesForDisplay } from "../lib/message-utils";
 import {
@@ -68,7 +69,6 @@ export function KetikReviewStage({
     null,
   );
   const attachmentTrigger = useRef<HTMLButtonElement | null>(null);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [replayOpen, setReplayOpen] = useState(false);
   const [rerunOpen, setRerunOpen] = useState(false);
   const [target, setTarget] = useState<KetikReviewTarget | null>(null);
@@ -82,6 +82,18 @@ export function KetikReviewStage({
     [session.messages],
   );
   const numbers = useMemo(() => numberMessages(messages), [messages]);
+  const pdf = useKetikReviewPdf(
+    review.phase === "ready" && !review.rerunFailed
+      ? {
+          session,
+          review: review.review,
+          typos: review.typos,
+          previousScore,
+          numbers,
+          canRerun: canStartReview,
+        }
+      : null,
+  );
   const typosByMessage = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const typo of review.typos) {
@@ -144,36 +156,6 @@ export function KetikReviewStage({
     focusReviewTarget(element);
   };
 
-  const handleDownloadPdf = async () => {
-    if (
-      downloadingPdf ||
-      review.phase !== "ready" ||
-      !review.review ||
-      review.rerunFailed
-    )
-      return;
-    setDownloadingPdf(true);
-    try {
-      const [{ generateKetikReviewPdf }, { downloadPdf }] = await Promise.all([
-        import("../utils/ketikReviewPdf"),
-        import("../../../utils/sessionReviewPdf"),
-      ]);
-      const bytes = await generateKetikReviewPdf({
-        session,
-        review: review.review,
-        typos: review.typos,
-        previousScore,
-        numbers,
-        canRerun: canStartReview,
-      });
-      downloadPdf(bytes, `ketik_telaah_${session.id}.pdf`);
-    } catch {
-      notify.error("PDF belum bisa dibuat. Coba lagi.");
-    } finally {
-      setDownloadingPdf(false);
-    }
-  };
-
   const participant =
     session.simulationSubject?.type === "participant"
       ? formatSimulationSubjectLabel(session.simulationSubject)
@@ -234,12 +216,12 @@ export function KetikReviewStage({
             type="button"
             variant="outline"
             disabled={
-              downloadingPdf ||
+              pdf.status === "generating" ||
               review.phase !== "ready" ||
               !review.review ||
               review.rerunFailed
             }
-            onClick={() => void handleDownloadPdf()}
+            onClick={() => void pdf.run()}
             className="min-h-[44px] min-w-[44px] gap-2 px-3 text-[13px]"
           >
             <Download data-icon="inline-start" />
