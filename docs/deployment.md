@@ -490,12 +490,16 @@ curl http://localhost:3001/api/health
 #  -> Cek raw aiResponse.text untuk diagnosis lebih lanjut
 
 # 5. Jika error "AI tidak tersedia dari provider manapun."
-#  -> Cek GEMINI_API_KEY dan OPENAI_API_KEY di service API
-#  -> Verifikasi dengan curl ke endpoint AI provider
+#  -> Cek kebijakan model aktif ketik_review dan ketik_review_fallback di admin
+#  -> Default keduanya Gemini (gemini-3.8-flash / gemini-3.5-flash-lite): cek GEMINI_API_KEY di service API
+#  -> OPENAI_API_KEY hanya relevan untuk telaah KETIK bila admin memilih model OpenAI
+#  -> Jangan menjalankan smoke/provider berbayar tanpa izin terpisah
 
-# 6. Jika review stuck "processing" lebih dari 5 menit
-#  -> Polling akan auto-mark failed (lease timeout + 30s grace)
-#  -> Klik "Jalankan Ulang Analisis" untuk retry
+# 6. Jika telaah tetap "processing"
+#  -> Polling read-only; tidak mengubah status berdasarkan umur antrean atau lease
+#  -> Worker mengambil ulang job setelah lease habis (minimum lease 600 detik, dihitung dari timeout model)
+#  -> Maksimum 3 attempt; setelah budget habis, worker menandai job failed
+#  -> Setelah failed, gunakan "Coba telaah lagi" bila izin akun memungkinkan
 ```
 
 ### Test Commands (KETIK Specific)
@@ -948,7 +952,7 @@ Konfigurasi worker:
 | `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014                   | Integer 0–65535; 0 untuk port ephemeral tes; standalone saja                   |
 | `KETIK_REVIEW_WORKER_DEADLINE_MS` | Tidak diset            | Khusus `NODE_ENV=test`, integer 250–3600000; ditolak di production/development |
 
-Concurrency per proses = 1. Lease dihitung dari registry timeout: dua percobaan kompatibilitas Gemini + satu fallback OpenAI + 120 detik grace, minimum 600 detik. Tiga claim maksimum per permintaan manual. Crash/timeout dapat mengulangi panggilan provider; tidak ada jaminan exactly-once billing. SDK yang terlambat selesai tidak boleh memublikasikan hasil setelah token lease hilang/kedaluwarsa.
+Concurrency per proses = 1. Lease dihitung dari timeout primary dan fallback pada kebijakan model yang di-resolve saat claim: `max(600, ceil((2 * timeoutPrimaryMs + timeoutFallbackMs) / 1000) + 120)` detik. Budget mencakup satu retry kompatibilitas primary, satu fallback yang dikonfigurasi, dan 120 detik grace; tidak mengasumsikan provider fallback tertentu. Tiga claim maksimum per permintaan manual. Crash/timeout dapat mengulangi panggilan provider; tidak ada jaminan exactly-once billing. SDK yang terlambat selesai tidak boleh memublikasikan hasil setelah token lease hilang/kedaluwarsa.
 
 Saat antrean kosong atau polling gagal, jeda polling berlipat hingga batas idle; enqueue di proses yang sama segera membangunkan worker. Sinyal ini tidak lintas proses: enqueue dari API lain (misalnya Coolify dengan worker nonaktif) atau ke worker standalone menunggu polling berikutnya hingga `KETIK_REVIEW_WORKER_IDLE_MAX_MS`.
 

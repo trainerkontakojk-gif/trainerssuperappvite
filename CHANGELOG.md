@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): align review troubleshooting and lease guidance with current worker behavior
+
 - fix(ketik): bound deadline review release and make worker host lifecycle explicit
 
 - docs(ketik): record authorized target apply of the review job transition migration

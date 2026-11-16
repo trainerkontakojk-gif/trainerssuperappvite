@@ -1,6 +1,6 @@
 # KETIK review worker: explicit transitions and bounded deadline release
 
-Status: **WS1 implemented, pushed (`cc8baf9c`), and applied to the authorized target on 2026-11-17. WS2 implemented and locally verified; push held for separate deployment approval. WS3 deployment-debug edits not started; its code comment was fixed with WS2.** Original plan written from a read-only audit.
+Status: **WS1 implemented, pushed (`cc8baf9c`), and applied to the authorized target on 2026-11-17. WS2 committed locally (`3b3af406`) with all local gates passed. WS3 documentation corrected; Fajar authorized pushing WS2 and WS3 together after WS3 checks. Its code comment was already fixed with WS2.** Original plan written from a read-only audit.
 Baseline: HEAD `3b511754` on `main`.
 
 ## Requirement
@@ -117,12 +117,14 @@ Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
 ### WS0: intake (all workstreams)
 
 - [x] Read `AGENTS.md`, `docs/AGENT_WORKFLOW.md`, this plan, and `plans/markdown/ketik-backend-status-transitions.md`. Load `trainers-superapp-tdd` before any WS1/WS2 edit; load `supabase-migration` for WS1.
-- [ ] Drift-check every file:line above against HEAD. Grep for **all** writers of `ketik_review_jobs.status` and `ketik_history.review_status` (`supabase/migrations/`, latest definitions only; `apps/api/src`). Add any missed writer to WS1 scope or report it.
+- [x] Drift-check every file:line above against HEAD. Grep for **all** writers of `ketik_review_jobs.status` and `ketik_history.review_status` (`supabase/migrations/`, latest definitions only; `apps/api/src`). Add any missed writer to WS1 scope or report it.
 - [x] `graphify query` for `releaseKetikReview` / `claimKetikReview` callers (Lane C/D rule).
 
 ### WS3: docs (can go first; smallest)
 
-- [ ] Edit the docs and the comment as designed → Prettier on touched files → `git diff --check` → commit `docs(ketik): …` with a changelog entry → push.
+- [x] Correct deployment debug steps 5–6 and the additional stale lease-budget paragraph. The code comment was corrected in WS2; use the verified current retry label, not the removed label.
+- [x] Scoped Prettier, source/document structural checks, and `git diff --check`; no product tests for Lane A.
+- [ ] Separate `docs(ketik): …` commit with changelog → push together with WS2, as Fajar requested (outcome in final report).
 
 ### WS1: DB transitions (Lane D)
 
@@ -147,8 +149,8 @@ Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
 - [x] Implement the host union, `transitionHost`, `releaseWithin`, and the deadline-path bound, plus the approved test-only override.
 - [x] GREEN: five new E2E scenarios and both worker projects in full, including the existing SIGTERM/SIGKILL/health/wake/backoff/publication scenarios.
 - [x] `thermo-nuclear` self-review, serial root gates, graphify update, scoped lint/format checks, changelog and task-owned cleanup; evidence below.
-- [ ] Commit `fix(ketik): bound deadline review release and make worker host lifecycle explicit` locally (outcome in final report).
-- [ ] **HOLD PUSH:** obtain separate approval before pushing WS2 to `main`, because it triggers Railway auto-deploy. No Railway mutation/deploy or remote DB action is authorized by this workstream.
+- [x] Commit `fix(ketik): bound deadline review release and make worker host lifecycle explicit` locally: `3b3af406`.
+- [ ] Push WS2 only after WS3 is fixed and checked: Fajar authorized this sequence on 2026-11-17. Push to `main` triggers Railway auto-deploy; no manual Railway deployment or remote DB action is part of this step.
 
 ## Risks and boundaries
 
@@ -252,7 +254,17 @@ All logs/traces below are ignored under `artifacts/ketik-review-host/`. Traces c
 - Existing wrapper-level flags in `ketik-review-worker-entrypoint.ts` (`stopping`) and `api-runtime.ts` (`shutdownStarted`) remain legacy and untouched; this workstream replaces only the runtime's five scoped flags/handles. No claim that all process hosts or Telefun lifecycles have been remodeled.
 - Remaining doc/code drift: WS3 deployment-debug steps still mention an OpenAI key/auto-failure polling; the worker lease-budget paragraph in the same deployment doc also still says OpenAI fallback although model policy is configurable and both defaults are Gemini. This additional stale sentence is reported, not silently folded into WS2's provider scope. Legacy unit-command/debug-pointer prose remains open. The code comment itself is now corrected.
 - WS1's pre-existing global `ai_model_policy_*` allowlist drift is unchanged; no global guard success is claimed and that unrelated gate was not rerun for WS2 (no SQL/signature change).
-- Commit is local-only; **do not push or deploy WS2 without separate Fajar approval**. No Railway CLI/MCP operation, Supabase remote command, production test or production variable change ran during WS2. WS3 remains a separate docs commit.
+- At WS2 completion, commit `3b3af406` was local-only pending separate approval. Fajar subsequently authorized pushing it after WS3 is corrected (see below). No Railway CLI/MCP operation, Supabase remote command, production test or production variable change ran during WS2. WS3 remains a separate docs commit.
+
+## WS3 documentation correction — 2026-11-17
+
+- Lane A, docs-only follow-up. Fajar requested finishing WS3 first and then pushing both pending workstreams. Owned files: `docs/deployment.md`, this existing plan record, and `CHANGELOG.md`; no product/test/config file changes and no new plan.
+- Verified `AI_TASK_DEFINITIONS` defaults and the actual primary/fallback branches in `review-processor.ts`. Debug step 5 now checks keys against the active model policy: both defaults are Gemini; OpenAI credentials apply to KETIK review only if an admin selects an OpenAI model. It no longer suggests an unapproved paid provider smoke call.
+- Verified `read_ketik_review` is SQL STABLE/read-only, and the current claim helper retains lease recovery and three-attempt exhaustion. Debug step 6 no longer promises automatic failure from polling or uses an arbitrary five-minute cutoff. The actual UI retry label is **Coba telaah lagi** (`KetikReviewStage.tsx`); **Jalankan Ulang Analisis** is absent and is removed from the checklist.
+- Corrected the additional stale worker lease paragraph to the existing configured-primary/fallback timeout formula; no hardcoded fallback provider. The original `review-lifecycle.ts` comment was already corrected in WS2 and is not edited again here.
+- Scoped gates: `pnpm exec prettier --write docs/deployment.md plans/markdown/ketik-review-worker-transitions.md CHANGELOG.md` followed by `pnpm exec prettier --check` on those same paths → **0** (`artifacts/ketik-review-docs/format.log`); seven source/document consistency checks → **all true** (`artifacts/ketik-review-docs/structural-checks.json`); `git diff --check` → **0**. The first structural-check attempt used a truncated whole-document read; rerun with exact owned sections passed without product changes. No product tests, root typecheck/lint/build, Graphify update, paid/provider calls, manual deploy or remote DB action. The unchanged WS2 implementation retains its recorded 66 passing E2E scenarios/2 host-specific skips and root checks.
+- Report-only drift remains intentionally untouched: the duplicate legacy unit-test command subsection and the old `ketik-service.ts` debug pointer (plan F4), plus the unrelated `ai_model_policy_*` allowlist inventory drift. No claim that all deployment instructions are now current.
+- One separate docs commit, then push WS2 + WS3 to this repository's configured `origin/main`. Push success does not establish Railway deployment SUCCESS; no deployment outcome is pre-claimed.
 
 ## Report back (required format)
 
