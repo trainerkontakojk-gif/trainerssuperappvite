@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- docs(deployment): bring the deployment guide under Prettier (table padding only) and spell out a prose "+" that Prettier would have turned into a list item
+
 - docs(architecture): correct the frontend-to-Supabase edge to Auth plus the two legacy Storage uploads (no Realtime), drop the duplicated Gemini Live edge, and re-run Prettier on the rollback index and database doc
 
 ## 2026-11-15

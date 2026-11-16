@@ -71,22 +71,22 @@ root sekarang mengunci ke web saja.
 
 ### API Service
 
-| Variable                                      | Value                               | Notes                                                                                    |
-| --------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| `PORT`                                        | `$PORT`                             | Railway auto-inject                                                                      |
-| `NODE_ENV`                                    | `production`                        | **Wajib** — tanpa ini, CORS fallback ke `localhost:3000` dan `ALLOWED_ORIGINS` diabaikan |
-| `VITE_SUPABASE_URL`                           | `https://<project>.supabase.co`     | Supabase project URL                                                                     |
-| `SUPABASE_SERVICE_ROLE_KEY`                   | `eyJ...`                            | Service role key                                                                         |
-| `GEMINI_API_KEY`                              | `AI...`                             | Google Gemini API key                                                                    |
-| `GEMINI_PROXY_URL` | kosong (opsional) | Proxy HTTP(S) via CONNECT, hanya untuk `generativelanguage.googleapis.com`. Isi hanya pada host yang diblokir lokasi Google (mis. VPS Coolify); biarkan kosong di Railway/Render/Vercel. OpenAI/Supabase tetap langsung; proxy gagal tidak fallback langsung. |
-| `OPENAI_API_KEY`                              | `sk-...`                            | OpenAI API key untuk text generation direct via Responses API                            |
-| `TELEFUN_INTERNAL_URL`                        | retired compatibility value         | Tidak memulai assessment OpenAI Telefun; API scoring tidak memanggil endpoint internal ini |
-| `TELEFUN_INTERNAL_TOKEN`                      | `<random>`                          | Shared server-only secret; nilai sama dengan Telefun                                     |
-| `ALLOWED_ORIGINS`                             | `https://<web-url>.up.railway.app`  | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
-| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | retired/no-op                      | Permanently disabled; POST/start and capability unavailable                              |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | retired/no-op                      | Cohort retired; ignored                                                                    |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | retired/no-op                      | Model allowlist retired; ignored                                                           |
-| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | retired/no-op                      | No new WebRTC session/write path                                                           |
+| Variable                                      | Value                              | Notes                                                                                                                                                                                                                                                         |
+| --------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                                        | `$PORT`                            | Railway auto-inject                                                                                                                                                                                                                                           |
+| `NODE_ENV`                                    | `production`                       | **Wajib** — tanpa ini, CORS fallback ke `localhost:3000` dan `ALLOWED_ORIGINS` diabaikan                                                                                                                                                                      |
+| `VITE_SUPABASE_URL`                           | `https://<project>.supabase.co`    | Supabase project URL                                                                                                                                                                                                                                          |
+| `SUPABASE_SERVICE_ROLE_KEY`                   | `eyJ...`                           | Service role key                                                                                                                                                                                                                                              |
+| `GEMINI_API_KEY`                              | `AI...`                            | Google Gemini API key                                                                                                                                                                                                                                         |
+| `GEMINI_PROXY_URL`                            | kosong (opsional)                  | Proxy HTTP(S) via CONNECT, hanya untuk `generativelanguage.googleapis.com`. Isi hanya pada host yang diblokir lokasi Google (mis. VPS Coolify); biarkan kosong di Railway/Render/Vercel. OpenAI/Supabase tetap langsung; proxy gagal tidak fallback langsung. |
+| `OPENAI_API_KEY`                              | `sk-...`                           | OpenAI API key untuk text generation direct via Responses API                                                                                                                                                                                                 |
+| `TELEFUN_INTERNAL_URL`                        | retired compatibility value        | Tidak memulai assessment OpenAI Telefun; API scoring tidak memanggil endpoint internal ini                                                                                                                                                                    |
+| `TELEFUN_INTERNAL_TOKEN`                      | `<random>`                         | Shared server-only secret; nilai sama dengan Telefun                                                                                                                                                                                                          |
+| `ALLOWED_ORIGINS`                             | `https://<web-url>.up.railway.app` | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                                                                                                                                                                                          |
+| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | retired/no-op                      | Permanently disabled; POST/start and capability unavailable                                                                                                                                                                                                   |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | retired/no-op                      | Cohort retired; ignored                                                                                                                                                                                                                                       |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | retired/no-op                      | Model allowlist retired; ignored                                                                                                                                                                                                                              |
+| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | retired/no-op                      | No new WebRTC session/write path                                                                                                                                                                                                                              |
 
 #### SIDAK — Jadwal Shifting (WFM Dash Pro)
 
@@ -124,30 +124,30 @@ Detail batas integrasi ada di [`docs/architecture.md`](architecture.md#sidak--ja
 
 `OPENAI_API_KEY` di API tetap dipakai untuk direct OpenAI text generation. Telefun aktif hanya Gemini Live; GPT/OpenAI Realtime Telefun sudah permanen dinonaktifkan untuk semua user. Telefun tidak memerlukan key provider untuk start baru. Optional cleanup reference key hanya untuk authenticated owner-bound DELETE historical call.
 
-| Variable                                           | Value                           | Notes                                                                                                                         |
-| -------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                                             | `$PORT`                         | Railway auto-inject                                                                                                           |
-| `NODE_ENV`                                         | `production`                    |                                                                                                                               |
-| `SUPABASE_URL`                                     | `https://<project>.supabase.co` | Supabase project URL                                                                                                          |
-| `SUPABASE_ANON_KEY`                                | `eyJ...`                        | Supabase anon key                                                                                                             |
-| `SUPABASE_SERVICE_ROLE_KEY`                        | `eyJ...`                        | Service role key                                                                                                              |
-| `GEMINI_API_KEY`                                   | `AI...`                         | Google Gemini API key                                                                                                         |
-| `GEMINI_PROXY_URL` | kosong (opsional) | Proxy HTTP(S) via CONNECT khusus Gemini Live. Isi hanya pada host yang diblokir lokasi Google (mis. VPS Coolify); biarkan kosong di Railway/Render/Vercel. Supabase/OpenAI tetap langsung; semua reconnect Gemini tetap lewat proxy. |
-| `OPENAI_API_KEY`                                   | kosong/opsional                 | Tidak digunakan untuk Telefun start; API tetap memerlukan key ini untuk direct OpenAI text |
-| `TELEFUN_OPENAI_ENABLED`                           | retired/no-op                  | Retired permanently; ignored and cannot enable Telefun OpenAI Realtime                                                      |
-| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | retired/no-op                  | Retired permanently; POST/start and capability remain unavailable                                                            |
-| `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | retired/no-op                  | No upstream provider POST; retained only as deployment compatibility input                                                     |
-| `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | retired/no-op                  | No sideband start path                                                                                                         |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | retired/no-op                   | Former cohort input; ignored and never read for admission                                                                        |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`          | retired/no-op                   | Former model allowlist; ignored and never read for admission                                                                     |
-| `TELEFUN_INTERNAL_TOKEN`                           | `<random>`                      | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web                                                 |
-| `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | optional                        | Server-only historical cleanup reference key; never an enablement flag                                                          |
-| `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`               | historical compatibility        | Never admits a session; retained only for durable cleanup data compatibility                                                  |
-| `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS`         | historical compatibility        | Never admits a session; retained only for durable cleanup data compatibility                                                  |
-| `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`          | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                        |
-| `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS`      | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                        |
-| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE`      | retired/no-op                   | No active OpenAI WebRTC start/write path                                                                                      |
-| `ALLOWED_ORIGINS`                                  | exact HTTPS allowlist           | Exact origin list for production and historical cleanup DELETE; wildcard/HTTP are rejected                                     |
+| Variable                                      | Value                           | Notes                                                                                                                                                                                                                                |
+| --------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PORT`                                        | `$PORT`                         | Railway auto-inject                                                                                                                                                                                                                  |
+| `NODE_ENV`                                    | `production`                    |                                                                                                                                                                                                                                      |
+| `SUPABASE_URL`                                | `https://<project>.supabase.co` | Supabase project URL                                                                                                                                                                                                                 |
+| `SUPABASE_ANON_KEY`                           | `eyJ...`                        | Supabase anon key                                                                                                                                                                                                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`                   | `eyJ...`                        | Service role key                                                                                                                                                                                                                     |
+| `GEMINI_API_KEY`                              | `AI...`                         | Google Gemini API key                                                                                                                                                                                                                |
+| `GEMINI_PROXY_URL`                            | kosong (opsional)               | Proxy HTTP(S) via CONNECT khusus Gemini Live. Isi hanya pada host yang diblokir lokasi Google (mis. VPS Coolify); biarkan kosong di Railway/Render/Vercel. Supabase/OpenAI tetap langsung; semua reconnect Gemini tetap lewat proxy. |
+| `OPENAI_API_KEY`                              | kosong/opsional                 | Tidak digunakan untuk Telefun start; API tetap memerlukan key ini untuk direct OpenAI text                                                                                                                                           |
+| `TELEFUN_OPENAI_ENABLED`                      | retired/no-op                   | Retired permanently; ignored and cannot enable Telefun OpenAI Realtime                                                                                                                                                               |
+| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | retired/no-op                   | Retired permanently; POST/start and capability remain unavailable                                                                                                                                                                    |
+| `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`   | retired/no-op                   | No upstream provider POST; retained only as deployment compatibility input                                                                                                                                                           |
+| `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`   | retired/no-op                   | No sideband start path                                                                                                                                                                                                               |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | retired/no-op                   | Former cohort input; ignored and never read for admission                                                                                                                                                                            |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | retired/no-op                   | Former model allowlist; ignored and never read for admission                                                                                                                                                                         |
+| `TELEFUN_INTERNAL_TOKEN`                      | `<random>`                      | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web                                                                                                                                                        |
+| `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`            | optional                        | Server-only historical cleanup reference key; never an enablement flag                                                                                                                                                               |
+| `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`          | historical compatibility        | Never admits a session; retained only for durable cleanup data compatibility                                                                                                                                                         |
+| `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS`    | historical compatibility        | Never admits a session; retained only for durable cleanup data compatibility                                                                                                                                                         |
+| `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`     | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                                                                                                                               |
+| `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS` | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                                                                                                                               |
+| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | retired/no-op                   | No active OpenAI WebRTC start/write path                                                                                                                                                                                             |
+| `ALLOWED_ORIGINS`                             | exact HTTPS allowlist           | Exact origin list for production and historical cleanup DELETE; wildcard/HTTP are rejected                                                                                                                                           |
 
 `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` is obsolete since 2026-11-10 and can be deleted from Railway/Coolify.
 
@@ -181,16 +181,16 @@ pnpm start:telefun-scoring-worker   # root = pnpm --filter @trainers/api start:t
 
 Env vars (nama exact; invalid/disabled config → proses **exit non-zero** dengan log JSON terstruktur, fail-fast):
 
-| Variable | Wajib | Value / bound | Notes |
-| --- | --- | --- | --- |
-| `TELEFUN_SCORING_WORKER_ENABLED` | ya | `true` | Harus persis `"true"`; selain itu = kill switch, worker exit non-zero tanpa memproses job |
-| `TELEFUN_SCORING_WORKER_INTERVAL_MS` | ya | `30000` | Integer positif `1000..600000` |
-| `TELEFUN_SCORING_WORKER_BATCH_SIZE` | ya | `5` | Integer positif `1..50` |
-| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `600` | Integer `>=600`; mencakup transkripsi + assessment dan deadline shutdown in-flight |
-| `TELEFUN_SCORING_WORKER_HEALTH_PORT` | opsional | `9100` | Integer `1024..65535`; mengaktifkan health internal. Jangan pakai `PORT` publik |
-| `TELEFUN_INTERNAL_TOKEN` | bila health aktif | `<random>` | Shared server-only secret, nilai sama dengan API/Telefun; wajib saat health port diset |
-| `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/release worker (service-role, backend-only) |
-| `GEMINI_API_KEY` | ya | Gemini credential | Untuk active Gemini voice scoring; usage dicatat via `logAiUsage()`. API `OPENAI_API_KEY` remains separate for direct text only. |
+| Variable                                       | Wajib             | Value / bound     | Notes                                                                                                                            |
+| ---------------------------------------------- | ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `TELEFUN_SCORING_WORKER_ENABLED`               | ya                | `true`            | Harus persis `"true"`; selain itu = kill switch, worker exit non-zero tanpa memproses job                                        |
+| `TELEFUN_SCORING_WORKER_INTERVAL_MS`           | ya                | `30000`           | Integer positif `1000..600000`                                                                                                   |
+| `TELEFUN_SCORING_WORKER_BATCH_SIZE`            | ya                | `5`               | Integer positif `1..50`                                                                                                          |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional          | `600`             | Integer `>=600`; mencakup transkripsi + assessment dan deadline shutdown in-flight                                               |
+| `TELEFUN_SCORING_WORKER_HEALTH_PORT`           | opsional          | `9100`            | Integer `1024..65535`; mengaktifkan health internal. Jangan pakai `PORT` publik                                                  |
+| `TELEFUN_INTERNAL_TOKEN`                       | bila health aktif | `<random>`        | Shared server-only secret, nilai sama dengan API/Telefun; wajib saat health port diset                                           |
+| `SUPABASE_SERVICE_ROLE_KEY`                    | ya                | `eyJ...`          | Queue fetch/claim/release worker (service-role, backend-only)                                                                    |
+| `GEMINI_API_KEY`                               | ya                | Gemini credential | Untuk active Gemini voice scoring; usage dicatat via `logAiUsage()`. API `OPENAI_API_KEY` remains separate for direct text only. |
 
 Health endpoint (`GET /health`, bind default `127.0.0.1:<port>`; deployment mem-bind alamat private network Railway):
 
@@ -199,7 +199,7 @@ Health endpoint (`GET /health`, bind default `127.0.0.1:<port>`; deployment mem-
 - Payload bounded: `enabled`, `loopAlive`, `lastSuccessfulPollAt`, `lastErrorClass`, `queue {pending,processing,failed}`, `oldestEligiblePendingAgeMs` — tanpa UUID/session/user ID/recording path/prompt/raw error.
 - DB error pada queue fetch **tidak pernah** tampil sebagai empty/healthy: `lastErrorClass` terisi (mis. `DatabaseError`) dan `lastSuccessfulPollAt` stale.
 
-Graceful shutdown (SIGTERM/SIGINT): stop admission → abort analysis (`AbortSignal`, deadline = claim timeout) → bounded wait → bila deadline habis, coba *release* claim aktif ke retryable (`reschedule_telefun_scoring`) dengan batas kedua sebesar lease. Jika RPC release juga tidak settle, runtime mencatat `claim_release_deferred` dan lease database menjadi recovery backstop; shutdown tetap selesai tanpa retry release kedua. Late result tidak persist (guard `complete_telefun_scoring`) dan tidak ada AI call kedua (`checkCachedAssessment`). Pastikan grace period orchestrator ≥ `2 × TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` agar kedua batas lokal dapat berjalan.
+Graceful shutdown (SIGTERM/SIGINT): stop admission → abort analysis (`AbortSignal`, deadline = claim timeout) → bounded wait → bila deadline habis, coba _release_ claim aktif ke retryable (`reschedule_telefun_scoring`) dengan batas kedua sebesar lease. Jika RPC release juga tidak settle, runtime mencatat `claim_release_deferred` dan lease database menjadi recovery backstop; shutdown tetap selesai tanpa retry release kedua. Late result tidak persist (guard `complete_telefun_scoring`) dan tidak ada AI call kedua (`checkCachedAssessment`). Pastikan grace period orchestrator ≥ `2 × TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` agar kedua batas lokal dapat berjalan.
 
 Alert thresholds:
 
@@ -219,14 +219,14 @@ sebelum API embedded worker terbukti drain queue dan retry di production.
 
 API env (nama exact):
 
-| Variable | Wajib | Value / bound | Notes |
-| --- | --- | --- | --- |
-| `TELEFUN_SCORING_WORKER_ENABLED` | ya untuk mengaktifkan | `true` | Harus persis `"true"`; unset/selain itu membuat API tetap hidup tanpa worker |
-| `TELEFUN_SCORING_WORKER_INTERVAL_MS` | saat aktif | `30000` | Integer `1000..600000`; polling tidak overlap |
-| `TELEFUN_SCORING_WORKER_BATCH_SIZE` | saat aktif | `5` | Integer `1..50` |
-| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `600` | Lease claim dan bounded shutdown deadline; integer `>=600`, default 600 detik |
-| `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/persist backend-only |
-| `GEMINI_API_KEY` | ya | Gemini credential | Voice scoring Gemini; usage dicatat via `logAiUsage()` |
+| Variable                                       | Wajib                 | Value / bound     | Notes                                                                         |
+| ---------------------------------------------- | --------------------- | ----------------- | ----------------------------------------------------------------------------- |
+| `TELEFUN_SCORING_WORKER_ENABLED`               | ya untuk mengaktifkan | `true`            | Harus persis `"true"`; unset/selain itu membuat API tetap hidup tanpa worker  |
+| `TELEFUN_SCORING_WORKER_INTERVAL_MS`           | saat aktif            | `30000`           | Integer `1000..600000`; polling tidak overlap                                 |
+| `TELEFUN_SCORING_WORKER_BATCH_SIZE`            | saat aktif            | `5`               | Integer `1..50`                                                               |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional              | `600`             | Lease claim dan bounded shutdown deadline; integer `>=600`, default 600 detik |
+| `SUPABASE_SERVICE_ROLE_KEY`                    | ya                    | `eyJ...`          | Queue fetch/claim/persist backend-only                                        |
+| `GEMINI_API_KEY`                               | ya                    | Gemini credential | Voice scoring Gemini; usage dicatat via `logAiUsage()`                        |
 
 Claim menggunakan token hash + owner. Completion, failure, dan reschedule hanya
 boleh menulis bila token claim masih cocok, sehingga worker lama yang stale
@@ -333,17 +333,17 @@ Setelah remux berhasil, player menggunakan signed URL persisten; jika gagal, blo
 
 ## Root Package Scripts
 
-| Script          | Command                                           | Purpose                          |
-| --------------- | ------------------------------------------------- | -------------------------------- |
-| `start`         | `pnpm run start:web`                              | Default Railway start (web only) |
-| `start:web`     | `pnpm --filter @trainers/web start`               | Web production via `serve`       |
-| `build:web`     | `pnpm turbo run build --filter @trainers/web`     | Build web (TSC + Vite)           |
-| `start:api`     | `pnpm --filter @trainers/api start`               | API production via `tsx`         |
+| Script                         | Command                                                    | Purpose                                                 |
+| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------- |
+| `start`                        | `pnpm run start:web`                                       | Default Railway start (web only)                        |
+| `start:web`                    | `pnpm --filter @trainers/web start`                        | Web production via `serve`                              |
+| `build:web`                    | `pnpm turbo run build --filter @trainers/web`              | Build web (TSC + Vite)                                  |
+| `start:api`                    | `pnpm --filter @trainers/api start`                        | API production via `tsx`                                |
 | `start:telefun-scoring-worker` | `pnpm --filter @trainers/api start:telefun-scoring-worker` | Deprecated standalone scoring worker (rollout fallback) |
-| `build:api`     | `pnpm turbo run build --filter @trainers/api`     | Build API (TSC)                  |
-| `start:telefun` | `pnpm --filter @trainers/telefun start`           | Telefun production via `node`    |
-| `build:telefun` | `pnpm turbo run build --filter @trainers/telefun` | Build Telefun (TSC)              |
-| `start:all`     | `turbo run start`                                 | Local multi-service (not deploy) |
+| `build:api`                    | `pnpm turbo run build --filter @trainers/api`              | Build API (TSC)                                         |
+| `start:telefun`                | `pnpm --filter @trainers/telefun start`                    | Telefun production via `node`                           |
+| `build:telefun`                | `pnpm turbo run build --filter @trainers/telefun`          | Build Telefun (TSC)                                     |
+| `start:all`                    | `turbo run start`                                          | Local multi-service (not deploy)                        |
 
 ## Healthcheck Smoke Test
 
@@ -546,7 +546,7 @@ ditandai `applied` (skema di prod sudah cocok, diverifikasi dengan readback
 hanya-baca), dan `20260908093728` ditandai `reverted` (isinya identik dengan
 `20260904150000`). `supabase migration list --linked` sekarang menunjukkan
 semua baris Local = Remote. Penerapan tetap per file lewat `db query --linked -f`
-+ `migration repair` sampai diputuskan lain.
+ditambah `migration repair` sampai diputuskan lain.
 
 **2026-10-17 (izin Fajar):** `20261017150000_ketik_settle_review_drop_legacy_results.sql`
 diterapkan ke prod lewat jalur di atas, oleh Fajar dari terminalnya. Readback
@@ -650,14 +650,14 @@ rewrite catch-all ke `/index.html`.
 
 Header yang berlaku sekarang:
 
-| Header                                                        | Sumber                         |
-| ------------------------------------------------------------- | ------------------------------ |
-| `Content-Security-Policy` (lihat bagian berikut)               | `vercel.json`                  |
-| `X-Content-Type-Options: nosniff`                              | `vercel.json`                  |
-| `X-Frame-Options: DENY`                                        | `vercel.json`                  |
-| `Referrer-Policy: strict-origin-when-cross-origin`             | `vercel.json`                  |
-| `Permissions-Policy: camera=(), microphone=(self), geolocation=()` | `vercel.json`              |
-| `Cache-Control: public, max-age=31536000, immutable` di `/assets/*` | `vercel.json`            |
+| Header                                                                    | Sumber                              |
+| ------------------------------------------------------------------------- | ----------------------------------- |
+| `Content-Security-Policy` (lihat bagian berikut)                          | `vercel.json`                       |
+| `X-Content-Type-Options: nosniff`                                         | `vercel.json`                       |
+| `X-Frame-Options: DENY`                                                   | `vercel.json`                       |
+| `Referrer-Policy: strict-origin-when-cross-origin`                        | `vercel.json`                       |
+| `Permissions-Policy: camera=(), microphone=(self), geolocation=()`        | `vercel.json`                       |
+| `Cache-Control: public, max-age=31536000, immutable` di `/assets/*`       | `vercel.json`                       |
 | `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` | default Vercel — **jangan** ditimpa |
 
 HSTS sengaja tidak ditulis di `vercel.json`: nilai apa pun di sana menggantikan
@@ -907,13 +907,13 @@ Prasyarat aktivasi yang direview operator:
 
 Konfigurasi worker:
 
-| Env                               | Default     | Batas                                                     |
-| --------------------------------- | ----------- | --------------------------------------------------------- |
-| `KETIK_REVIEW_WORKER_ENABLED`     | Tidak aktif | Harus tepat `true`; proses standalone lain ditolak exit 1 |
-| `KETIK_REVIEW_WORKER_INTERVAL_MS` | 5000        | Integer 250–60000                                         |
-| `KETIK_REVIEW_WORKER_IDLE_MAX_MS` | `max(30000, interval)` | Integer 250–300000, minimal interval |
-| `KETIK_REVIEW_WORKER_SHUTDOWN_MS` | 10000       | Integer 250–30000                                         |
-| `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014        | Integer 0–65535; 0 untuk port ephemeral tes; standalone saja |
+| Env                               | Default                | Batas                                                        |
+| --------------------------------- | ---------------------- | ------------------------------------------------------------ |
+| `KETIK_REVIEW_WORKER_ENABLED`     | Tidak aktif            | Harus tepat `true`; proses standalone lain ditolak exit 1    |
+| `KETIK_REVIEW_WORKER_INTERVAL_MS` | 5000                   | Integer 250–60000                                            |
+| `KETIK_REVIEW_WORKER_IDLE_MAX_MS` | `max(30000, interval)` | Integer 250–300000, minimal interval                         |
+| `KETIK_REVIEW_WORKER_SHUTDOWN_MS` | 10000                  | Integer 250–30000                                            |
+| `KETIK_REVIEW_WORKER_HEALTH_PORT` | 3014                   | Integer 0–65535; 0 untuk port ephemeral tes; standalone saja |
 
 Concurrency per proses = 1. Lease dihitung dari registry timeout: dua percobaan kompatibilitas Gemini + satu fallback OpenAI + 120 detik grace, minimum 600 detik. Tiga claim maksimum per permintaan manual. Crash/timeout dapat mengulangi panggilan provider; tidak ada jaminan exactly-once billing. SDK yang terlambat selesai tidak boleh memublikasikan hasil setelah token lease hilang/kedaluwarsa.
 
