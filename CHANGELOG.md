@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- refactor(ketik): centralize review job status transitions with guarded SQL updates
+
 - docs(ketik): record authorized target apply of the session status transition migration
 
 - refactor(ketik): centralize backend chat status transitions with guarded SQL updates

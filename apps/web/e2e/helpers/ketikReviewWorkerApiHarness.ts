@@ -10,6 +10,7 @@ import {
   createUserWithJwt,
   installLoopbackFetchGuard,
   readLoopbackEnv,
+  runSql,
 } from "./sidakRealBackend";
 import { tnaApiRequest } from "./tnaApi";
 
@@ -171,6 +172,31 @@ export async function teardownKetikReviewWorkerSuite() {
   for (const identity of identities)
     expect((await db.auth.admin.deleteUser(identity.userId)).error).toBeNull();
   await new Promise<void>((resolve) => server.close(() => resolve()));
+}
+
+// Disposable instrumentation only: not installed by product migrations.
+export function installKetikReviewTransitionGuard() {
+  const guard = `e2e_review_transition_${randomUUID().replaceAll("-", "")}`;
+  runSql(
+    env,
+    `
+    CREATE FUNCTION public.${guard}() RETURNS trigger
+    LANGUAGE plpgsql SET search_path = '' AS $$
+    DECLARE stack text;
+    BEGIN
+      GET DIAGNOSTICS stack = PG_CONTEXT;
+      IF position('transition_ketik_review_job(' IN stack) = 0 THEN
+        RAISE EXCEPTION 'e2e-review-transition-bypass';
+      END IF;
+      RETURN NEW;
+    END; $$;
+    CREATE TRIGGER ${guard} AFTER UPDATE OF status ON public.ketik_review_jobs
+      FOR EACH ROW EXECUTE FUNCTION public.${guard}();
+    CREATE TRIGGER ${guard} AFTER UPDATE OF review_status ON public.ketik_history
+      FOR EACH ROW EXECUTE FUNCTION public.${guard}();
+  `,
+  );
+  return () => runSql(env, `DROP FUNCTION public.${guard}() CASCADE;`);
 }
 
 export async function seedSession(ownerId = trainer.userId, completed = false) {

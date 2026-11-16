@@ -111,6 +111,7 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.settle_ketik_review(uuid,uuid,jsonb,boolean)",
   "public.settle_ketik_session_response(uuid,uuid,uuid,uuid,jsonb,boolean,integer)",
   "public.start_ketik_session(uuid,uuid,jsonb,text,uuid)",
+  "public.transition_ketik_review_job(uuid,text,uuid,uuid,text,integer)",
   "public.transition_ketik_session_status(uuid,uuid,text,uuid,uuid,integer)",
 ] as const;
 

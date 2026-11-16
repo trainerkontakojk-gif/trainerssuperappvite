@@ -1,0 +1,201 @@
+# KETIK review worker: explicit transitions and bounded deadline release
+
+Status: **WS1 implemented and locally verified (2026-11-16); remote apply pending explicit authorization. WS2/WS3 not started.** Original plan written from a read-only audit.
+Baseline: HEAD `3b511754` on `main`.
+
+## Requirement
+
+A read-only audit of the durable KETIK review worker found three gaps against `AGENTS.md` ("No new implicit state machines") and one documentation drift. This plan fixes them in three independent workstreams. **Each workstream is its own commit** (with its own `CHANGELOG.md` entry) and can ship on its own.
+
+| WS  | Finding                                                                                    | Lane | Ship order |
+| --- | ------------------------------------------------------------------------------------------ | ---- | ---------- |
+| WS1 | Review-job status writes scattered across three RPCs; `claim` has no expected-status guard | D    | 1st        |
+| WS2 | Worker host lifecycle is a set of flags, and the deadline-path release has no time bound   | C    | 2nd        |
+| WS3 | `docs/deployment.md` and one code comment describe removed behavior                        | A    | any        |
+
+Out of scope: provider/model selection, quota/usage accounting, the session chat lifecycle (already centralized in `20261116160000_ketik_session_status_transitions.sql`), frontend, and new job statuses. Do not touch the three pre-existing untracked plans in `plans/markdown/`.
+
+## Verified findings (evidence for the executor)
+
+Re-verify each against live code before editing (`docs/AGENT_WORKFLOW.md` drift check).
+
+### F1: review-job transitions are not centralized (WS1)
+
+Effective definitions. No later migration redefines these:
+
+- `claim_ketik_review(text,integer,uuid)`: `supabase/migrations/20261016000935_ketik_durable_review_worker.sql` (claim body around lines 55–75).
+- `settle_ketik_review(uuid,uuid,jsonb,boolean)`: `supabase/migrations/20261017150000_ketik_settle_review_drop_legacy_results.sql:13–50`.
+- `enqueue_ketik_review(uuid,uuid,uuid,boolean)`: `supabase/migrations/20261018200000_user_controls.sql:24–54`.
+
+Precise state of each:
+
+- **`settle`** is already _effectively_ guarded. It locks `ketik_history` and then the job `FOR UPDATE`, and returns `false` unless `status='processing'`, the token matches, and the lease is live. The UPDATEs themselves use only `WHERE id=j.id`. This is a policy gap, not a race.
+- **`enqueue`** is effectively guarded too. Under `FOR UPDATE` it returns early when the job is `queued`/`processing`. The `ON CONFLICT DO UPDATE` has no status predicate. Policy gap.
+- **`claim` is the real weak point.** It picks the candidate with the statement snapshot but locks only `ketik_history` (`FOR UPDATE OF h SKIP LOCKED`). Then it runs `SELECT … FROM ketik_review_jobs … FOR UPDATE` and **does not re-check `j.status` / lease** before `UPDATE … SET status='processing' … WHERE id=j.id`. Other RPCs lock `h` without updating it, so Postgres does no EvalPlanQual re-check. If a second worker's claim (or a settle) commits between this statement's snapshot and its lock, the claim proceeds on stale job state. It can then steal a live lease, wasting an AI call and adding an extra `attempt_count`, so the job can reach `failed` early. In theory it can also re-open a `completed` job. This needs at least 2 concurrent workers and a very narrow window. **Plausible, not reproduced.** Do not claim it was reproduced unless a test actually shows it.
+
+### F2: worker host lifecycle is implicit (WS2)
+
+`apps/api/src/workers/ketik-review-worker-runtime.ts:74–88`: `started`, `stopping`, `loopAlive`, `active`, and `cycle` together encode the phase. `start()`, `shutdown()`, `runCycle()`, `loop()`, and `health()` each read and write them. The **poll schedule is already explicit** (`PollState`/`PollEvent`/`transitionPoll`, lines 52–85). Keep it and extend that pattern; do not replace it.
+
+### F3: deadline-path release is unbounded (WS2)
+
+`ketik-review-worker-runtime.ts:119–121`: `await releaseKetikReview(claim)` has no application timeout. `createAdminClient()` (`apps/api/src/lib/supabase.ts`) sets no fetch timeout either. `loop()` awaits the whole cycle, so a hung `settle_ketik_review` RPC blocks every later claim on this worker. The shutdown path already bounds its release (`:187–203`, `RELEASE_TIMEOUT`), so the two paths are inconsistent. The embedded worker has no health server, so nothing restarts it. With a single worker, nothing else reclaims the job after its lease expires. No existing E2E covers the deadline path.
+
+### F4: documentation drift (WS3)
+
+- `docs/deployment.md:491–498` (KETIK debug checklist, steps 5–6):
+  - Step 6 says "Polling akan auto-mark failed". In fact `read_ketik_review` is `LANGUAGE sql STABLE` with no writes, and the E2E `ketik-review-worker-api-host.spec.ts` "polling is read-only…" asserts this.
+  - Step 5 tells the reader to check `OPENAI_API_KEY`, which implies an OpenAI fallback. The default KETIK review models are both Gemini: `packages/types/src/ai-model-policy.ts` → `ketik_review` `gemini-3.8-flash`, `ketik_review_fallback` `gemini-3.5-flash-lite`. Admin policy can override this.
+- `apps/api/src/services/ketik/review-lifecycle.ts:19` comment "Gemini can retry … once, then OpenAI": same drift.
+- Report only, do not fix: the duplicate "Test Commands (KETIK Specific)" section at `docs/deployment.md:501–508` lists legacy unit commands, and its step 4 points to `ketik-service.ts`. Both were already reported by `ketik-backend-status-transitions.md`.
+
+## Design
+
+### WS1: `transition_ketik_review_job` (Lane D)
+
+Follow the shape of `transition_ketik_session_status` in `20261116160000_ketik_session_status_transitions.sql`. That migration and its plan (`plans/markdown/ketik-backend-status-transitions.md`) are the house pattern; read both first.
+
+- New migration `supabase/migrations/<ts>_ketik_review_job_transitions.sql` plus paired `supabase/rollbacks/rollback_<ts>_ketik_review_job_transitions.sql` (load the `supabase-migration` skill).
+- One `SECURITY INVOKER`, `search_path=''`, **service_role-only** function `public.transition_ketik_review_job(...)` with a closed event set. Derive the status union from the live `ketik_review_jobs.status` CHECK constraint (expected `queued|processing|completed|failed`). Proposed events, to be confirmed against current RPC semantics:
+
+| Event          | From (expected predicate)                                                                        | To                                           | Fence                     |
+| -------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- | ------------------------- |
+| `enqueue`      | no row / `completed` / `failed`                                                                  | `queued`                                     | caller holds history lock |
+| `claim`        | `queued` and `available_at<=now`, or `processing` with null/expired lease, and `attempt_count<3` | `processing` (new token, `attempt_count+1`)  | n/a                       |
+| `exhaust`      | same as `claim` but `attempt_count>=3`                                                           | `failed`                                     | n/a                       |
+| `release`      | `processing`, token match, live lease                                                            | `queued`                                     | token + expiry            |
+| `fail_attempt` | `processing`, token match, live lease                                                            | `queued` if `attempt_count<3`, else `failed` | token + expiry            |
+| `complete`     | `processing`, token match, live lease                                                            | `completed`                                  | token + expiry            |
+
+- Every UPDATE carries `AND status = <expected>` (plus the lease/token predicate where listed) and checks `ROW_COUNT`.
+- The mirrored `ketik_history.review_status` writes (`processing` / `failed` / `completed`) move into the same function, keeping their existing "never downgrade `completed`" predicates.
+- Locking order is unchanged: `ketik_history` first, then the job row.
+- Rewrite `claim_ketik_review`, `settle_ketik_review`, and `enqueue_ketik_review` to delegate their status writes to the helper. **Keep signatures, return JSON shapes, error codes, ACLs, and validation unchanged**, so no API change and no deploy-ordering dependency. Business writes (review rows, typo rows, scores) stay in `settle`, in the same transaction.
+- **Claim fix:** after `SELECT … FOR UPDATE` on the job, re-check the claim predicate on the locked row. If it no longer holds, return `NULL` (the same as "no work") instead of raising. The next poll finds other work. `settle` keeps returning `false` on a fence miss. A required single-row transition that misses inside `enqueue` raises `PT409` (consistent with the session helper).
+- Inventory updates the existing harness depends on:
+  - Add the new signature to the allowlist in `apps/web/e2e/exposed-function-guard-api.spec.ts`. Do **not** add the unrelated `ai_model_policy_*` drift reported in the previous plan.
+  - Append the new migration to the reapply list in `apps/web/e2e/ketik-review-worker-api-host.spec.ts` (rollback test, about line 553). Otherwise that test reapplies the old RPC bodies and leaves the helper unused.
+  - Add a row to the rollback README catalog.
+- The rollback restores the exact prior bodies of the three RPCs and drops the helper. DDL only, no data deletion.
+
+### WS2: explicit host lifecycle and bounded deadline release (Lane C)
+
+F3 adds a new lifecycle outcome ("release timed out"). Under `AGENTS.md`, changing lifecycle state requires an explicit union, so F2 and F3 are done together.
+
+- Replace the five flags with one host state union and a single pure `transitionHost(state, event)` beside `transitionPoll`. Suggested shape (adjust to what the code needs):
+  - `idle → running(waiting) ⇄ running(claiming) → running(processing, claim) → running(releasing, claim) → running(waiting)`
+  - Any running phase `→ stopping(…) → stopped`.
+  - `start()` on non-idle throws `WORKER_ALREADY_STARTED`, as today.
+- Timer handles, `loopPromise`, `wake`, and `unsubscribe` stay as resource handles, not state. `health()` derives from the state plus `lastPollAt`/`errorClass`, keeping the same JSON fields.
+- **Bounded deadline release.** Extract one helper, `releaseWithin(claim, ms)`, used by both the deadline path and the shutdown path. On the deadline path:
+  - Bound: `min(config.shutdownMs, 20_000)`. It must finish inside the 30 s grace left before lease expiry (`claim.leaseSeconds - 30`).
+  - On timeout: log `ketik_review_worker.deadline_release_timeout`, set `errorClass = "ReleaseTimeout"` (health degrades until the next successful poll resets it), leave the claim to lease expiry, and continue the loop.
+  - A late `settle` is harmless because it is token-fenced. Do not add a second fallback.
+- Keep the poll back-off, the wake semantics, and the shutdown contract (`shutdown_claim_fenced` / `shutdown_recovery_deferred` logs) unchanged.
+- Also fix the stale comment at `review-lifecycle.ts:19` in this commit if WS3 has not landed.
+
+**Decision gate (stop and ask Fajar before coding the test):** the deadline fires at `leaseSeconds - 30` s, and lease is at least 600 s (`claim_ketik_review` rejects `<600`; `calculateKetikReviewLeaseSeconds` floors at 600). There is no E2E seam that reaches the deadline path in reasonable time. Present these options:
+
+1. **(Recommended)** Add a test-only override such as `KETIK_REVIEW_WORKER_DEADLINE_MS`, parsed in `parseKetikWorkerConfig`, **rejected when `NODE_ENV=production`**, and documented as test-only. The E2E then:
+   - runs the real worker against the disposable stack with a short deadline and a stubbed slow provider;
+   - holds a `FOR UPDATE` lock on that `ketik_history` row from a separate `psql` session, so `settle_ketik_review` truly blocks;
+   - asserts that the worker logs the timeout, reports degraded health, and claims a _second_ queued job while the first is still blocked;
+   - releases the lock and asserts the late settle is fenced after lease expiry or reclaim.
+2. Accept code-only verification of F3 plus the existing E2E regression. This is weaker; say so explicitly in the report.
+
+Do not add unit tests (`AGENTS.md`: ask first, explain what E2E cannot prove).
+
+### WS3: docs (Lane A)
+
+- `docs/deployment.md` step 5: the provider keys to check follow the active KETIK model policy (defaults are both Gemini → `GEMINI_API_KEY`; `OPENAI_API_KEY` only if an admin assigned an OpenAI model).
+- `docs/deployment.md` step 6: polling is read-only. A stuck `processing` job is reclaimed by a worker after lease expiry, up to 3 attempts, then `failed`. Mention "Jalankan Ulang Analisis" only if it still exists in the UI (verify with a grep).
+- `review-lifecycle.ts:19`: rewrite the comment to match `review-processor.ts` (primary, then configured fallback).
+- Gates: Prettier on touched `.md`, `git diff --check`. No product tests.
+
+## Tasklist
+
+### WS0: intake (all workstreams)
+
+- [x] Read `AGENTS.md`, `docs/AGENT_WORKFLOW.md`, this plan, and `plans/markdown/ketik-backend-status-transitions.md`. Load `trainers-superapp-tdd` before any WS1/WS2 edit; load `supabase-migration` for WS1.
+- [ ] Drift-check every file:line above against HEAD. Grep for **all** writers of `ketik_review_jobs.status` and `ketik_history.review_status` (`supabase/migrations/`, latest definitions only; `apps/api/src`). Add any missed writer to WS1 scope or report it.
+- [x] `graphify query` for `releaseKetikReview` / `claimKetikReview` callers (Lane C/D rule).
+
+### WS3: docs (can go first; smallest)
+
+- [ ] Edit the docs and the comment as designed → Prettier on touched files → `git diff --check` → commit `docs(ketik): …` with a changelog entry → push.
+
+### WS1: DB transitions (Lane D)
+
+- [x] Create a fresh, task-owned disposable Supabase stack. Copy the procedure and pitfalls from the previous plan: `--workdir` under ignored `scratch/`, exclude `mailpit` not `inbucket`, unused loopback ports, no `.env*` edits, never point at prod `ruosnjmtywcrghjgqugz`. One Playwright run at a time.
+- [x] RED: add a fixture-only DB trigger, as in the previous plan's `PG_CONTEXT` call-stack fixture and never shipped, that rejects any `ketik_review_jobs.status` / `ketik_history.review_status` change not made by `transition_ketik_review_job`. Run the existing worker publication/host flows under it; expect failure on the current RPCs. Save the log and trace.
+- [x] RED (claim guard): a real-DB test that calls `claim_ketik_review` for a specific session whose job is `processing` with a live lease, or `completed`, after making the candidate SELECT see stale state if that is feasible. If the stale window cannot be forced deterministically, assert only the helper's CAS behavior and **say so**. Do not fake the race.
+- [x] Implement the migration, rollback, allowlist, reapply-list, and catalog changes; apply locally with `psql -v ON_ERROR_STOP=1 -f …`.
+- [x] GREEN: the focused tests, then the full worker suite, serially, with `--workers=1 --trace on`:
+  - `pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-(host|publication)\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-review-worker-real-backend`
+  - the same with `--project=ketik-review-worker-embedded-real-backend`
+  - plus `user-controls-api.spec.ts` (re-score / enqueue) and `ketik-errors-api.spec.ts`.
+- [x] Rollback → reapply → re-run the focused tests. Verify that the rollback restores the prior three bodies byte-for-byte (md5 of `pg_get_functiondef`) and leaves data unchanged.
+- [x] Structural check on the local catalog: every status UPDATE on the two tables lives in the helper and has an expected-status predicate.
+- [x] `thermo-nuclear` self-review; serial root typecheck/lint/build with `TURBO_CONCURRENCY=1` on each command; `GRAPHIFY_MAX_WORKERS=1 graphify update .`; changelog and diff review. See executed evidence and the explicitly open pre-existing global RPC gate below.
+- [ ] Commit `refactor(ketik): centralize review job status transitions with guarded SQL updates`, then push (outcome reported after execution, not pre-claimed in this commit).
+- [ ] **Stop.** Remote apply needs Fajar's explicit authorization. When granted, follow the "Target apply" procedure in the previous plan: preflight `migration list --linked`, apply only this file, `migration repair`, catalog readback, and serial CLI commands only.
+
+### WS2: worker host (Lane C)
+
+- [ ] Ask Fajar the deadline-test decision gate question (above). Wait for the answer.
+- [ ] RED, if option 1: write the blocked-release E2E; it must fail on current code (the second job is never claimed while release hangs).
+- [ ] Implement the host union, `transitionHost`, `releaseWithin`, and the deadline-path bound (and the test-only override if approved).
+- [ ] GREEN: the new test, then both worker projects in full, plus SIGTERM/SIGKILL/health scenarios (already in `ketik-review-worker-api-publication.spec.ts` / `-host.spec.ts`).
+- [ ] `thermo-nuclear`, root gates, graphify update, changelog, commit `fix(ketik): bound deadline review release and make worker host lifecycle explicit`, push. Railway auto-deploys on push to `main`, so state that in the report.
+
+## Risks and boundaries
+
+- WS1 touches result publication (`settle`). Any change to its fence or publish order can lose or duplicate scores. Keep business writes byte-identical apart from moving the status writes out.
+- The claim predicate re-check must not turn "no work" into an error. Workers treat `NULL` as idle, and errors as `cycle_failed` plus back-off.
+- Do not weaken the global `exposed-function-guard` precondition. Its pre-existing `ai_model_policy_*` drift stays reported, not fixed.
+- No remote DB command, no production deploy, no E2E against production.
+
+## WS1 execution evidence — 2026-11-16
+
+### Scope and review
+
+- Direct implementation, Lane D; no delegation or independent review claimed. Only WS1 is authorized in this run. WS2 deadline-test decision remains unasked/unselected; WS3 remains unchanged.
+- Verified effective writers in all canonical migrations and `apps/api/src`: only the three RPCs listed in F1 mutate existing job/history review statuses. Inserts still initialize rows. WS0's broad WS2/WS3 drift-check checkbox remains open because those workstreams were not started.
+- New migration/rollback: `20261116170000_ketik_review_job_transitions.sql`. Current API signatures, defaults, JSON responses, access validation and service-role-only ACLs are retained. No TypeScript runtime or provider/model/quota changes.
+- Helper events are closed; all six live status UPDATE statements are in the helper (three job UPDATEs and three mirrored history UPDATEs). Job predicates compare expected status; nullable history status uses `IS NOT DISTINCT FROM` as the null-safe CAS. Every status write checks ROW_COUNT. The helper and all three delegates are SECURITY INVOKER with empty search_path, anon/authenticated denied, service_role allowed (`catalog-review.log`).
+- Settle completes the fenced transition before its unchanged business writes, in the same transaction: a fence miss returns false without publication; later review/typo/score failures roll back both transition and results. Existing real-worker failure-injection E2E passed under the fixture-only call-stack guard.
+- **Claim race not reproduced.** Tests prove live/completed/future-queue rejection, helper CAS, null/expired lease reclaim, attempt exhaustion, stale-token denial and unchanged data on misses. They do not force the narrow candidate-snapshot window; the locked-row recheck was reviewed structurally. The original RED proves centralized mutation, not that concurrency race.
+- Thermo-nuclear/lifecycle/SQL-security self-review: **owned implementation PASS**; remote application is blocked pending authorization. The known unrelated global RPC-inventory gate remains red and is not represented as successful.
+- Graphify `graphify query 'claimKetikReview'` exited 0 and identified both claim/release callers and the two worker hosts; live code/migrations remained authoritative. Context7 was not repeated: this internal refactor reuses the existing PostgreSQL call-stack/CAS fixture and changes no external API usage or dependencies.
+
+### Disposable target and commands
+
+All logs below are under ignored `artifacts/ketik-review-transitions/`; traces may contain local test JWTs and must not be committed. Workdir is ignored `scratch/ketik-review-transitions-20261116`, project `ketik-review-transitions-test-20261116`, API/DB loopback ports **55421/55422**. Canonical migrations are symlinked, seeds disabled, Storage schema retained but runtime excluded. No `.env*`, developer stack or remote project touched.
+
+- `supabase start --workdir "$PWD/scratch/ketik-review-transitions-20261116" --exclude studio,mailpit,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta` → **0** (`stack-start.log`). Fresh baseline replay, no existing user data. Only task-owned DB/Auth/PostgREST/Kong containers.
+- Local SQL apply: `psql postgresql://postgres:postgres@127.0.0.1:55422/postgres -v ON_ERROR_STOP=1 -f supabase/migrations/20261116170000_ketik_review_job_transitions.sql` → **0** (`apply.log`). This URL uses the disposable local database's standard development credentials, never a remote credential.
+- Initial RED command: `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-transitions-20261116" pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-host\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-review-worker-real-backend -g 'review job status transitions' --reporter=line --workers=1 --trace on` → **1**, expected enqueue HTTP 202, received 500 because the old history writer bypassed the fixture guard (`red.log`, preserved `red-trace.zip`). Identical command after apply → **0**, 1 passed (`green.log`).
+- Expanded focus adds `-g 'review job status transitions|review transition CAS|review transition rollback|review authorization' --max-failures=1` in place of that single-test grep → **0**, 4 passed (`focused-expanded.log`). Denial checks cover anon and every fixture JWT role with exact SQLSTATE 42501, including the new helper; service-role controls exercise actual transitions.
+- Standalone regression: `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-transitions-20261116" pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-(host|publication)\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-review-worker-real-backend --reporter=line --workers=1 --trace on --max-failures=1` → **0**, **28 passed, 1 skipped** (`worker-standalone.log`; skip is embedded-only wake).
+- Same regression command with `--project=ketik-review-worker-embedded-real-backend` → **0**, **28 passed, 1 skipped** (`worker-embedded.log`; skip is standalone-only health). Every publication-suite status write runs under the call-stack fixture guard, including rollback-on-publication-failure, SIGTERM, SIGKILL and restart.
+- `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-transitions-20261116" pnpm --dir apps/web exec playwright test '(^|/)user-controls-api\.spec\.ts$' --config=playwright.api.config.ts --project=user-controls-real-backend --reporter=line --workers=1 --trace on --max-failures=1` → **0**, **3 passed** (`user-controls.log`).
+- Same command with file `ketik-errors-api\.spec\.ts$` and project `ketik-errors-real-backend` → **0**, **5 passed** (`errors.log`). Provider calls are stubbed only at the HTTP boundary; no external requests/cost.
+- Global guard: `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-transitions-20261116" pnpm --dir apps/web exec playwright test '(^|/)exposed-function-guard-api\.spec\.ts$' --config=playwright.api.config.ts --project=db-guard-real-backend -g 'D5.9' --reporter=line --workers=1 --trace on --max-failures=1` → **1**, before RPC calls: baseline `ai_model_policy_reset(text,text,uuid)` and `ai_model_policy_set(text,text,uuid)` remain outside the allowlist (`global-rpc-guard.log`). No crash or new KETIK inventory mismatch. This is the pre-existing drift explicitly excluded by the plan, not repaired or hidden.
+- `supabase db reset --local --workdir "$PWD/scratch/ketik-review-transitions-20261116"` → **0**, complete canonical replay including the new migration (`clean-replay.log`). Expanded focus then → **0**, 4 passed, with `--output="$PWD/artifacts/ketik-review-transitions/final-results"` (`focused-clean-replay.log`).
+- Local rollback via `psql` with the paired rollback file → **0** (`rollback.log`); the initial guarded test then → **1**, same expected 202/500 RED (`rollback-red.log`, `rollback-red-results/`). Reapply via the same local SQL command → **0** (`reapply.log`); expanded focus again → **0**, 4 passed (`focused-reapply.log`, `reapply-results/`). The round-trip E2E derives baseline MD5s from the exact historical sources in rolled-back DDL, verifies all three `pg_get_functiondef` hashes, helper removal, and byte-identical JSON for history/job/reviews/typos, then verifies forward hashes and unchanged data after reapply. No HTTP writes while rolled back.
+- `psql postgresql://postgres:postgres@127.0.0.1:55422/postgres -v ON_ERROR_STOP=1 -f artifacts/ketik-review-transitions/catalog-review.sql` → **0**, six guarded writes in one live writer, correct ACL/search_path, zero remaining fixture triggers/profiles/history/jobs/usage logs (`catalog-review.log`).
+- Serial root gates: `TURBO_CONCURRENCY=1 pnpm typecheck`, `TURBO_CONCURRENCY=1 pnpm lint`, `TURBO_CONCURRENCY=1 pnpm build` → **0** each (`typecheck.log`, `lint.log`, `build.log`). Respectively 4/4/3 successful tasks, 3/3/2 cached; web typecheck includes E2E. Root lint retains **74 existing warnings, zero errors**, all in untouched web code.
+- Scoped `pnpm --dir apps/web exec eslint e2e/ketik-review-worker-api-host.spec.ts e2e/ketik-review-worker-api-publication.spec.ts e2e/helpers/ketikReviewWorkerApiHarness.ts e2e/exposed-function-guard-api.spec.ts` → **0**, no warnings (`scoped-lint.log`). No unit/legacy suite ran.
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .` → **0** (`graphify.log`); ignored cache only, one AST worker. No second update or delegated worker.
+- `supabase stop --workdir "$PWD/scratch/ketik-review-transitions-20261116" --no-backup` → **0** (`stack-stop.log`). Task-owned containers/volumes are gone; no task worker remains. The three unrelated untracked plans are preserved.
+
+### Remaining boundaries and drift
+
+- Remote apply is **not authorized and was not run**. Commit/push outcome belongs in the executor's final report, not a pre-claimed checklist item. WS2/WS3 remain separate changes/commits.
+- `docs/deployment.md` steps 5–6 and the `review-lifecycle.ts` fallback comment remain the planned WS3 drift. Existing legacy unit-command instructions and the old `ketik-service.ts` debug pointer remain report-only, as required.
+- Canonical `docs/database.md` now describes this migration and compatible rollback. The rollback index adds only the owned catalog row; its existing reverse-order usage example/blanket verification-query prose are not repaired by WS1.
+- A tooling-only invocation `node scripts/check-migration-rollbacks.mjs --help` exited 1 because that script accepts a base ref, not a help flag. The actual committed-migration check is run with the baseline ref after commit; no product or test gate was weakened.
+
+## Report back (required format)
+
+For each workstream: files changed, exact commands with exit codes and log paths, what is claimed vs not claimed (especially: was the claim race reproduced, and which option was chosen for the deadline test), commit SHA, and any newly found doc/code inconsistencies.

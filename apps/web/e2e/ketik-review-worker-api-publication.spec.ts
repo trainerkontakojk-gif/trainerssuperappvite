@@ -12,6 +12,7 @@ import {
   releaseProvider,
   workerLog,
   setupKetikReviewWorkerSuite,
+  installKetikReviewTransitionGuard,
   teardownKetikReviewWorkerSuite,
   seedSession,
   request,
@@ -23,9 +24,16 @@ import {
   cleanupKetikReviewWorkerTest,
 } from "./helpers/ketikReviewWorkerApiHarness";
 
-test.beforeAll(setupKetikReviewWorkerSuite);
+let removeTransitionGuard: (() => string) | undefined;
+test.beforeAll(async () => {
+  await setupKetikReviewWorkerSuite();
+  removeTransitionGuard = installKetikReviewTransitionGuard();
+});
 
-test.afterAll(teardownKetikReviewWorkerSuite);
+test.afterAll(async () => {
+  removeTransitionGuard?.();
+  await teardownKetikReviewWorkerSuite();
+});
 
 test.beforeEach(resetKetikReviewWorkerTest);
 

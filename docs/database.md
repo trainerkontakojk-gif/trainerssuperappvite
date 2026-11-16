@@ -688,6 +688,22 @@ EXECUTE hanya service_role: `can_access_ketik_review`, `enqueue_ketik_review`,
   kolom lama yang aman melalui RLS owner; `lease_token`, `request_id`, dan
   `available_at` tidak diberi SELECT. Mutasi/RPC tetap backend-only.
 
+Migration `20261116170000_ketik_review_job_transitions.sql` memusatkan status
+job dan mirror `ketik_history.review_status` pada `transition_ketik_review_job`
+(SECURITY INVOKER, search_path kosong, service-role-only). Event tertutup:
+enqueue, claim, exhaust, release, fail_attempt, complete. UPDATE job memakai
+expected status serta token/expiry bila diperlukan; mirror history memakai
+expected status null-safe karena kolom legacy nullable. Claim memeriksa ulang
+eligibility setelah job dikunci; kandidat stale mengembalikan NULL, bukan error.
+Settle yang kehilangan fence mengembalikan false tanpa publikasi. Hasil lama
+tetap authoritative selama rerun dan publication tetap satu transaksi.
+
+Signature/JSON ketiga RPC lama tidak berubah, sehingga migrasi ini tidak
+memerlukan deploy API bersama. Rollback pasangannya hanya mengembalikan tiga
+definisi RPC terdahulu dan menghapus helper, tanpa mengubah data; hentikan
+mutasi review selama rollback. Tidak ada trigger produk baru: guard call-stack
+hanya fixture E2E pada database disposable.
+
 Rollback E menolak job queued/processing, menghapus RPC/index/kolom tambahan,
 dan mengembalikan SELECT tabel lama setelah kolom token dihapus. Review, typo,
 dan skor published tetap ada. Terapkan rollback hanya setelah drain/stop dan

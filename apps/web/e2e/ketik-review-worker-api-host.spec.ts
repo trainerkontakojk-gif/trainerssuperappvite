@@ -19,6 +19,7 @@ import {
   worker,
   workerLog,
   setupKetikReviewWorkerSuite,
+  installKetikReviewTransitionGuard,
   teardownKetikReviewWorkerSuite,
   seedSession,
   request,
@@ -38,6 +39,107 @@ test.afterAll(teardownKetikReviewWorkerSuite);
 test.beforeEach(resetKetikReviewWorkerTest);
 
 test.afterEach(cleanupKetikReviewWorkerTest);
+
+test("review job status transitions use one guarded writer through HTTP and the real worker", async () => {
+  const id = await seedSession();
+  const removeGuard = installKetikReviewTransitionGuard();
+  try {
+    expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+      202,
+    );
+    await startWorker();
+    await expect.poll(() => suite.providerCalls).toBe(1);
+    const live = await job(id);
+    expect(live).toMatchObject({ status: "processing", attempt_count: 1 });
+    const claim = () =>
+      db.rpc("claim_ketik_review", {
+        p_worker: "guard-probe",
+        p_lease_seconds: 600,
+        p_session: id,
+      });
+    expect(await claim()).toMatchObject({ error: null, data: null });
+    // These CAS checks do not reproduce the candidate-snapshot race.
+    for (const p_event of ["claim", "exhaust"]) {
+      expect(
+        await db.rpc("transition_ketik_review_job", {
+          p_session: id,
+          p_event,
+          p_worker: "guard-probe",
+          p_lease_seconds: 600,
+        }),
+      ).toMatchObject({ error: null, data: false });
+    }
+    expect(
+      await db.rpc("settle_ketik_review", {
+        p_session: id,
+        p_token: randomUUID(),
+        p_release: true,
+      }),
+    ).toMatchObject({ error: null, data: false });
+    expect(await job(id)).toEqual(live);
+    suite.providerMode = "success";
+    releaseProvider();
+    await expect.poll(async () => (await job(id)).status).toBe("completed");
+    await stopWorker();
+    expect(await claim()).toMatchObject({ error: null, data: null });
+    expect(
+      await db.rpc("transition_ketik_review_job", {
+        p_session: id,
+        p_event: "claim",
+        p_worker: "guard-probe",
+        p_lease_seconds: 600,
+      }),
+    ).toMatchObject({ error: null, data: false });
+
+    // Rerun preserves the published score, release invalidates the old token,
+    // and three failed attempts use the same writer without downgrading history.
+    expect(
+      (await request("/review", trainer, { sessionId: id, rerun: true }))
+        .status,
+    ).toBe(202);
+    const released = await claim();
+    expect(released.error).toBeNull();
+    expect(
+      await db.rpc("settle_ketik_review", {
+        p_session: id,
+        p_token: released.data.token,
+        p_release: true,
+      }),
+    ).toMatchObject({ error: null, data: true });
+    expect(
+      await db.rpc("settle_ketik_review", {
+        p_session: id,
+        p_token: released.data.token,
+        p_release: true,
+      }),
+    ).toMatchObject({ error: null, data: false });
+    suite.providerMode = "fail";
+    await startWorker();
+    await expect
+      .poll(async () => (await job(id)).status, { timeout: 15_000 })
+      .toBe("failed");
+    await stopWorker();
+    expect(
+      (await request(`/review/status/${id}`).then((r) => r.json())).data,
+    ).toMatchObject({
+      status: "failed",
+      previousKept: true,
+      resultReady: true,
+    });
+    expect(
+      (
+        await db
+          .from("ketik_history")
+          .select("review_status,final_score")
+          .eq("id", id)
+          .single()
+      ).data,
+    ).toEqual({ review_status: "completed", final_score: 80 });
+  } finally {
+    await stopWorker();
+    removeGuard();
+  }
+});
 
 test("review authorization follows own account or the trainer assignment; public RPCs remain denied", async () => {
   const own = await seedSession(agent.userId);
@@ -126,11 +228,17 @@ test("review authorization follows own account or the trainer assignment; public
         ["settle_ketik_review", { p_session: team, p_token: randomUUID() }],
         ["read_ketik_review", { p_actor: trainer.userId, p_session: team }],
         [
+          "transition_ketik_review_job",
+          { p_session: team, p_event: "enqueue", p_request: randomUUID() },
+        ],
+        [
           "can_access_ketik_review",
           { p_actor: trainer.userId, p_session: team },
         ],
       ] as const)
-        expect((await client.rpc(name, args)).error).not.toBeNull();
+        expect((await client.rpc(name, args)).error).toMatchObject({
+          code: "42501",
+        });
     }
     expect(
       (
@@ -492,6 +600,214 @@ test("competing real database claims admit only one worker and release invalidat
   ).toBe(false);
 });
 
+test("review transition CAS rejects ineligible claims and stale settlement without changing data", async () => {
+  const id = await seedSession();
+  expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+    202,
+  );
+  const claim = () =>
+    db.rpc("claim_ketik_review", {
+      p_worker: "cas-probe",
+      p_lease_seconds: 600,
+      p_session: id,
+    });
+  const snapshot = () =>
+    runSql(
+      env,
+      `SELECT jsonb_build_object(
+    'job',(SELECT to_jsonb(j) FROM public.ketik_review_jobs j WHERE session_id='${id}'),
+    'history',(SELECT to_jsonb(h) FROM public.ketik_history h WHERE id='${id}'));`,
+    );
+  const queued = await job(id);
+  expect(
+    (
+      await db
+        .from("ketik_review_jobs")
+        .update({ available_at: "2099-01-01T00:00:00Z" })
+        .eq("session_id", id)
+    ).error,
+  ).toBeNull();
+  const future = snapshot();
+  expect(await claim()).toMatchObject({ error: null, data: null });
+  expect(
+    await db.rpc("transition_ketik_review_job", {
+      p_session: id,
+      p_event: "claim",
+      p_worker: "cas-probe",
+      p_lease_seconds: 600,
+    }),
+  ).toMatchObject({ error: null, data: false });
+  expect(snapshot()).toBe(future);
+  expect(
+    (
+      await db
+        .from("ketik_review_jobs")
+        .update({ available_at: queued.available_at })
+        .eq("session_id", id)
+    ).error,
+  ).toBeNull();
+  const first = await claim();
+  expect(first.error).toBeNull();
+  expect(first.data.attempt).toBe(1);
+  // NULL leases are reclaimable but cannot settle; the new token fences the old one.
+  expect(
+    (
+      await db
+        .from("ketik_review_jobs")
+        .update({ lease_expires_at: null })
+        .eq("session_id", id)
+    ).error,
+  ).toBeNull();
+  expect(
+    await db.rpc("settle_ketik_review", {
+      p_session: id,
+      p_token: first.data.token,
+    }),
+  ).toMatchObject({ error: null, data: false });
+  const second = await claim();
+  expect(second.error).toBeNull();
+  expect(second.data.attempt).toBe(2);
+  const live = snapshot();
+  for (const p_event of ["release", "fail_attempt", "complete"]) {
+    expect(
+      await db.rpc("transition_ketik_review_job", {
+        p_session: id,
+        p_event,
+        p_token: first.data.token,
+      }),
+    ).toMatchObject({ error: null, data: false });
+  }
+  expect(
+    (
+      await db.rpc("transition_ketik_review_job", {
+        p_session: id,
+        p_event: "enqueue",
+        p_request: randomUUID(),
+      })
+    ).error?.code,
+  ).toBe("PT409");
+  expect(
+    (
+      await db.rpc("transition_ketik_review_job", {
+        p_session: id,
+        p_event: "unknown",
+      })
+    ).error?.code,
+  ).toBe("PT409");
+  expect(snapshot()).toBe(live);
+  expect(
+    (
+      await db
+        .from("ketik_review_jobs")
+        .update({ lease_expires_at: "2020-01-01T00:00:00Z" })
+        .eq("session_id", id)
+    ).error,
+  ).toBeNull();
+  const third = await claim();
+  expect(third.error).toBeNull();
+  expect(third.data.attempt).toBe(3);
+  expect(await claim()).toMatchObject({ error: null, data: null });
+  expect(
+    (
+      await db
+        .from("ketik_review_jobs")
+        .update({ lease_expires_at: "2020-01-01T00:00:00Z" })
+        .eq("session_id", id)
+    ).error,
+  ).toBeNull();
+  expect(await claim()).toMatchObject({
+    error: null,
+    data: { status: "failed", sessionId: id },
+  });
+  expect((await job(id)).attempt_count).toBe(3);
+  expect(
+    (await request(`/review/status/${id}`).then((r) => r.json())).data,
+  ).toMatchObject({ status: "failed", resultReady: false });
+  // Manual retry resets the budget; this is not a re-score of a published result.
+  expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+    202,
+  );
+  expect(await job(id)).toMatchObject({ status: "queued", attempt_count: 0 });
+});
+
+test("review transition rollback restores exact prior RPC bodies without changing published data", async () => {
+  test.skip(
+    !process.env.E2E_SUPABASE_WORKDIR,
+    "DDL round trip requires an explicitly selected disposable target",
+  );
+  const id = await seedSession(trainer.userId, true);
+  expect(
+    (await request("/review", trainer, { sessionId: id, rerun: true })).status,
+  ).toBe(202);
+  const sqlFile = (path: string) =>
+    readFileSync(
+      fileURLToPath(new URL(`../../../supabase/${path}`, import.meta.url)),
+      "utf8",
+    );
+  const digestSql = `SELECT jsonb_object_agg(proname,md5(pg_get_functiondef(oid))) FROM pg_proc
+    WHERE pronamespace='public'::regnamespace AND proname IN ('claim_ketik_review','settle_ketik_review','enqueue_ketik_review');`;
+  // Compile the historical source definitions inside a rolled-back DDL transaction
+  // to derive the baseline pg_get_functiondef MD5s without hard-coding version formatting.
+  const prior = [
+    ["20261016000935_ketik_durable_review_worker.sql", "claim_ketik_review"],
+    [
+      "20261017150000_ketik_settle_review_drop_legacy_results.sql",
+      "settle_ketik_review",
+    ],
+    ["20261018200000_user_controls.sql", "enqueue_ketik_review"],
+  ].map(([file, name]) => {
+    const source = sqlFile(`migrations/${file}`);
+    const definition = source.match(
+      new RegExp(
+        `CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\([^]*?END \\$\\$;`,
+      ),
+    )?.[0];
+    expect(definition).toBeTruthy();
+    return definition!.replace(
+      /^CREATE (?:OR REPLACE )?FUNCTION/,
+      "CREATE OR REPLACE FUNCTION",
+    );
+  });
+  const expectedPrior = runSql(
+    env,
+    `BEGIN; ${prior.join("\n")} ${digestSql} ROLLBACK;`,
+  );
+  const current = runSql(env, digestSql);
+  const dataSql = `SELECT jsonb_build_object(
+    'history',(SELECT to_jsonb(h) FROM public.ketik_history h WHERE id='${id}'),
+    'job',(SELECT to_jsonb(j) FROM public.ketik_review_jobs j WHERE session_id='${id}'),
+    'reviews',(SELECT jsonb_agg(r ORDER BY id) FROM public.ketik_session_reviews r WHERE session_id='${id}'),
+    'typos',(SELECT jsonb_agg(t ORDER BY id) FROM public.ketik_typo_findings t WHERE session_id='${id}'));`;
+  const before = runSql(env, dataSql);
+  const forward = sqlFile(
+    "migrations/20261116170000_ketik_review_job_transitions.sql",
+  );
+  try {
+    runSql(
+      env,
+      sqlFile(
+        "rollbacks/rollback_20261116170000_ketik_review_job_transitions.sql",
+      ),
+    );
+    expect(runSql(env, digestSql)).toBe(expectedPrior);
+    expect(
+      runSql(
+        env,
+        "SELECT to_regprocedure('public.transition_ketik_review_job(uuid,text,uuid,uuid,text,integer)') IS NULL;",
+      ),
+    ).toBe("t");
+    expect(runSql(env, dataSql)).toBe(before);
+  } finally {
+    runSql(env, forward);
+  }
+  expect(runSql(env, digestSql)).toBe(current);
+  expect(runSql(env, dataSql)).toBe(before);
+  // The schema remains usable by the unchanged API after reapply.
+  expect(
+    (await request(`/review/status/${id}`).then((r) => r.json())).data,
+  ).toMatchObject({ status: "queued", resultReady: true });
+});
+
 test("health becomes degraded when active work exceeds its lease-age bound", async () => {
   test.skip(
     embedded(),
@@ -556,6 +872,7 @@ test("migration rollback refuses live jobs, preserves published data, and reappl
     "20261016000935_ketik_durable_review_worker.sql",
     "20261017150000_ketik_settle_review_drop_legacy_results.sql",
     "20261018200000_user_controls.sql",
+    "20261116170000_ketik_review_job_transitions.sql",
   ])
     runSql(
       env,
