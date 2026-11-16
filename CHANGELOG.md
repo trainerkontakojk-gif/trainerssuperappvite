@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-16
 
+- refactor(ketik): make assignment, history actions, CSV export, and replay playback lifecycles explicit
+
 - refactor(ketik): centralize client session, chat, and review lifecycles in explicit reducers and keep failed response recovery manual and idempotent
 
 - feat(profiler): upload participant photos through a validated API route instead of writing to Supabase Storage from the browser, and record the Telefun recording upload as the one approved direct frontend Storage write

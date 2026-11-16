@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type {
   KetikHistoryPage,
   KetikHistoryStatus,
@@ -7,6 +7,10 @@ import type {
 import { useAuthStore } from "../../../store/authStore";
 import { ketikApi } from "../ketikApi";
 import { downloadKetikHistory } from "../utils/transcript";
+import {
+  historyExportReducer,
+  type ExportEvent,
+} from "./historyActionLifecycle";
 
 const EMPTY: KetikHistoryPage = {
   items: [],
@@ -123,22 +127,26 @@ export function useKetikHistoryPage() {
 export function useKetikHistoryExport(status: KetikHistoryStatus, q: string) {
   const userId = useAuthStore((s) => s.session?.user.id);
   const generation = useRef(0);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [error, setError] = useState(false);
+  const [state, dispatch] = useReducer(historyExportReducer, {
+    status: "idle",
+  });
+  const currentState = useRef(state);
+  const transition = useCallback((event: ExportEvent) => {
+    currentState.current = historyExportReducer(currentState.current, event);
+    dispatch(event);
+  }, []);
   useEffect(() => {
     const invalidate = () => {
       generation.current++;
     };
     invalidate();
-    setProgress(null);
-    setError(false);
+    transition({ type: "reset" });
     return invalidate;
-  }, [userId, status, q]);
+  }, [userId, status, q, transition]);
   const run = async () => {
-    if (progress !== null) return;
+    if (currentState.current.status === "exporting") return;
     const current = ++generation.current;
-    setProgress(0);
-    setError(false);
+    transition({ type: "start", request: current });
     try {
       const rows: KetikHistorySummaryItem[] = [];
       const ids = new Set<string>();
@@ -158,19 +166,23 @@ export function useKetikHistoryExport(status: KetikHistoryStatus, q: string) {
           ids.add(item.id);
           rows.push(item);
         }
-        setProgress(rows.length);
+        transition({ type: "progress", count: rows.length, request: current });
         if (!result.nextCursor) {
           downloadKetikHistory(rows);
+          transition({ type: "done", request: current });
           return;
         }
         cursor = result.nextCursor;
       }
       throw new Error("Export page limit exceeded");
     } catch {
-      if (generation.current === current) setError(true);
-    } finally {
-      if (generation.current === current) setProgress(null);
+      if (generation.current === current)
+        transition({ type: "failed", request: current });
     }
   };
-  return { run, progress, error };
+  return {
+    run,
+    progress: state.status === "exporting" ? state.progress : null,
+    error: state.status === "failed",
+  };
 }

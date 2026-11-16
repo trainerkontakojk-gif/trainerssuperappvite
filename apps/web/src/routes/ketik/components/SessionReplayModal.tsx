@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useReducer, useEffect, useRef } from "react";
+import { playbackReducer, type PlaybackState } from "../hooks/replayLifecycle";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -38,8 +39,13 @@ export function SessionReplayModal({
   consumerName = "Consumer",
   container,
 }: SessionReplayModalProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [playback, dispatch] = useReducer(playbackReducer, {
+    status: "closed",
+    index: 0,
+    count: messages.length,
+  } satisfies PlaybackState);
+  const currentIndex = playback.index;
+  const isPlaying = playback.status === "playing";
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const renderTextWithHighlights = (text: string, messageId?: string) => {
@@ -89,22 +95,16 @@ export function SessionReplayModal({
 
   // Satu modal dipakai untuk banyak sesi: setiap kali dibuka, mulai dari awal.
   useEffect(() => {
-    if (!isOpen) return;
-    setCurrentIndex(0);
-    setIsPlaying(false);
+    dispatch(
+      isOpen ? { type: "open", count: messages.length } : { type: "close" },
+    );
   }, [isOpen, messages]);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isPlaying && currentIndex < messages.length - 1) {
-      interval = setInterval(() => {
-        setCurrentIndex((prev) => prev + 1);
-      }, 1500);
-    } else if (currentIndex >= messages.length - 1) {
-      setIsPlaying(false);
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying, currentIndex, messages.length]);
+    if (!isOpen || !isPlaying) return;
+    const timer = setTimeout(() => dispatch({ type: "tick" }), 1500);
+    return () => clearTimeout(timer);
+  }, [isOpen, isPlaying, currentIndex]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -121,7 +121,10 @@ export function SessionReplayModal({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open) {
+          dispatch({ type: "close" });
+          onClose();
+        }
       }}
     >
       <DialogContent
@@ -225,27 +228,25 @@ export function SessionReplayModal({
                   className="h-full bg-primary"
                   initial={{ width: 0 }}
                   animate={{
-                    width: `${((currentIndex + 1) / messages.length) * 100}%`,
+                    width: `${messages.length ? ((currentIndex + 1) / messages.length) * 100 : 0}%`,
                   }}
                 />
               </div>
               <span className="text-xs font-black tabular-nums text-muted-foreground min-w-[40px]">
-                {currentIndex + 1} / {messages.length}
+                {messages.length ? currentIndex + 1 : 0} / {messages.length}
               </span>
             </div>
             <div className="flex items-center justify-center gap-4">
               <button
-                onClick={() => {
-                  setCurrentIndex(0);
-                  setIsPlaying(false);
-                }}
+                onClick={() => dispatch({ type: "reset" })}
+                disabled={!messages.length}
                 className="w-12 h-12 flex items-center justify-center rounded-2xl border border-border/50 hover:bg-foreground/5 transition-all"
                 title="Reset"
               >
                 <RotateCcw className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+                onClick={() => dispatch({ type: "step", direction: -1 })}
                 disabled={currentIndex === 0}
                 className="w-12 h-12 flex items-center justify-center rounded-2xl border border-border/50 hover:bg-foreground/5 transition-all disabled:opacity-20"
                 title="Previous"
@@ -253,7 +254,8 @@ export function SessionReplayModal({
                 <ChevronLeft className="w-6 h-6" />
               </button>
               <button
-                onClick={() => setIsPlaying(!isPlaying)}
+                onClick={() => dispatch({ type: "toggle" })}
+                disabled={!messages.length || playback.status === "ended"}
                 className="w-16 h-16 bg-primary text-white flex items-center justify-center rounded-[2rem] shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                 title={isPlaying ? "Pause" : "Play"}
               >
@@ -264,12 +266,10 @@ export function SessionReplayModal({
                 )}
               </button>
               <button
-                onClick={() =>
-                  setCurrentIndex((prev) =>
-                    Math.min(messages.length - 1, prev + 1),
-                  )
+                onClick={() => dispatch({ type: "step", direction: 1 })}
+                disabled={
+                  !messages.length || currentIndex >= messages.length - 1
                 }
-                disabled={currentIndex === messages.length - 1}
                 className="w-12 h-12 flex items-center justify-center rounded-2xl border border-border/50 hover:bg-foreground/5 transition-all disabled:opacity-20"
                 title="Next"
               >

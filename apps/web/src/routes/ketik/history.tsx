@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Download, Play, Search, Trash2 } from "lucide-react";
-import type {
-  KetikSessionHistoryItem,
-  KetikHistorySummaryItem,
-} from "@trainers/types";
+import type { KetikHistorySummaryItem } from "@trainers/types";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useAuthStore } from "../../store/authStore";
 import { notify } from "../../lib/toast";
 import { ketikApi } from "./ketikApi";
+import {
+  historyActionReducer,
+  INITIAL_HISTORY_ACTIONS,
+  type HistoryActionEvent,
+  type DeleteTarget,
+} from "./hooks/historyActionLifecycle";
 import { SessionReplayModal } from "./components/SessionReplayModal";
 import {
   formatKetikDate,
@@ -48,9 +51,6 @@ function statusOf(
   }
 }
 
-type PendingDelete =
-  { kind: "one"; session: KetikHistorySummaryItem } | { kind: "all" };
-
 export default function KetikHistory() {
   const userId = useAuthStore((s) => s.session?.user.id);
   const {
@@ -70,40 +70,51 @@ export default function KetikHistory() {
   const { items: history, counts } = data;
   const visible = history;
   const csv = useKetikHistoryExport(filter, searchTerm);
-  const [replay, setReplay] = useState<KetikSessionHistoryItem | null>(null);
-  const [replayPending, setReplayPending] = useState<string | null>(null);
-  const [replayError, setReplayError] = useState<string | null>(null);
+  const [actions, dispatch] = useReducer(
+    historyActionReducer,
+    INITIAL_HISTORY_ACTIONS,
+  );
+  const current = useRef(actions);
+  const transition = useCallback((event: HistoryActionEvent) => {
+    current.current = historyActionReducer(current.current, event);
+    dispatch(event);
+  }, []);
+  const replay =
+    actions.replay.status === "ready" ? actions.replay.session : null;
+  const replayPending =
+    actions.replay.status === "loading" ? actions.replay.id : null;
+  const replayError =
+    actions.replay.status === "failed" ? actions.replay.id : null;
+  const pendingDelete =
+    actions.deletion.status === "idle" ? null : actions.deletion.target;
+  const confirmOpen = ["confirming", "deleting", "failed"].includes(
+    actions.deletion.status,
+  );
+  const deleting = actions.deletion.status === "deleting";
   const replayRequest = useRef(0);
+  const deleteRequest = useRef(0);
   useEffect(() => {
     const invalidate = () => {
       replayRequest.current++;
+      deleteRequest.current++;
     };
     invalidate();
-    setReplay(null);
-    setReplayError(null);
-    setReplayPending(null);
+    transition({ type: "reset" });
     return invalidate;
-  }, [userId]);
+  }, [userId, transition]);
   const openReplay = async (id: string) => {
     const request = ++replayRequest.current;
-    setReplayPending(id);
-    setReplayError(null);
+    transition({ type: "replay-load", id, request });
     try {
       const detail = await ketikApi.getHistoryDetail(id);
-      if (request === replayRequest.current) setReplay(detail);
+      if (request === replayRequest.current)
+        transition({ type: "replay-loaded", session: detail, request });
     } catch {
-      if (request === replayRequest.current) setReplayError(id);
-    } finally {
-      if (request === replayRequest.current) setReplayPending(null);
+      if (request === replayRequest.current)
+        transition({ type: "replay-failed", request });
     }
   };
-  // `pendingDelete` dibiarkan terisi saat dialog menutup supaya teksnya tidak
-  // berganti selama animasi tutup; `confirmOpen` yang mengatur tampil/tidak.
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
-    null,
-  );
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // The reducer's closed state retains the target during the exit animation.
 
   const summary =
     data.total === 0
@@ -118,34 +129,33 @@ export default function KetikHistory() {
             : []),
         ].join(" · ");
 
-  const askDelete = (next: PendingDelete) => {
-    setPendingDelete(next);
-    setConfirmOpen(true);
-  };
+  const askDelete = (target: DeleteTarget) =>
+    transition({ type: "delete-ask", target });
 
   const confirmDelete = async () => {
-    if (!pendingDelete) return;
-    setDeleting(true);
+    const deletion = current.current.deletion;
+    if (deletion.status !== "confirming" && deletion.status !== "failed")
+      return;
+    const target = deletion.target;
+    const request = ++deleteRequest.current;
+    transition({ type: "delete-start", request });
     try {
-      if (pendingDelete.kind === "one") {
-        const { id } = pendingDelete.session;
-        await ketikApi.deleteSession(id);
-        loadHistory();
-      } else {
-        await ketikApi.clearHistory();
-        resetFilters();
-        loadHistory();
-      }
-      setConfirmOpen(false);
+      if (target.kind === "one")
+        await ketikApi.deleteSession(target.session.id);
+      else await ketikApi.clearHistory();
+      if (request !== deleteRequest.current) return;
+      if (target.kind === "all") resetFilters();
+      loadHistory();
+      transition({ type: "delete-done", request });
     } catch (error) {
+      if (request !== deleteRequest.current) return;
+      transition({ type: "delete-failed", request });
       console.error("[Ketik] Failed to delete history:", error);
       notify.error(
-        pendingDelete.kind === "one"
+        target.kind === "one"
           ? "Sesi belum terhapus. Coba lagi."
           : "Riwayat belum terhapus. Coba lagi.",
       );
-    } finally {
-      setDeleting(false);
     }
   };
 
@@ -407,7 +417,10 @@ export default function KetikHistory() {
 
       <SessionReplayModal
         isOpen={replay !== null}
-        onClose={() => setReplay(null)}
+        onClose={() => {
+          replayRequest.current++;
+          transition({ type: "replay-close" });
+        }}
         messages={replay?.messages ?? []}
         scenarioTitle={replay?.scenarioTitle}
         consumerName={replay?.consumerName}
@@ -429,7 +442,7 @@ export default function KetikHistory() {
         }
         busy={deleting}
         onConfirm={() => void confirmDelete()}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => transition({ type: "delete-cancel" })}
       />
     </div>
   );

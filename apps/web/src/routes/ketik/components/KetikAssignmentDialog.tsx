@@ -1,5 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import type { KetikAssignmentSnapshot, ManagedUser } from "@trainers/types";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import {
+  assignmentReducer,
+  INITIAL_ASSIGNMENT,
+  type AssignmentEvent,
+} from "../hooks/assignmentLifecycle";
 import { KETIK_ERROR_MESSAGES } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
 import {
@@ -22,72 +33,68 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 
-type Source = Awaited<ReturnType<typeof ketikApi.getAssignmentSource>>;
 export function KetikAssignmentDialog({ onClose }: { onClose: () => void }) {
-  const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [source, setSource] = useState<Source | null>(null);
-  const [query, setQuery] = useState("");
-  const [recipient, setRecipient] = useState("");
-  const [snapshot, setSnapshot] = useState<KetikAssignmentSnapshot | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const [state, dispatch] = useReducer(assignmentReducer, INITIAL_ASSIGNMENT);
+  const current = useRef(state);
+  const transition = useCallback((event: AssignmentEvent) => {
+    current.current = assignmentReducer(current.current, event);
+    dispatch(event);
+  }, []);
+  const mounted = useRef(true);
   useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const [query, setQuery] = useState("");
+  const { source, users, recipient, snapshot, error } = state;
+  const loading = state.status === "loading";
+  const saving = state.status === "saving";
+  const success = state.status === "success";
+  const checking = state.status === "checking";
+  useEffect(() => {
+    if (!loading) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
-    setSource(null);
-    setSnapshot(null);
     void (async () => {
       try {
         const loadedSource = await ketikApi.getAssignmentSource();
         const loadedUsers = await ketikApi.getAssignmentRecipients();
         if (cancelled) return;
-        setSource(loadedSource);
-        setUsers(
-          loadedUsers.filter(
+        transition({
+          type: "loaded",
+          source: loadedSource,
+          users: loadedUsers.filter(
             (u) =>
               !u.is_deleted &&
               ["active", "approved"].includes(u.status) &&
               (u.role === "agent" || u.role === "leader"),
           ),
-        );
+        });
       } catch {
-        if (!cancelled)
-          setError("Data penugasan belum bisa dimuat. Coba muat ulang.");
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) transition({ type: "load-failed" });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [loading, transition]);
   useEffect(() => {
-    if (!recipient || !source) return;
+    if (!checking || !recipient || !source) return;
     let cancelled = false;
-    setSnapshot(null);
-    setSuccess(false);
-    setError("");
     void ketikApi
       .getAssignment(recipient)
       .then((data) => {
-        if (!cancelled) setSnapshot(data);
+        if (!cancelled)
+          transition({ type: "checked", recipient, snapshot: data });
       })
       .catch(() => {
-        if (!cancelled)
-          setError(
-            "Penugasan penerima belum bisa dimuat atau berada di luar akses Anda.",
-          );
+        if (!cancelled) transition({ type: "check-failed", recipient });
       });
     return () => {
       cancelled = true;
     };
-  }, [recipient, source]);
+  }, [checking, recipient, source, transition]);
   const matches = useMemo(
     () =>
       users.filter((u) =>
@@ -105,28 +112,32 @@ export function KetikAssignmentDialog({ onClose }: { onClose: () => void }) {
       : visible
   ).map((u) => ({ value: u.id, label: u.full_name || u.email }));
   const assign = async () => {
-    if (!source || !snapshot || !recipient || saving) return;
-    setSaving(true);
-    setError("");
-    setSuccess(false);
+    const pending = current.current;
+    if (pending.status !== "ready") return;
+    transition({ type: "save" });
     try {
-      const result = await ketikApi.assignConfiguration(recipient, {
-        sourceSettingsVersion: source.version,
-        recipientSettingsVersion: snapshot.recipientSettingsVersion,
-        expectedAssignmentVersion: snapshot.assignment?.version ?? null,
+      const result = await ketikApi.assignConfiguration(pending.recipient, {
+        sourceSettingsVersion: pending.source.version,
+        recipientSettingsVersion: pending.snapshot.recipientSettingsVersion,
+        expectedAssignmentVersion: pending.snapshot.assignment?.version ?? null,
       });
-      setSnapshot(result);
-      setSuccess(true);
+      if (mounted.current)
+        transition({
+          type: "saved",
+          recipient: pending.recipient,
+          snapshot: result,
+        });
     } catch (cause) {
-      setError(
-        cause instanceof ApiError && cause.code === "ASSIGNMENT_CONFLICT"
-          ? KETIK_ERROR_MESSAGES.ASSIGNMENT_CONFLICT
-          : KETIK_ERROR_MESSAGES.ASSIGNMENT_SAVE_FAILED,
-      );
-      // Never refresh versions and silently retry an overwrite.
-      setSnapshot(null);
-    } finally {
-      setSaving(false);
+      // Failed/conflicting saves require an explicit reload, never a silent overwrite retry.
+      if (mounted.current)
+        transition({
+          type: "save-failed",
+          recipient: pending.recipient,
+          error:
+            cause instanceof ApiError && cause.code === "ASSIGNMENT_CONFLICT"
+              ? KETIK_ERROR_MESSAGES.ASSIGNMENT_CONFLICT
+              : KETIK_ERROR_MESSAGES.ASSIGNMENT_SAVE_FAILED,
+        });
     }
   };
   return (
@@ -183,7 +194,7 @@ export function KetikAssignmentDialog({ onClose }: { onClose: () => void }) {
                       disabled={saving}
                       onValueChange={(value, details) => {
                         if (value && details.reason !== "none")
-                          setRecipient(value);
+                          transition({ type: "select", recipient: value });
                       }}
                     >
                       <SelectTrigger
@@ -210,7 +221,7 @@ export function KetikAssignmentDialog({ onClose }: { onClose: () => void }) {
                       atau email untuk mempersempit pilihan.
                     </p>
                   )}
-                  {recipient && !snapshot && !error && (
+                  {checking && (
                     <p role="status">Memeriksa penugasan penerima…</p>
                   )}
                   {snapshot && !success && (
@@ -232,7 +243,7 @@ export function KetikAssignmentDialog({ onClose }: { onClose: () => void }) {
               variant="outline"
               className="min-h-[44px]"
               disabled={saving}
-              onClick={() => setAttempt((n) => n + 1)}
+              onClick={() => transition({ type: "reload" })}
             >
               Muat ulang data penugasan
             </Button>
@@ -256,7 +267,7 @@ export function KetikAssignmentDialog({ onClose }: { onClose: () => void }) {
           <Button
             className="min-h-[44px]"
             onClick={() => void assign()}
-            disabled={loading || saving || !source || !snapshot || success}
+            disabled={state.status !== "ready"}
           >
             {saving
               ? "Menyimpan…"
