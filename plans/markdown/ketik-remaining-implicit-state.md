@@ -1,6 +1,6 @@
 # KETIK: remove the last implicit state machines (scenario editor, `consumer_closed`)
 
-Status: **planned, not started** (2026-11-17). Executor: Codex worker (gpt-6.1-terra, xhigh). Baseline: HEAD `127b92cb` on `main`.
+Status: **W1 done (`8c27f923`), W2 done locally (`7a1a26d3`); migration `20261116180000_ketik_consumer_close_transition.sql` not applied to production (needs Fajar's authorization)** (2026-11-17). Executor: Codex worker (gpt-6.1-terra, xhigh). Original baseline: HEAD `127b92cb` on `main`.
 Source: read-only audit of 2026-11-17. Fajar reopened two residuals that `ketik-client-residual-lifecycle-state.md` ("Out of scope") had left as legacy.
 
 ## Requirement

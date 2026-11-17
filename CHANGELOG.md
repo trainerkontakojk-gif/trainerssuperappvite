@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): mark the implicit-state plan done locally
+
 - refactor(ketik): centralize consumer close transitions
 
 - refactor(ketik): centralize scenario editor image-read lifecycle
