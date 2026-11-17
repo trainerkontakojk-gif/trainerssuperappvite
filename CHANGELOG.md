@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): plan removing the scenario-editor and consumer_closed implicit state machines
+
 - fix(ketik): abort provider work when the review worker gives up a claim
 
 - docs(ketik): keep the external lease-loss fence test unchanged in the R3 plan
