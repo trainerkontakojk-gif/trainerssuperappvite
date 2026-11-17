@@ -1,6 +1,6 @@
 # KETIK client: move the last lifecycle decisions out of refs
 
-Status: **planned, not started** (2026-11-17). Executor: another agent. Baseline: HEAD `9d17d223` on `main`.
+Status: **W1 characterization E2E written and GREEN on the unchanged hook; W1/W2 refactor not started** (2026-11-17). Executor: another agent. Baseline: HEAD `9d17d223` on `main`.
 Source: read-only audit of 2026-11-17 (residuals #1 and #2). Residual #3 (`consumer_closed`) and #4 (R3 provider cancellation) are out of scope; see the last section.
 
 ## Requirement
@@ -29,7 +29,7 @@ A "legacy turn" is a `ketik_session_turns` row from the old single-call endpoint
 - `:614–640` (`retry`): the order is append-blocked → no-op while busy → `recovery-failed` → **`legacyPending.current?.status === "failed"`** → append error → modern response retry. The legacy branch dispatches `legacy-retry`, calls `sendTurn` with the stored `requestId`, `text` and `expectedVersion`. On success it sets `legacyPending.current = null`, applies the session, dispatches `session` and `response-finish`, then flushes queued appends or schedules a response. On failure it dispatches `response-failed`.
 - `chatLifecycle.ts`: `append-saved` turns `blocked` into `idle`. Today that cannot happen for a legacy-blocked chat, because appends are held. A reducer-only design must keep that invariant.
 - `isLoading` / `isConsumerTyping` / `retryLabel` (`:648–671`) derive from reducer state only. The legacy case shows `isLoading` during `legacy-retrying` and the label "Coba minta balasan lagi".
-- **No existing browser E2E sets `pendingTurn`** (only `pendingResponse`; `rg pendingTurn apps/web/e2e` is empty). Existing chat lifecycle E2E: `apps/web/e2e/ketik-client-lifecycle.spec.ts`, which uses `openHermeticShell` + `ketikServerChatHarness` (`base`, `id`, `session(...)`).
+- **Correction (2026-11-17):** an earlier version of this plan said no browser E2E sets `pendingTurn`. That was wrong. `apps/web/e2e/ketik-server-chat-turns.spec.ts` already covers a failed legacy turn retried with the same request (`:8–74`) and a processing legacy turn that resolves to a closed chat (`:185–`). It does not cover appends being held during a legacy turn, a retry that fails again, or the absence of `/respond` calls; the new tests in `ketik-client-lifecycle.spec.ts` add those. Existing chat lifecycle E2E: `apps/web/e2e/ketik-client-lifecycle.spec.ts`, which uses `openHermeticShell` + `ketikServerChatHarness` (`base`, `id`, `session(...)`).
 
 ### W2: settings save reentrancy
 
@@ -99,3 +99,10 @@ Acceptance: `rg -n "legacyPending|saveInFlightRef" apps/web/src/routes/ketik` re
 - **#3 `ketik_sessions.consumer_closed`:** the boolean next to `state` forms an implicit "closing" sub-state. Writes happen under the session row lock after an `active AND NOT consumer_closed` check, so there is no known race. Changing it is a Lane D migration and API contract change (`consumerClosed` in `KetikServerSession`). Leave it as legacy unless Fajar opens that task.
 - **#4 R3 provider cancellation at the review deadline** (`apps/api/src/workers/ketik-review-worker-runtime.ts:360`): it needs `AbortSignal` plumbing through `review-processor.ts` and the provider clients, and it is Fajar's decision. It gets its own plan.
 - Other refs in `useServerKetikChat.ts` (timers, pacing, idempotency key, mounted guard), `KetikScenariosTab.tsx` `pendingImageReads`, `ketik-review-worker-entrypoint.ts` `stopping`, and simple dialog/form toggles. These are resource handles, counters or UI state, not lifecycle phases.
+
+## Execution log
+
+- 2026-11-17, first baseline run (executor): focused W1 command exited 1 — 2 passed, 1 failed, 3 not run. `legacy processing holds queued messages…` stayed on “Memuat sesi chat…”. Trace (`artifacts/ketik-client-residual-lifecycle/w1-baseline-failure/trace.zip`) shows two `GET /api/v1/ketik/sessions/:id` 8 ms apart at page load: React StrictMode runs the resume effect in `apps/web/src/routes/ketik/index.tsx:153–` twice in dev, the first result is discarded as cancelled, and the fixture's “hold every read after the first” gate held the second load read (~4 s) instead of a recovery poll. Fixture defect, not a product defect.
+- Fixture fix: hold only the first session read issued after the chat room is open and a message is queued (`holdNextRead` flag), instead of counting reads. No product file changed.
+- Second baseline run: `pnpm --dir apps/web exec playwright test '(^|/)ketik-client-lifecycle\.spec\.ts$' --reporter=line --workers=1 --trace on --max-failures=1 --output=$PWD/artifacts/ketik-client-residual-lifecycle/w1-baseline-r2-results` → exit 0, **6 passed** (3 new characterization + 3 existing), log `artifacts/ketik-client-residual-lifecycle/w1-baseline-r2.log`. This run is a fixture change followed by a single run, not a retry of the same code.
+- Next: implement the W1 design, rerun the same focused command, then the regression set.

@@ -1,10 +1,238 @@
 import { expect, test } from "@playwright/test";
-import { expectHermetic, openHermeticShell } from "./helpers/hermeticShell";
+import {
+  expectHermetic,
+  openHermeticShell,
+  waitForMockedApi,
+} from "./helpers/hermeticShell";
 import { assertLocalDevOnlyTarget } from "./helpers/sidakJadwalShiftingHarness";
 import { base, id, session } from "./helpers/ketikServerChatHarness";
 import { PENDING_SESSION } from "./helpers/ketikFlowHarness";
 
 test.beforeAll(() => assertLocalDevOnlyTarget());
+
+for (const failFirstRetry of [false, true]) {
+  test(`legacy failed turn ${failFirstRetry ? "retries after another failure" : "holds queued messages until retry succeeds"}`, async ({
+    page,
+  }) => {
+    const turn = {
+      requestId: "23000000-0000-4000-8000-000000000007",
+      text: "Pesan legacy",
+      expectedVersion: 3,
+    };
+    let live = session({
+      version: 4,
+      pendingTurn: { ...turn, status: "failed", leaseExpiresAt: null },
+    });
+    const turns: unknown[] = [];
+    const appends: unknown[] = [];
+    let responses = 0;
+    const audit = await openHermeticShell(page, {
+      path: `/ketik?sesi=${id}&tahap=chat`,
+      apiMocks: [
+        ...base,
+        {
+          method: "GET",
+          path: `/api/v1/ketik/sessions/${id}`,
+          body: { success: true, data: live },
+        },
+      ],
+      expectedThirdPartyHosts: ["randomuser.me"],
+      beforeNavigate: async () => {
+        await page.route(
+          `**/api/v1/ketik/sessions/${id}/turns`,
+          async (route) => {
+            turns.push(route.request().postDataJSON());
+            if (failFirstRetry && turns.length === 1) {
+              await route.fulfill({
+                status: 503,
+                json: {
+                  success: false,
+                  error: { code: "SESSION_AI_FAILED", message: "Coba lagi." },
+                },
+              });
+              return;
+            }
+            live = { ...live, pendingTurn: null, consumerClosed: true };
+            await route.fulfill({ json: { success: true, data: live } });
+          },
+        );
+        await page.route(
+          `**/api/v1/ketik/sessions/${id}/messages`,
+          async (route) => {
+            const body = route.request().postDataJSON() as {
+              requestId: string;
+              text: string;
+            };
+            appends.push(body);
+            live = {
+              ...live,
+              agentVersion: live.agentVersion + 1,
+              messages: [
+                ...live.messages,
+                {
+                  id: body.requestId,
+                  sender: "agent",
+                  text: body.text,
+                  timestamp: new Date().toISOString(),
+                },
+              ],
+            };
+            await route.fulfill({ json: { success: true, data: live } });
+          },
+        );
+        await page.route(
+          `**/api/v1/ketik/sessions/${id}/respond`,
+          async (route) => {
+            responses++;
+            await route.abort();
+          },
+        );
+      },
+    });
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    await expect(room.getByRole("alert")).toContainText(
+      "Balasan konsumen belum tersedia",
+    );
+    if (!failFirstRetry) {
+      const input = room.getByRole("textbox", { name: "Tulis balasan" });
+      await input.fill("Pesan menunggu legacy");
+      await input.press("Enter");
+      await expect(room.getByText("1 pesan sedang disimpan.")).toBeVisible();
+      expect(appends).toHaveLength(0);
+    }
+    const retry = room.getByRole("button", { name: "Coba minta balasan lagi" });
+    await retry.click();
+    if (failFirstRetry) {
+      await expect.poll(() => turns.length).toBe(1);
+      await expect(room.getByRole("alert")).toContainText(
+        "Balasan konsumen belum tersedia",
+      );
+      await retry.click();
+    }
+    await expect(room.getByRole("alert")).toHaveCount(0);
+    if (!failFirstRetry) await expect.poll(() => appends.length).toBe(1);
+    expect(turns).toEqual(failFirstRetry ? [turn, turn] : [turn]);
+    expect(responses).toBe(0);
+    await waitForMockedApi(audit, ["GET /api/v1/ketik/settings"]);
+    expectHermetic(audit);
+  });
+}
+
+test("legacy processing holds queued messages until recovery publishes the reply", async ({
+  page,
+}) => {
+  const turn = {
+    requestId: "23000000-0000-4000-8000-000000000008",
+    text: "Pesan legacy sedang diproses",
+    expectedVersion: 3,
+  };
+  let live = session({
+    version: 4,
+    pendingTurn: { ...turn, status: "processing", leaseExpiresAt: null },
+  });
+  // The page may read the session more than once while it loads (React
+  // StrictMode runs the resume effect twice in dev), so hold only the first
+  // recovery poll issued after the chat room is open, not "the second read".
+  let holdNextRead = false;
+  let heldReads = 0;
+  let turns = 0;
+  let responses = 0;
+  const appends: unknown[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${id}&tahap=chat`,
+    apiMocks: base,
+    expectedThirdPartyHosts: ["randomuser.me"],
+    beforeNavigate: async () => {
+      await page.route(`**/api/v1/ketik/sessions/${id}`, async (route) => {
+        if (holdNextRead) {
+          holdNextRead = false;
+          heldReads++;
+          await gate;
+          live = {
+            ...live,
+            pendingTurn: null,
+            consumerClosed: true,
+            messages: [
+              {
+                id: "legacy-reply",
+                sender: "consumer",
+                text: "Balasan legacy selesai.",
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+        }
+        await route.fulfill({ json: { success: true, data: live } });
+      });
+      await page.route(
+        `**/api/v1/ketik/sessions/${id}/messages`,
+        async (route) => {
+          const body = route.request().postDataJSON() as {
+            requestId: string;
+            text: string;
+          };
+          appends.push(body);
+          live = {
+            ...live,
+            agentVersion: live.agentVersion + 1,
+            messages: [
+              ...live.messages,
+              {
+                id: body.requestId,
+                sender: "agent",
+                text: body.text,
+                timestamp: new Date().toISOString(),
+              },
+            ],
+          };
+          await route.fulfill({ json: { success: true, data: live } });
+        },
+      );
+      await page.route(
+        `**/api/v1/ketik/sessions/${id}/turns`,
+        async (route) => {
+          turns++;
+          await route.abort();
+        },
+      );
+      await page.route(
+        `**/api/v1/ketik/sessions/${id}/respond`,
+        async (route) => {
+          responses++;
+          await route.abort();
+        },
+      );
+    },
+  });
+  try {
+    const room = page.getByRole("region", { name: "Ruang chat" });
+    await expect(
+      room.getByRole("status", { name: "Konsumen sedang mengetik" }),
+    ).toBeVisible();
+    const input = room.getByRole("textbox", { name: "Tulis balasan" });
+    await input.fill("Pesan antrean recovery");
+    await input.press("Enter");
+    await expect(room.getByText("1 pesan sedang disimpan.")).toBeVisible();
+    holdNextRead = true;
+    await expect.poll(() => heldReads).toBe(1);
+    expect(appends).toHaveLength(0);
+    release();
+    await expect(
+      room.getByText("Balasan legacy selesai.", { exact: true }),
+    ).toBeVisible();
+    await expect.poll(() => appends.length).toBe(1);
+    expect(turns).toBe(0);
+    expect(responses).toBe(0);
+    await waitForMockedApi(audit, ["GET /api/v1/ketik/settings"]);
+    expectHermetic(audit);
+  } finally {
+    release();
+  }
+});
 
 test("response recovery retries status after a network failure without requesting a new AI response", async ({
   page,

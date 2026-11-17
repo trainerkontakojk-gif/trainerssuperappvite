@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@trainers/types";
+import type { ChatMessage, KetikServerSession } from "@trainers/types";
 import { KETIK_SESSION_ERRORS } from "@trainers/types";
 
 // Orthogonal regions: appends deliberately remain possible during a response.
@@ -14,6 +14,7 @@ export interface ChatState {
   append:
     { status: "idle" | "saving" } | { status: "blocked"; message: string };
   response: ResponseStatus;
+  legacy: KetikServerSession["pendingTurn"];
   phase: "active" | "expired" | "closed";
   messages: ChatMessage[];
   queuedCount: number;
@@ -31,6 +32,8 @@ export type ChatEvent =
   | { type: "response-start" }
   | { type: "response-published" }
   | { type: "response-finish" }
+  | { type: "legacy-recovered"; turn: KetikServerSession["pendingTurn"] }
+  | { type: "legacy-finished" }
   | { type: "response-failed" }
   | { type: "recovery-failed" }
   | { type: "response-retry" }
@@ -50,7 +53,7 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
     case "expire":
       return state.phase === "active" ? { ...state, phase: "expired" } : state;
     case "append-start":
-      return state.append.status === "idle"
+      return state.append.status === "idle" && state.legacy === null
         ? {
             ...state,
             append: { status: "saving" },
@@ -102,6 +105,14 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
       ].includes(state.response)
         ? { ...state, response: "idle" }
         : state;
+    case "legacy-recovered":
+      return state.response === "recovering"
+        ? { ...state, legacy: event.turn, response: "idle" }
+        : state;
+    case "legacy-finished":
+      return state.response === "legacy-retrying"
+        ? { ...state, legacy: null, response: "idle" }
+        : state;
     case "response-failed":
       return {
         ...state,
@@ -127,7 +138,9 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         error: null,
       };
     case "legacy-retry":
-      return { ...state, response: "legacy-retrying", error: null };
+      return state.legacy?.status === "failed"
+        ? { ...state, response: "legacy-retrying", error: null }
+        : state;
     case "send-refused":
       return { ...state, error: { kind: "append", message: event.message } };
   }

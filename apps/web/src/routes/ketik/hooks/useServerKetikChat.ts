@@ -139,6 +139,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
       const pending = session.pendingResponse ?? session.pendingTurn;
       return {
         append: { status: "idle" },
+        legacy: session.pendingTurn,
         response:
           pending?.status === "processing"
             ? "recovering"
@@ -175,7 +176,6 @@ export function useServerKetikChat(initial: KetikServerSession) {
     lifecycle.current = chatReducer(lifecycle.current, event);
     dispatch(event);
   }, []);
-  const legacyPending = useRef(initial.pendingTurn);
   const responseRequestId = useRef<string | null>(
     initial.pendingResponse?.requestId ?? null,
   );
@@ -320,7 +320,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
     if (
       lifecycle.current.append.status !== "idle" ||
       !mounted.current ||
-      legacyPending.current
+      lifecycle.current.legacy !== null
     )
       return;
     transition({ type: "append-start" });
@@ -548,8 +548,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
           loaded.pendingResponse?.status === "processing" ||
           loaded.pendingTurn?.status === "processing";
         if (!stillProcessing) {
-          legacyPending.current = loaded.pendingTurn;
-          transition({ type: "response-finish" });
+          transition({ type: "legacy-recovered", turn: loaded.pendingTurn });
           responseRequestId.current =
             loaded.pendingResponse?.status === "failed"
               ? loaded.pendingResponse.requestId
@@ -616,21 +615,21 @@ export function useServerKetikChat(initial: KetikServerSession) {
       transition({ type: "response-retry" });
       return;
     }
-    if (legacyPending.current?.status === "failed") {
+    const legacy = lifecycle.current.legacy;
+    if (legacy?.status === "failed") {
       transition({ type: "legacy-retry" });
-      const { requestId, text, expectedVersion } = legacyPending.current;
+      const { requestId, text, expectedVersion } = legacy;
       void ketikApi
         .sendTurn(initial.id, { requestId, text, expectedVersion })
         .then((loaded) => {
           if (!mounted.current) return;
-          legacyPending.current = null;
           current.current = loaded;
           refreshMessages();
           transition({
             type: "session",
             closed: loaded.consumerClosed || loaded.state !== "active",
           });
-          transition({ type: "response-finish" });
+          transition({ type: "legacy-finished" });
           if (queued.current.length) void processAppends();
           else scheduleResponseRef.current();
         })
