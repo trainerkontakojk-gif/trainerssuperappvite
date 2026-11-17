@@ -495,6 +495,64 @@ test("a newer processing read from ready still shows a review started elsewhere"
   expectHermetic(audit);
 });
 
+test("a failed status refresh cannot discard a result that is already loading", async ({
+  page,
+}) => {
+  const detailGate = Promise.withResolvers<void>();
+  let detailReads = 0;
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${id}&tahap=telaah`,
+    auth: { role: "agent" },
+    apiMocks: [
+      {
+        method: "GET",
+        path: `/api/v1/ketik/review/status/${id}`,
+        status: 500,
+        body: { success: false },
+      },
+      ...mocks(true),
+    ],
+    beforeNavigate: async (p) => {
+      await p.route(`**/api/v1/ketik/review/${id}`, async (route) => {
+        detailReads++;
+        await detailGate.promise;
+        await route.fulfill({ json: { success: true, data: detail } });
+      });
+    },
+  });
+  const result = page.getByRole("region", { name: "Hasil telaah" });
+  try {
+    // The initial status read failed, so the known-completed result is loading directly.
+    await expect(
+      result.getByText("Memuat hasil telaah", { exact: true }),
+    ).toBeVisible({ timeout: 10_000 });
+    const statusReads = () =>
+      audit.mockedApi.filter(
+        (request) => request === `GET /api/v1/ketik/review/status/${id}`,
+      ).length;
+    const readsBeforeRefresh = statusReads();
+    const refresh = page.waitForResponse((response) =>
+      response.url().endsWith(`/review/status/${id}`),
+    );
+    await result.getByRole("button", { name: "Coba cek status" }).click();
+    await (await refresh).finished();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    detailGate.resolve();
+    await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
+    expect(detailReads).toBe(1);
+    // The refresh issued exactly one status read and nothing re-fetched the result.
+    expect(statusReads()).toBe(readsBeforeRefresh + 1);
+    expectHermetic(audit);
+  } finally {
+    detailGate.resolve();
+  }
+});
+
 test("a late enqueue failure cannot downgrade a result already confirmed by polling", async ({
   page,
 }) => {

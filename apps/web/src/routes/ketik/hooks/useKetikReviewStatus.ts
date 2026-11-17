@@ -43,9 +43,12 @@ export function useKetikReviewStatus(
   const sessionRef = useRef(session);
   const onChangeRef = useRef(onSessionChange);
   const runRef = useRef(0);
-  // Latest-issued read wins within a run. Like runRef, this is an async
-  // response fence, not lifecycle state; phases remain in reviewReducer.
-  const latestReadRef = useRef(0);
+  // Same-run read fence: a response applies only while no newer read has
+  // applied. A failed read only reports polling health and never supersedes,
+  // so it cannot discard an older read's in-flight result. Like runRef, these
+  // are async response fences, not lifecycle state (phases live in reviewReducer).
+  const issuedReadRef = useRef(0);
+  const appliedReadRef = useRef(0);
   const requestRef = useRef<{
     sessionId: string;
     requestId: string;
@@ -60,6 +63,11 @@ export function useKetikReviewStatus(
     sessionRef.current = next;
     onChangeRef.current(next);
   }, []);
+  const isCurrent = useCallback(
+    (run: number, read: number) =>
+      run === runRef.current && read >= appliedReadRef.current,
+    [],
+  );
   const fail = useCallback(
     (run: number, failure: KetikReviewFailure, confirmed = false) => {
       if (run !== runRef.current || !sessionRef.current) return;
@@ -79,12 +87,12 @@ export function useKetikReviewStatus(
       previousKept = false,
     ) => {
       const current = sessionRef.current;
-      if (!current || run !== runRef.current || read !== latestReadRef.current)
-        return;
+      if (!current || !isCurrent(run, read)) return;
+      appliedReadRef.current = read;
       dispatch({ type: "load-result" });
       try {
         const detail = known ?? (await ketikApi.getReviewDetail(current.id));
-        if (run !== runRef.current || read !== latestReadRef.current) return;
+        if (!isCurrent(run, read)) return;
         requestRef.current = null;
         update(withScores(current, detail.scores));
         dispatch({
@@ -93,20 +101,21 @@ export function useKetikReviewStatus(
           previousKept,
         });
       } catch {
-        if (run !== runRef.current || read !== latestReadRef.current) return;
+        if (!isCurrent(run, read)) return;
         fail(run, "result");
       }
     },
-    [fail, update],
+    [fail, isCurrent, update],
   );
   const checkStatus = useCallback(
     async (run: number, initial = false) => {
       const current = sessionRef.current;
       if (!current || run !== runRef.current) return;
-      const read = ++latestReadRef.current;
+      const read = ++issuedReadRef.current;
       try {
         const data = await ketikApi.getReviewStatus(current.id);
-        if (run !== runRef.current || read !== latestReadRef.current) return;
+        if (!isCurrent(run, read)) return;
+        appliedReadRef.current = read;
         dispatch({ type: "poll-ok", rerunsLeft: data.rerunsLeft });
         if (data.status === "failed" && data.previousKept && data.resultReady) {
           await loadResult(run, read, data.detail, true);
@@ -129,19 +138,16 @@ export function useKetikReviewStatus(
           dispatch({ type: "idle" });
         }
       } catch {
-        if (run !== runRef.current || read !== latestReadRef.current) return;
+        if (!isCurrent(run, read)) return;
         dispatch({ type: "poll-failed" });
         if (initial && current.reviewStatus === "completed")
           await loadResult(run, read);
       }
     },
-    [fail, loadResult, update],
+    [fail, isCurrent, loadResult, update],
   );
   useEffect(() => {
-    const invalidate = () => {
-      ++latestReadRef.current;
-      return ++runRef.current;
-    };
+    const invalidate = () => ++runRef.current;
     const run = invalidate();
     requestRef.current = null;
     const current = sessionRef.current;
@@ -183,7 +189,6 @@ export function useKetikReviewStatus(
       )
         return;
       const run = ++runRef.current;
-      ++latestReadRef.current;
       const request =
         requestRef.current?.sessionId === current.id &&
         requestRef.current.rerun === rerun
@@ -198,7 +203,7 @@ export function useKetikReviewStatus(
         });
         if (run !== runRef.current || requestRef.current !== request) return;
         if (result.status === "completed")
-          await loadResult(run, ++latestReadRef.current);
+          await loadResult(run, ++issuedReadRef.current);
         else if (result.status === "failed") await checkStatus(run);
         else {
           if (
@@ -215,7 +220,7 @@ export function useKetikReviewStatus(
           // Refused before anything changed: keep showing the current result.
           requestRef.current = null;
           dispatch({ type: "rerun-refused", message: error.message });
-          await loadResult(run, ++latestReadRef.current);
+          await loadResult(run, ++issuedReadRef.current);
           return;
         }
         // Acceptance may have succeeded despite a lost response; polling is the primary recovery path.
@@ -231,7 +236,7 @@ export function useKetikReviewStatus(
     start: () => submit(false),
     rerun: () => submit(true),
     retryResult: () => {
-      void loadResult(++runRef.current, ++latestReadRef.current);
+      void loadResult(++runRef.current, ++issuedReadRef.current);
     },
     refreshStatus: () => {
       void checkStatus(runRef.current);
