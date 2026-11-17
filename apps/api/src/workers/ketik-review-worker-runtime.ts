@@ -86,7 +86,7 @@ function transitionPoll(
 
 type HostWork =
   | { phase: "waiting" | "claiming" | "release_timed_out" }
-  | { phase: "processing"; claim: KetikReviewClaim }
+  | { phase: "processing"; claim: KetikReviewClaim; abort: AbortController }
   | { phase: "releasing"; claim: KetikReviewClaim; promise: Promise<boolean> };
 type HostState =
   | { status: "idle" }
@@ -109,9 +109,9 @@ type HostEvent =
         | "loop_stopped"
         | "fault";
     }
+  | { type: "claimed"; claim: KetikReviewClaim; abort: AbortController }
   | {
-      type:
-        "claimed" | "release_finished" | "release_timed_out" | "release_failed";
+      type: "release_finished" | "release_timed_out" | "release_failed";
       claim: KetikReviewClaim;
     }
   | { type: "release"; claim: KetikReviewClaim; promise: Promise<boolean> };
@@ -151,7 +151,8 @@ class HostTransitionError extends Error {
  * faulted                 fault                         noop
  * Every other state/event or mismatched claim is illegal (throws).
  *
- * The release event carries its promise; releasing cannot exist without it.
+ * The claimed event carries the processing abort controller; the release
+ * event carries its promise, so releasing cannot exist without it.
  * Repeated release attempts join in releaseWithin, never dispatch twice. A late
  * RPC after timeout cannot dispatch another completion (Promise.race settled).
  * Cycle cleanup joins any shutdown release before cycle_finished/loop_stopped,
@@ -200,7 +201,10 @@ function transitionHost(state: HostState, event: HostEvent): HostState {
       break;
     case "claimed":
       if (work.phase === "claiming")
-        return { ...state, work: { phase: "processing", claim: event.claim } };
+        return {
+          ...state,
+          work: { phase: "processing", claim: event.claim, abort: event.abort },
+        };
       break;
     case "release":
     case "release_finished":
@@ -349,19 +353,27 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     errorClass = null;
     transition(claim ? "found-work" : "empty");
     if (!claim || claim.status !== "processing") return;
-    transitionHostState({ type: "claimed", claim });
+    const abort = new AbortController();
+    transitionHostState({ type: "claimed", claim, abort });
     if (host.status !== "running") {
       await releaseWithin(claim, Math.min(config.shutdownMs, 20_000));
       return;
     }
     let deadline: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    const processing = processClaimedKetikReview(claim, {
+      signal: abort.signal,
+    }).then((result) => {
+      if (result.status === "lease_lost") log("ketik_review_worker.lease_lost");
+      return "settled" as const;
+    });
     try {
       // Leave persistence grace before the DB lease expires. Late writes are fenced by its token/expiry.
       const result = await Promise.race([
-        processClaimedKetikReview(claim).then((result) => {
-          if (result.status === "lease_lost")
-            log("ketik_review_worker.lease_lost");
-          return "settled" as const;
+        processing,
+        new Promise<"cancelled">((resolve) => {
+          onAbort = () => resolve("cancelled");
+          abort.signal.addEventListener("abort", onAbort, { once: true });
         }),
         new Promise<"deadline">((resolve) => {
           deadline = setTimeout(
@@ -375,6 +387,7 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
       ]);
       // Shutdown may already have fenced this claim while the provider ran.
       if (result === "deadline" && activeClaim(host) === claim) {
+        abort.abort(new Error("KETIK review deadline"));
         try {
           const released = await releaseWithin(
             claim,
@@ -396,6 +409,24 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
       lastPollAt = Date.now();
     } finally {
       if (deadline) clearTimeout(deadline);
+      if (onAbort) abort.signal.removeEventListener("abort", onAbort);
+      if (abort.signal.aborted) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const joined = await Promise.race([
+            processing.then(() => true),
+            new Promise<false>((resolve) => {
+              timer = setTimeout(
+                () => resolve(false),
+                Math.min(config.shutdownMs, 20_000),
+              );
+            }),
+          ]);
+          if (!joined) log("ketik_review_worker.cancel_join_timeout");
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      }
     }
   }
   async function loop() {
@@ -476,8 +507,18 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         throw new ReleaseTimeout();
       const claim = activeClaim(host);
       if (!settled && claim) {
-        await releaseWithin(claim, Math.min(config.shutdownMs, 20_000));
-        log("ketik_review_worker.shutdown_claim_fenced");
+        if (
+          (host.status === "running" || host.status === "stopping") &&
+          host.work.phase === "processing" &&
+          host.work.claim === claim
+        )
+          host.work.abort.abort(new Error("KETIK review shutdown"));
+        try {
+          await releaseWithin(claim, Math.min(config.shutdownMs, 20_000));
+          log("ketik_review_worker.shutdown_claim_fenced");
+        } finally {
+          await loopPromise;
+        }
       } else if (!settled) {
         // A hung admission RPC may still acquire a lease; expiry is its bounded recovery backstop.
         log("ketik_review_worker.shutdown_recovery_deferred");

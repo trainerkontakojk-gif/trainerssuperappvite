@@ -101,14 +101,19 @@ export async function releaseKetikReview(
   if (error) throw error;
   return data === true;
 }
-export async function processClaimedKetikReview(claim: KetikReviewClaim) {
+export async function processClaimedKetikReview(
+  claim: KetikReviewClaim,
+  options?: { signal?: AbortSignal },
+) {
   try {
     return await processKetikReviewJob(
       claim.sessionId,
       claim.token,
       claim.models,
+      options,
     );
   } catch (error) {
+    if (options?.signal?.aborted) return { status: "cancelled" as const };
     console.error("[KETIK] Review attempt failed", {
       errorClass: error instanceof Error ? error.name : "Unknown",
     });

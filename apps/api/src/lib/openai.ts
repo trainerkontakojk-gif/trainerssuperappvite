@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { resolveModelProvider, supportsTemperature } from "./ai-models";
 import { logAiUsage, UsageContext } from "./ai-usage";
 import { sanitizeAiResponse } from "./ai-sanitize";
@@ -96,6 +97,7 @@ export async function generateOpenAIContent(options: {
   usageContext?: UsageContext;
   userId?: string;
   sanitizeOutput?: boolean;
+  signal?: AbortSignal;
 }): Promise<OpenAIResponse> {
   const requestId = `openai-${randomUUID()}`;
   const apiKey = process.env.OPENAI_API_KEY;
@@ -169,12 +171,15 @@ export async function generateOpenAIContent(options: {
   try {
     let response: Response | undefined;
     for (let attempt = 1; attempt <= 4; attempt++) {
+      options.signal?.throwIfAborted();
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs ?? 120_000);
       try {
         response = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
-          signal: controller.signal,
+          signal: options.signal
+            ? AbortSignal.any([options.signal, controller.signal])
+            : controller.signal,
           headers: {
             Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
@@ -184,6 +189,7 @@ export async function generateOpenAIContent(options: {
       } finally {
         clearTimeout(timer);
       }
+      options.signal?.throwIfAborted();
       if (
         response.ok ||
         (response.status !== 429 && response.status < 500) ||
@@ -191,7 +197,7 @@ export async function generateOpenAIContent(options: {
       ) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      await delay(attempt * 500, undefined, { signal: options.signal });
     }
 
     if (!response?.ok) {
@@ -199,11 +205,13 @@ export async function generateOpenAIContent(options: {
         response?.status ?? 500,
         response ? await response.text() : "",
       );
+      options.signal?.throwIfAborted();
       await logTerminal("failed", {}, error);
       return { success: false, error };
     }
 
     const data = (await response.json()) as ResponsesData;
+    options.signal?.throwIfAborted();
     if (data.status === "incomplete") {
       const error = "Respons AI tidak lengkap. Coba lagi.";
       await logTerminal("failed", data.usage, error);
@@ -232,8 +240,12 @@ export async function generateOpenAIContent(options: {
     };
   } catch (error) {
     console.error("[OpenAI] Error:", error);
-    const timeout = isAbortError(error);
-    const message = timeout
+    const cancelled = options.signal?.aborted === true;
+    const timeout = cancelled || isAbortError(error);
+    const reason = options.signal?.reason;
+    const message = cancelled
+      ? `cancelled: ${reason instanceof Error ? reason.message : String(reason)}`
+      : timeout
       ? "Permintaan AI timeout. Coba lagi."
       : "Terjadi kesalahan koneksi ke server AI.";
     await logTerminal(timeout ? "timeout" : "failed", {}, message);

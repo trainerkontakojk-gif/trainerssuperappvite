@@ -57,6 +57,7 @@ export async function generateGeminiContent(options: {
   usageContext?: UsageContext;
   userId?: string;
   sanitizeOutput?: boolean;
+  abortSignal?: AbortSignal;
 }): Promise<GeminiResponse> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -86,6 +87,7 @@ export async function generateGeminiContent(options: {
     const timeoutMs = modelInfo?.timeoutMs ?? 120_000;
 
     const generateWithTimeout = async () => {
+      options.abortSignal?.throwIfAborted();
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeoutPromise = new Promise<never>((_, reject) => {
         timer = setTimeout(
@@ -101,6 +103,7 @@ export async function generateGeminiContent(options: {
             contents,
             config: {
               systemInstruction,
+              abortSignal: options.abortSignal,
               responseMimeType: options.responseMimeType,
               responseSchema: options.responseSchema,
               responseModalities: options.responseModalities,
@@ -123,6 +126,7 @@ export async function generateGeminiContent(options: {
     } catch (firstError: unknown) {
       const err = firstError as { message?: string };
       if (
+        !options.abortSignal?.aborted &&
         err?.message?.includes("Developer instruction is not enabled") &&
         options.systemInstruction &&
         supportsSystemInstruction
@@ -134,30 +138,8 @@ export async function generateGeminiContent(options: {
           options.contents,
           options.systemInstruction,
         );
-        const retryTimeout = new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Gemini request timed out after ${timeoutMs}ms`),
-              ),
-            timeoutMs,
-          ),
-        );
-        response = await Promise.race([
-          ai.models.generateContent({
-            model: modelName,
-            contents,
-            config: {
-              responseMimeType: options.responseMimeType,
-              responseSchema: options.responseSchema,
-              responseModalities: options.responseModalities,
-              ...(options.thinkingLevel
-                ? { thinkingConfig: { thinkingLevel: options.thinkingLevel } }
-                : {}),
-            } as any,
-          }),
-          retryTimeout,
-        ]);
+        systemInstruction = undefined;
+        response = await generateWithTimeout();
       } else {
         throw firstError;
       }

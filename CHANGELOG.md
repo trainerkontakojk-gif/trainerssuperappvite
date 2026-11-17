@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- fix(ketik): abort provider work when the review worker gives up a claim
+
 - docs(ketik): keep the external lease-loss fence test unchanged in the R3 plan
 
 - docs(ketik): approve changing the second late-provider deadline test in the R3 plan

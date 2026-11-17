@@ -212,8 +212,9 @@ test("deadline release timeout degrades health and completes another job while P
       expect((await response.json()).errorClass).toBeNull();
     }
 
-    // Let the late release hit an expired lease. The original provider output
-    // must also be fenced; a subsequent real claim is allowed to recover it.
+    // The provider is disconnected before the blocked release is unlocked.
+    await expect.poll(() => suite.providerAborts).toBe(1);
+    // Let the late release hit an expired lease; a new claim can recover it.
     expect(
       (
         await db
@@ -224,16 +225,18 @@ test("deadline release timeout degrades health and completes another job while P
     ).toBeNull();
     await unlock();
     unlock = undefined;
-    releaseProvider();
-    await expect
-      .poll(() =>
-        workerLog.includes('"event":"ketik_review_worker.lease_lost"'),
-      )
-      .toBe(true);
     await expect
       .poll(async () => (await job(first)).status, { timeout: 10_000 })
       .toBe("completed");
     expect((await job(first)).attempt_count).toBe(2);
+    expect(
+      await db.rpc("settle_ketik_review", {
+        p_session: first,
+        p_token: old.lease_token,
+        p_release: true,
+      }),
+    ).toMatchObject({ error: null, data: false });
+    expect(workerLog).not.toContain('"event":"ketik_review_worker.lease_lost"');
     expect(
       (
         await db
@@ -246,7 +249,8 @@ test("deadline release timeout degrades health and completes another job while P
       body: JSON.stringify({
         secondCompletedWhileLocked: true,
         sawDegraded: embedded() ? "standalone-only" : sawDegraded,
-        lateProviderFenced: true,
+        providerAborted: true,
+        oldTokenFenced: true,
         workerLog,
       }),
       contentType: "application/json",
@@ -323,7 +327,7 @@ test("shutdown after an earlier claim release timeout exits cleanly with no acti
   }
 });
 
-test("a healthy deadline release invalidates its token and late provider output cannot publish", async () => {
+test("a healthy deadline aborts provider work and invalidates its token", async () => {
   const first = await seedSession();
   const second = await seedSession();
   expect((await request("/review", trainer, { sessionId: first })).status).toBe(
@@ -350,15 +354,73 @@ test("a healthy deadline release invalidates its token and late provider output 
       p_release: true,
     }),
   ).toMatchObject({ error: null, data: false });
-  releaseProvider();
-  await expect
-    .poll(() => workerLog.includes('"event":"ketik_review_worker.lease_lost"'))
-    .toBe(true);
+  await expect.poll(() => suite.providerAborts).toBe(1);
+  expect(workerLog).not.toContain('"event":"ketik_review_worker.lease_lost"');
+  expect(workerLog).not.toContain("ketik_review_worker.cancel_join_timeout");
   await expect
     .poll(async () => (await job(first)).status, { timeout: 10_000 })
     .toBe("completed");
   expect((await job(first)).attempt_count).toBe(2);
   if (!embedded()) expect((await guarded(healthUrl())).status).toBe(200);
+});
+
+test("deadline cancellation does not start a fallback or fail the abandoned attempt", async () => {
+  const id = await seedSession();
+  expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+    202,
+  );
+  await startWorker({
+    KETIK_REVIEW_WORKER_DEADLINE_MS: "1000",
+    KETIK_REVIEW_WORKER_INTERVAL_MS: "5000",
+  });
+  await expect.poll(() => suite.providerCalls).toBe(1);
+  await expect
+    .poll(() =>
+      workerLog.includes('"event":"ketik_review_worker.deadline_released"'),
+    )
+    .toBe(true);
+  await expect.poll(() => suite.providerAborts).toBe(1);
+  expect(suite.providerCalls).toBe(1);
+  expect(await job(id)).toMatchObject({
+    status: "queued",
+    attempt_count: 1,
+    error_message: null,
+  });
+  expect(workerLog).not.toContain("[KETIK] Review attempt failed");
+  expect(workerLog).not.toContain("falling back to");
+  suite.providerMode = "success";
+  await expect
+    .poll(async () => (await job(id)).status, { timeout: 15_000 })
+    .toBe("completed");
+  expect((await job(id)).attempt_count).toBe(2);
+});
+
+test("shutdown disconnects the provider while the release is blocked", async () => {
+  const id = await seedSession();
+  expect((await request("/review", trainer, { sessionId: id })).status).toBe(
+    202,
+  );
+  await startWorker({ KETIK_REVIEW_WORKER_SHUTDOWN_MS: "3000" });
+  await expect.poll(() => suite.providerCalls).toBe(1);
+  const child = worker!;
+  const exited = new Promise<void>((resolve) =>
+    child.once("exit", () => resolve()),
+  );
+  const unlock = await lockHistory(id);
+  try {
+    child.kill("SIGTERM");
+    await expect
+      .poll(blockedSettlements, { timeout: 5000, intervals: [50] })
+      .toBe(1);
+    await expect.poll(() => suite.providerAborts, { timeout: 1500 }).toBe(1);
+    expect(child.exitCode).toBeNull();
+  } finally {
+    await unlock();
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill("SIGKILL");
+    await exited;
+    await stopWorker();
+  }
 });
 
 test("API SIGTERM then SIGINT joins the same in-flight shutdown", async () => {

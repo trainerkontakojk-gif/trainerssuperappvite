@@ -34,6 +34,7 @@ async function generateKetikReviewAiResponse(options: {
   userId: string;
   hasVerification: boolean;
   models: KetikReviewModels;
+  signal?: AbortSignal;
 }): Promise<{ success: boolean; text?: string; error?: string }> {
   const usageContext: UsageContext = {
     module: "ketik",
@@ -72,6 +73,7 @@ async function generateKetikReviewAiResponse(options: {
         usageContext,
         userId: options.userId,
         sanitizeOutput: false,
+        abortSignal: options.signal,
       });
     } else {
       primaryResp = await generateOpenAIContent({
@@ -82,9 +84,11 @@ async function generateKetikReviewAiResponse(options: {
         usageContext,
         userId: options.userId,
         sanitizeOutput: false,
+        signal: options.signal,
       });
     }
 
+    if (options.signal?.aborted) return { success: false, error: "cancelled" };
     if (primaryResp.success && primaryResp.text) {
       return primaryResp;
     }
@@ -93,11 +97,14 @@ async function generateKetikReviewAiResponse(options: {
       primaryResp.error,
     );
   } catch (err) {
+    if (options.signal?.aborted) return { success: false, error: "cancelled" };
     console.warn(
       `[KETIK Review] Primary model (${primaryModel.modelId}) exception, falling back to (${fallbackModel.modelId}):`,
       err,
     );
   }
+
+  if (options.signal?.aborted) return { success: false, error: "cancelled" };
 
   // Fallback model
   try {
@@ -111,6 +118,7 @@ async function generateKetikReviewAiResponse(options: {
         usageContext,
         userId: options.userId,
         sanitizeOutput: false,
+        signal: options.signal,
       });
     } else {
       fallbackResp = await generateGeminiContent({
@@ -121,6 +129,7 @@ async function generateKetikReviewAiResponse(options: {
         usageContext,
         userId: options.userId,
         sanitizeOutput: false,
+        abortSignal: options.signal,
       });
     }
     return fallbackResp;
@@ -196,6 +205,7 @@ export async function processKetikReviewJob(
   sessionId: string,
   leaseToken?: string,
   selectedModels?: KetikReviewModels,
+  options?: { signal?: AbortSignal },
 ): Promise<any> {
   if (!leaseToken) throw new Error("Review requires a backend claim token");
   const adminClient = createAdminClient();
@@ -238,7 +248,9 @@ export async function processKetikReviewJob(
       },
     ],
     userId: session.user_id,
+    signal: options?.signal,
   });
+  options?.signal?.throwIfAborted();
 
   if (!aiResponse.success || !aiResponse.text) {
     throw new Error(aiResponse.error || "AI Response failed or empty");
@@ -325,6 +337,7 @@ export async function processKetikReviewJob(
   }
   sanitizeKetikEducation(education);
 
+  options?.signal?.throwIfAborted();
   const { data: published, error: publishError } = await adminClient.rpc(
     "settle_ketik_review",
     {

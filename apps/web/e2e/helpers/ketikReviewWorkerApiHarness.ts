@@ -38,6 +38,7 @@ export const suiteDefaults = () => ({
   providerMode: "hold" as "hold" | "success" | "fail",
   boundaryRequests: [] as unknown[],
   providerCalls: 0,
+  providerAborts: 0,
   guidancePayload: undefined as unknown,
   verificationPayload: undefined as unknown,
 });
@@ -63,10 +64,19 @@ export const server = createServer(async (req, res) => {
   for await (const chunk of req) raw += String(chunk);
   suite.boundaryRequests.push(JSON.parse(raw || "{}"));
   suite.providerCalls++;
+  let releaseHeld: (() => void) | undefined;
+  res.once("close", () => {
+    if (!res.writableEnded) {
+      suite.providerAborts++;
+      releaseHeld?.();
+    }
+  });
   if (suite.providerMode === "hold")
     await new Promise<void>((resolve) => {
+      releaseHeld = resolve;
       releases.push(resolve);
     });
+  if (res.destroyed) return;
   if (suite.providerMode === "fail") {
     res.writeHead(400, { "content-type": "application/json" });
     res.end(
@@ -371,6 +381,7 @@ export async function stopWorker(signal: NodeJS.Signals = "SIGTERM") {
 export function resetKetikReviewWorkerTest() {
   suite.providerMode = "hold";
   suite.providerCalls = 0;
+  suite.providerAborts = 0;
   suite.boundaryRequests = [];
   suite.guidancePayload = undefined;
   suite.verificationPayload = undefined;

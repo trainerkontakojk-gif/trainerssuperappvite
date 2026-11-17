@@ -347,6 +347,8 @@ test("SIGTERM stops admission and fences an unfinished provider before restart",
   await startWorker();
   await expect.poll(() => suite.providerCalls).toBe(1);
   await stopWorker();
+  await expect.poll(() => suite.providerAborts).toBe(1);
+  expect(workerLog).toContain("ketik_review_worker.shutdown_claim_fenced");
   expect((await job(id)).status).toBe("queued");
   expect((await job(id)).lease_token).toBeNull();
   expect(
