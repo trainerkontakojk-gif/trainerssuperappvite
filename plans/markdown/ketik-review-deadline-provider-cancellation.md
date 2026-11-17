@@ -145,7 +145,24 @@ Replace the `lease_lost` expectation with:
 - the worker log never contains `"event":"ketik_review_worker.lease_lost"` for this run;
 - `cancel_join_timeout` is not logged.
 
-Record this change in the commit body and the final report. It changes the check that judges the work, and the reason is that the behavior it pinned is the defect R3 removes.
+The second test `deadline release timeout degrades health and completes another job while PostgreSQL is still blocked` (line 141; its tail is around lines 214–236) pins the same late-output behavior. The executor found it at drift-check, and Fajar approved changing it on 2026-11-17. Keep everything up to and including the forced lease expiry and `unlock()`:
+
+- `deadline_release_timeout`;
+- `blockedSettlements() > 0`;
+- the job still `processing` with `attempt_count` 1 and the old token, while it is locked;
+- no review rows;
+- health degraded, then 200.
+
+Then change the tail:
+
+- Replace the `lease_lost` poll with `suite.providerAborts` reaching 1.
+  - The abort fires at the deadline, before the blocked release, so it can be asserted before `unlock()`. That is the stronger ordering if it holds.
+- Add an explicit fence proof in place of the late-publish fence: after the job is re-claimed and `completed`, `settle_ketik_review(first, old.lease_token, p_release: true)` returns `data: false`.
+- Keep `attempt_count` 2 and exactly one `ketik_session_reviews` row.
+- Assert that the worker log never contains `"event":"ketik_review_worker.lease_lost"`.
+- In the attached evidence, replace `lateProviderFenced: true` with `providerAborted` and `oldTokenFenced`.
+
+Record both changes in the commit body and the final report. They change the check that judges the work, and the reason is that the behavior they pinned is the defect R3 removes. If drift-check finds a third test that waits for late provider output, stop and ask again.
 
 ### New RED tests (write first, confirm each fails for the expected reason)
 

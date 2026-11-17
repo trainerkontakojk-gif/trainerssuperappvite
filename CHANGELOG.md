@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): approve changing the second late-provider deadline test in the R3 plan
+
 - refactor(ketik): name chat recovery completion for both recovery paths
 
 - docs(ketik): plan review-deadline provider cancellation and W1/W2 review follow-ups
