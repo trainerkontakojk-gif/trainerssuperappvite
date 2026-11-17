@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- refactor(ketik): name chat recovery completion for both recovery paths
+
 - docs(ketik): plan review-deadline provider cancellation and W1/W2 review follow-ups
 
 - refactor(ketik): derive settings save guards from reducer snapshot

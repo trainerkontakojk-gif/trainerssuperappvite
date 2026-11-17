@@ -548,7 +548,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
           loaded.pendingResponse?.status === "processing" ||
           loaded.pendingTurn?.status === "processing";
         if (!stillProcessing) {
-          transition({ type: "legacy-recovered", turn: loaded.pendingTurn });
+          transition({ type: "recovery-finished", turn: loaded.pendingTurn });
           responseRequestId.current =
             loaded.pendingResponse?.status === "failed"
               ? loaded.pendingResponse.requestId

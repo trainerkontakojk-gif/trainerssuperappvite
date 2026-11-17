@@ -355,6 +355,8 @@ export function useKetikSettingsDraft({
 
   function resetDraft() {
     setLocalSettings(toKetikDraft(effectiveSettings));
+    // Keep the form saving until the in-flight save settles, even if settings refresh.
+    // Previously it looked enabled during a save while clicks were still ignored.
     if (!isSavingPhase(saveLifecycle.current.phase))
       transition({ type: "ready" });
     const nextDurationMode = classifyDurationMode(settings.simulationDuration);

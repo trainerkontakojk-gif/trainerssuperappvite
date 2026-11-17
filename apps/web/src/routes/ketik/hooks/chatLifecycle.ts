@@ -32,7 +32,7 @@ export type ChatEvent =
   | { type: "response-start" }
   | { type: "response-published" }
   | { type: "response-finish" }
-  | { type: "legacy-recovered"; turn: KetikServerSession["pendingTurn"] }
+  | { type: "recovery-finished"; turn: KetikServerSession["pendingTurn"] }
   | { type: "legacy-finished" }
   | { type: "response-failed" }
   | { type: "recovery-failed" }
@@ -105,7 +105,8 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
       ].includes(state.response)
         ? { ...state, response: "idle" }
         : state;
-    case "legacy-recovered":
+    // Ends modern or legacy recovery; turn is the server's legacy pending turn or null.
+    case "recovery-finished":
       return state.response === "recovering"
         ? { ...state, legacy: event.turn, response: "idle" }
         : state;
