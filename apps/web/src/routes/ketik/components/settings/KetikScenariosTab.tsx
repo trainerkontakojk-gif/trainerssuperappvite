@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import {
   Trash2,
   Plus,
@@ -26,6 +32,10 @@ import {
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { normalizeKetikScenarioDraft } from "./ketikDraftNormalizers";
+import {
+  scenarioEditorReducer,
+  type ScenarioEditorEvent,
+} from "./scenarioEditorLifecycle";
 
 interface KetikScenariosTabProps {
   /** Tempat dialog konfirmasi dirender (wadah dialog Pengaturan). */
@@ -46,33 +56,36 @@ export function KetikScenariosTab({
   const [isNewCategoryInput, setIsNewCategoryInput] = useState(false);
   const [newScenarioCategory, setNewScenarioCategory] = useState("");
   const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
-  const [pendingImageReads, setPendingImageReads] = useState(0);
+  const [editorState, dispatch] = useReducer(scenarioEditorReducer, {
+    generation: 0,
+    pendingReads: 0,
+  });
+  const lifecycle = useRef(editorState);
+  const transition = useCallback((event: ScenarioEditorEvent) => {
+    lifecycle.current = scenarioEditorReducer(lifecycle.current, event);
+    dispatch(event);
+  }, []);
+  const hasPendingImageReads =
+    scenarioForm.isOpen && editorState.pendingReads > 0;
   const [pendingConfirm, setPendingConfirm] = useState<
     { kind: "discard" } | { kind: "delete"; id: string } | null
   >(null);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
-  const editorGenerationRef = useRef(0);
-  const pendingImageReadsRef = useRef(0);
-
   const beginEditor = () => {
-    editorGenerationRef.current += 1;
-    pendingImageReadsRef.current = 0;
-    setPendingImageReads(0);
+    transition({ type: "reset" });
   };
 
   const closeEditor = () => {
-    editorGenerationRef.current += 1;
-    pendingImageReadsRef.current = 0;
-    setPendingImageReads(0);
+    transition({ type: "reset" });
     scenarioForm.close();
   };
 
   useEffect(() => {
     return () => {
-      editorGenerationRef.current += 1;
+      transition({ type: "reset" });
     };
-  }, []);
+  }, [transition]);
 
   const handleSelectAll = () =>
     setLocalSettings((prev) => ({
@@ -164,7 +177,7 @@ export function KetikScenariosTab({
   };
 
   const handleSaveScenario = () => {
-    if (pendingImageReads > 0) return;
+    if (hasPendingImageReads) return;
     const category = isNewCategoryInput
       ? newScenarioCategory
       : newScenarioCategory || "Umum";
@@ -195,7 +208,7 @@ export function KetikScenariosTab({
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const readGeneration = editorGenerationRef.current;
+      const readGeneration = lifecycle.current.generation;
       Array.from(e.target.files).forEach((file) => {
         if (file.size > 500 * 1024) {
           notify.error(
@@ -206,21 +219,14 @@ export function KetikScenariosTab({
         const draftGeneration = scenarioForm.getDraftGeneration();
         const reader = new FileReader();
         let settled = false;
-        pendingImageReadsRef.current += 1;
-        setPendingImageReads(pendingImageReadsRef.current);
+        transition({ type: "read-start", generation: readGeneration });
         const finishRead = () => {
           if (settled) return;
           settled = true;
-          if (editorGenerationRef.current === readGeneration) {
-            pendingImageReadsRef.current = Math.max(
-              0,
-              pendingImageReadsRef.current - 1,
-            );
-            setPendingImageReads(pendingImageReadsRef.current);
-          }
+          transition({ type: "read-finish", generation: readGeneration });
         };
         const isCurrentEditor = () =>
-          editorGenerationRef.current === readGeneration &&
+          lifecycle.current.generation === readGeneration &&
           scenarioForm.getDraftGeneration() === draftGeneration &&
           scenarioForm.isOpen;
         reader.onloadend = () => {
@@ -434,7 +440,7 @@ export function KetikScenariosTab({
                 className="hidden"
               />
             </label>
-            {pendingImageReads > 0 && (
+            {hasPendingImageReads && (
               <p role="status" className="mt-3 text-xs text-muted-foreground">
                 Membaca lampiran...
               </p>
@@ -498,7 +504,7 @@ export function KetikScenariosTab({
             type="button"
             onClick={handleSaveScenario}
             disabled={
-              pendingImageReads > 0 ||
+              hasPendingImageReads ||
               !scenarioForm.draft.title ||
               !scenarioForm.draft.description
             }
