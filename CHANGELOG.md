@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): plan moving the last client lifecycle decisions from refs into reducers
+
 - fix(ketik): keep a loading review result when a newer status refresh fails
 
 - fix(ketik): fence same-run review status reads so late polls cannot replace results
