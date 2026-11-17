@@ -326,7 +326,134 @@ test("failed async rerun keeps previous result after reload and does not trigger
   expectHermetic(audit);
 });
 
-test("late polling cannot replace completed results after an explicit status refresh", async ({
+for (const staleResponse of ["queued", "network-error"] as const) {
+  test(
+    staleResponse === "queued"
+      ? "late polling cannot replace completed results after an explicit status refresh"
+      : "a stale polling network error cannot warn after a newer completed read",
+    async ({ page }) => {
+      const audit = await openHermeticShell(page, {
+        path: `/ketik?sesi=${id}&tahap=telaah`,
+        auth: { role: "agent" },
+        apiMocks: [
+          {
+            method: "GET",
+            path: `/api/v1/ketik/history/${id}`,
+            body: {
+              success: true,
+              data: { ...session, reviewStatus: "processing" },
+            },
+          },
+          ...mocks(),
+        ],
+      });
+      let polls = 0;
+      const stale = Promise.withResolvers<void>();
+      const fulfilled = Promise.withResolvers<void>();
+      const recovery = Promise.withResolvers<void>();
+      await page.route(`**/api/v1/ketik/review/status/${id}`, async (route) => {
+        const order = ++polls;
+        if (order === 1) {
+          await route.fulfill({ status: 500, json: { success: false } });
+          return;
+        }
+        if (order > 3) {
+          // Never let an automatic recovery poll conceal a transient regression.
+          await recovery.promise;
+          await route.abort();
+          return;
+        }
+        if (order === 2) await stale.promise;
+        if (order === 2 && staleResponse === "network-error") {
+          await route.fulfill({ status: 500, json: { success: false } });
+        } else {
+          await route.fulfill({
+            json: {
+              success: true,
+              data: {
+                status: order === 2 ? "queued" : "completed",
+                resultReady: order !== 2,
+                previousKept: false,
+                scores,
+              },
+            },
+          });
+        }
+        if (order === 2) fulfilled.resolve();
+      });
+      const observation = await page.evaluateHandle(() => {
+        const seen = { armed: false, queued: false, warning: false };
+        const observer = new MutationObserver(() => {
+          if (!seen.armed) return;
+          const text =
+            document.getElementById("ketik-review-result")?.textContent ?? "";
+          seen.queued ||= text.includes("Menunggu giliran telaah");
+          seen.warning ||= text.includes(
+            "Status telaah belum dapat diperbarui.",
+          );
+        });
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+        return { seen, observer };
+      });
+      const result = page.getByRole("region", { name: "Hasil telaah" });
+      try {
+        await expect(
+          result.getByRole("button", { name: "Coba cek status" }),
+        ).toBeVisible({ timeout: 10_000 });
+        await expect.poll(() => polls, { timeout: 10_000 }).toBe(2);
+        await result.getByRole("button", { name: "Coba cek status" }).click();
+        await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
+        await expect(
+          result.getByRole("button", { name: "Coba cek status" }),
+        ).toHaveCount(0);
+        await observation.evaluate(({ seen }) => {
+          seen.armed = true;
+        });
+        const late = page.waitForResponse((response) =>
+          response.url().endsWith(`/review/status/${id}`),
+        );
+        stale.resolve();
+        await fulfilled.promise;
+        await (await late).finished();
+        const seen = await observation.evaluate(async ({ seen }) => {
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          );
+          return seen;
+        });
+        expect(
+          seen.queued,
+          "An obsolete status read must never render queue progress",
+        ).toBe(false);
+        expect(
+          seen.warning,
+          "An obsolete failure must never render a polling warning",
+        ).toBe(false);
+        await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
+        await expect(
+          result.getByText("Menunggu giliran telaah", { exact: true }),
+        ).toHaveCount(0);
+        await expect(
+          result.getByText("Status telaah belum dapat diperbarui.", {
+            exact: true,
+          }),
+        ).toHaveCount(0);
+        expectHermetic(audit);
+      } finally {
+        await observation.evaluate(({ observer }) => observer.disconnect());
+        await observation.dispose();
+        stale.resolve();
+        recovery.resolve();
+      }
+    },
+  );
+}
+
+test("a newer processing read from ready still shows a review started elsewhere", async ({
   page,
 }) => {
   const audit = await openHermeticShell(page, {
@@ -335,63 +462,37 @@ test("late polling cannot replace completed results after an explicit status ref
     apiMocks: [
       {
         method: "GET",
-        path: `/api/v1/ketik/history/${id}`,
-        body: {
-          success: true,
-          data: { ...session, reviewStatus: "processing" },
-        },
+        path: `/api/v1/ketik/review/status/${id}`,
+        status: 500,
+        body: { success: false },
       },
-      ...mocks(),
+      ...mocks(true),
     ],
   });
-  let polls = 0;
-  let release: (() => void) | undefined;
-  await page.route(`**/api/v1/ketik/review/status/${id}`, async (route) => {
-    const order = ++polls;
-    if (order === 1) {
-      await route.fulfill({ status: 500, json: { success: false } });
-      return;
-    }
-    if (order === 2)
-      await new Promise<void>((resolve) => {
-        release = resolve;
-      });
-    await route.fulfill({
+  const result = page.getByRole("region", { name: "Hasil telaah" });
+  await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
+  await page.route(`**/api/v1/ketik/review/status/${id}`, (route) =>
+    route.fulfill({
       json: {
         success: true,
         data: {
-          status: order === 2 ? "queued" : "completed",
-          resultReady: order !== 2,
+          status: "processing",
+          resultReady: false,
           previousKept: false,
-          scores,
+          scores: null,
         },
       },
-    });
-  });
-  const result = page.getByRole("region", { name: "Hasil telaah" });
-  try {
-    await expect(
-      result.getByRole("button", { name: "Coba cek status" }),
-    ).toBeVisible({ timeout: 10_000 });
-    await expect.poll(() => polls, { timeout: 10_000 }).toBe(2);
-    await result.getByRole("button", { name: "Coba cek status" }).click();
-    await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
-    const late = page.waitForResponse((response) =>
-      response.url().endsWith(`/review/status/${id}`),
-    );
-    release?.();
-    await (await late).finished();
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        ),
-    );
-    await expect(result.getByTestId("ketik-final-score")).toHaveText("80");
-    expectHermetic(audit);
-  } finally {
-    release?.();
-  }
+    }),
+  );
+  await result.getByRole("button", { name: "Coba cek status" }).click();
+  await expect(
+    result.getByText("Sedang ditelaah AI", { exact: true }),
+  ).toBeVisible();
+  await expect(result.getByTestId("ketik-final-score")).toHaveCount(0);
+  expect(
+    audit.mockedApi.some((r) => r.startsWith("POST /api/v1/ketik/review")),
+  ).toBe(false);
+  expectHermetic(audit);
 });
 
 test("a late enqueue failure cannot downgrade a result already confirmed by polling", async ({

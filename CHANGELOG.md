@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- fix(ketik): fence same-run review status reads so late polls cannot replace results
+
 - docs(ketik): audit review polling races and lifecycle ownership
 
 - refactor(api): use one promise to guard graceful shutdown
