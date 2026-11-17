@@ -164,6 +164,12 @@ Then change the tail:
 
 Record both changes in the commit body and the final report. They change the check that judges the work, and the reason is that the behavior they pinned is the defect R3 removes. If drift-check finds a third test that waits for late provider output, stop and ask again.
 
+**Third test: keep it unchanged** (Fajar approved, 2026-11-17). `a live worker that loses its lease cannot publish a late successful response` is in `apps/web/e2e/ketik-review-worker-api-host.spec.ts:256`.
+
+- It expires the lease directly in the DB and re-claims with `test-successor`. No deadline and no shutdown fires, so R3 does not abort that request.
+- Its `lease_lost` still proves the DB fence on the publish path. After R3, it is the only test that exercises `settle_ketik_review(p_result)` with a stale token, so it must keep passing unmodified.
+- If it starts failing after R3, that is a regression, not a reason to edit it.
+
 ### New RED tests (write first, confirm each fails for the expected reason)
 
 1. **Deadline aborts the provider request.**
