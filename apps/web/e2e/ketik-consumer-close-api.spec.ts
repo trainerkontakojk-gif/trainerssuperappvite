@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { createAdmin } from "./helpers/sidakRealBackend";
+import { laterMigrationsRedefiningRollback } from "./helpers/migrationReapply";
 import {
   env,
   trainer,
@@ -189,6 +190,11 @@ test("local rollback restores prior functions without data loss and reapply rest
     p_session_id: session.id,
     p_event: "consumer_close",
   };
+  // Reapplying only this migration is HEAD while no later one redefines its RPCs.
+  expect(
+    laterMigrationsRedefiningRollback("20261116180000"),
+    "A later migration redefines a rolled-back RPC; reapply it after this migration",
+  ).toEqual([]);
   try {
     fixtureSql(
       sql(

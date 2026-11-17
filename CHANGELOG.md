@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- test(ketik): reapply later migrations in rollback round trips and guard the list
+
 - docs(ketik): record the consumer_close migration applied to production
 
 - docs(ketik): mark the implicit-state plan done locally

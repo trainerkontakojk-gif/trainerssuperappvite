@@ -188,6 +188,13 @@ Artifact di `apps/web/test-results/` ignored dan dapat memuat auth lokal; jangan
   hanya berjalan bila `E2E_SUPABASE_WORKDIR` dipilih eksplisit; tidak ada HTTP
   writes selama versi API/DB sementara tidak cocok. E2E tetap memanggil Hono,
   Auth/PostgREST dan PostgreSQL asli, bukan service mock.
+- Setiap round trip rollback/reapply memasang ulang migrasinya **dan** setiap
+  migrasi sesudahnya yang mendefinisikan ulang fungsi yang disentuh rollback,
+  agar DB berakhir di HEAD untuk spec berikutnya. Daftar reapply ditulis
+  eksplisit; `helpers/migrationReapply.ts` (`laterMigrationsRedefiningRollback`)
+  memindai `supabase/` dan tes gagal sebelum rollback bila daftar tertinggal.
+  Migrasi baru yang mengubah fungsi sesi/review wajib ditambahkan ke daftar
+  tersebut di spec sesi, review worker, dan consumer-close.
 - `ketik-server-chat-*.spec.ts` membuktikan bubble lokal lalu append server segera,
   composer tetap aktif saat response AI, reload memakai transkrip durable,
   legacy failed resume/retry, expiry, assignment error/retry tanpa auto-start,

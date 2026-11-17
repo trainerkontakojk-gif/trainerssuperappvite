@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { createAdmin } from "./helpers/sidakRealBackend";
+import { laterMigrationsRedefiningRollback } from "./helpers/migrationReapply";
 import {
   env,
   trainer,
@@ -544,6 +545,16 @@ test("local rollback restores previous RPCs without data loss and reapply resume
       return [name, match![1].trim()];
     }),
   );
+  // Reapply the migration and every later one that redefines its RPCs, so the
+  // database ends at HEAD and specs that run afterwards test current bodies.
+  const reapply = [
+    "20261116160000_ketik_session_status_transitions.sql",
+    "20261116180000_ketik_consumer_close_transition.sql",
+  ];
+  expect(
+    laterMigrationsRedefiningRollback("20261116160000"),
+    "Every later migration that redefines a rolled-back RPC must be in the reapply list",
+  ).toEqual(reapply.slice(1));
   try {
     // No HTTP writes while the old database/new API versions are mismatched.
     fixtureSql(
@@ -570,9 +581,7 @@ test("local rollback restores previous RPCs without data loss and reapply resume
         AND proname IN ('transition_ketik_session_status', 'fail_ketik_session_turn');`),
     ).toBe("0");
   } finally {
-    fixtureSql(
-      sql("migrations/20261116160000_ketik_session_status_transitions.sql"),
-    );
+    for (const file of reapply) fixtureSql(sql(`migrations/${file}`));
   }
   expect(snapshot()).toBe(before);
   const admin = createAdmin(env);

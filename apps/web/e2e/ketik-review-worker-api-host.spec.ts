@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { runSql } from "./helpers/sidakRealBackend";
+import { laterMigrationsRedefiningRollback } from "./helpers/migrationReapply";
 import {
   env,
   db,
@@ -782,6 +783,11 @@ test("review transition rollback restores exact prior RPC bodies without changin
   const forward = sqlFile(
     "migrations/20261116170000_ketik_review_job_transitions.sql",
   );
+  // Reapplying only this migration is HEAD while no later one redefines its RPCs.
+  expect(
+    laterMigrationsRedefiningRollback("20261116170000"),
+    "A later migration redefines a rolled-back RPC; reapply it after the forward migration",
+  ).toEqual([]);
   try {
     runSql(
       env,
@@ -826,6 +832,18 @@ test("health becomes degraded when active work exceeds its lease-age bound", asy
 });
 
 test("migration rollback refuses live jobs, preserves published data, and reapply restores protected RPCs", async () => {
+  // Reapply the worker migration and every later one that redefines its RPCs,
+  // so the database ends at HEAD and a rerun of this spec stays meaningful.
+  const reapply = [
+    "20261016000935_ketik_durable_review_worker.sql",
+    "20261017150000_ketik_settle_review_drop_legacy_results.sql",
+    "20261018200000_user_controls.sql",
+    "20261116170000_ketik_review_job_transitions.sql",
+  ];
+  expect(
+    laterMigrationsRedefiningRollback("20261016000935"),
+    "Every later migration that redefines a rolled-back RPC must be in the reapply list",
+  ).toEqual(reapply.slice(1));
   const id = await seedSession(trainer.userId, true);
   await request("/review", trainer, { sessionId: id, rerun: true });
   const rollback = readFileSync(
@@ -866,14 +884,7 @@ test("migration rollback refuses live jobs, preserves published data, and reappl
       })
     ).error,
   ).not.toBeNull();
-  // Reapply the worker migration and every later one that redefines its RPCs,
-  // so the database ends at HEAD and a rerun of this spec stays meaningful.
-  for (const migration of [
-    "20261016000935_ketik_durable_review_worker.sql",
-    "20261017150000_ketik_settle_review_drop_legacy_results.sql",
-    "20261018200000_user_controls.sql",
-    "20261116170000_ketik_review_job_transitions.sql",
-  ])
+  for (const migration of reapply)
     runSql(
       env,
       readFileSync(
