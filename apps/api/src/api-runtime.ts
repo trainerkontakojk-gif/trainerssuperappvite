@@ -93,7 +93,6 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
     });
 
   let shutdownPromise: Promise<void> | null = null;
-  let shutdownStarted = false;
   async function shutdown(): Promise<void> {
     subjectIntentCleanup.stop();
     let exitCode = 0;
@@ -113,11 +112,7 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
     setExitCode(exitCode);
   }
   function trigger(): Promise<void> {
-    if (!shutdownStarted) {
-      shutdownStarted = true;
-      shutdownPromise = shutdown();
-    }
-    return shutdownPromise as Promise<void>;
+    return (shutdownPromise ??= shutdown());
   }
 
   const onSignal =

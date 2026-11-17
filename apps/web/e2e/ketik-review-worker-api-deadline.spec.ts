@@ -361,6 +361,60 @@ test("a healthy deadline release invalidates its token and late provider output 
   if (!embedded()) expect((await guarded(healthUrl())).status).toBe(200);
 });
 
+test("API SIGTERM then SIGINT joins the same in-flight shutdown", async () => {
+  test.skip(!embedded(), "The shared API shutdown guard is embedded-host only");
+  const first = await seedSession();
+  expect((await request("/review", trainer, { sessionId: first })).status).toBe(
+    202,
+  );
+  await startWorker({ KETIK_REVIEW_WORKER_SHUTDOWN_MS: "1500" });
+  await expect.poll(() => suite.providerCalls).toBe(1);
+  const old = await job(first);
+  const child = worker!;
+  const exited = new Promise<void>((resolve) =>
+    child.once("exit", () => resolve()),
+  );
+  const unlock = await lockHistory(first);
+  try {
+    child.kill("SIGTERM");
+    // Observe real shutdown release I/O before sending the other registered
+    // signal. No sleep, mock signal handler or lifecycle instrumentation.
+    await expect
+      .poll(blockedSettlements, { timeout: 5000, intervals: [50] })
+      .toBe(1);
+    expect(child.exitCode).toBeNull();
+    child.kill("SIGINT");
+    await expect.poll(() => child.exitCode, { timeout: 5000 }).toBe(1);
+    await exited;
+    expect(
+      workerLog.match(
+        /"event":"ketik_review_worker.shutdown_recovery_deferred"/g,
+      ),
+    ).toHaveLength(1);
+    expect(workerLog).not.toContain(
+      "ketik_review_worker.shutdown_claim_fenced",
+    );
+    expect(workerLog).not.toContain("ERR_SERVER_NOT_RUNNING");
+    expect(await job(first)).toMatchObject({
+      status: "processing",
+      attempt_count: 1,
+      lease_token: old.lease_token,
+    });
+    await test.info().attach("api-double-signal-shutdown-evidence", {
+      body: JSON.stringify({ exitCode: child.exitCode, workerLog }),
+      contentType: "application/json",
+    });
+  } finally {
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill("SIGKILL");
+    await exited;
+    await unlock();
+    suite.providerMode = "success";
+    releaseProvider();
+    await stopWorker();
+  }
+});
+
 for (const duringDeadlineRelease of [false, true]) {
   test(`shutdown bounds blocked release during ${duringDeadlineRelease ? "deadline release" : "provider processing"}`, async () => {
     const first = await seedSession();
