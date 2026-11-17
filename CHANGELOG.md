@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): order the consumer_closed migration checks around the pinned rollback test
+
 - docs(ketik): keep scenario editor open state single-sourced in the implicit-state plan
 
 - docs(ketik): correct the consumer_closed guard facts in the implicit-state plan
