@@ -106,3 +106,36 @@ Acceptance: `rg -n "legacyPending|saveInFlightRef" apps/web/src/routes/ketik` re
 - Fixture fix: hold only the first session read issued after the chat room is open and a message is queued (`holdNextRead` flag), instead of counting reads. No product file changed.
 - Second baseline run: `pnpm --dir apps/web exec playwright test '(^|/)ketik-client-lifecycle\.spec\.ts$' --reporter=line --workers=1 --trace on --max-failures=1 --output=$PWD/artifacts/ketik-client-residual-lifecycle/w1-baseline-r2-results` → exit 0, **6 passed** (3 new characterization + 3 existing), log `artifacts/ketik-client-residual-lifecycle/w1-baseline-r2.log`. This run is a fixture change followed by a single run, not a retry of the same code.
 - Next: implement the W1 design, rerun the same focused command, then the regression set.
+
+## W3 follow-up: review notes on W1/W2 (Lane B, one small commit)
+
+Two notes from reviewing `8dfbf925` (W1) and `26d5e755` (W2). Neither is a correctness defect. Only note 1 needs a code change.
+
+### Note 1: rename `legacy-recovered` (needs a fix)
+
+- **Fact:** `apps/web/src/routes/ketik/hooks/useServerKetikChat.ts:551` dispatches `legacy-recovered` whenever a recovery poll sees no processing work. That includes a _modern_ `pendingResponse` recovery, where `loaded.pendingTurn` is `null`.
+- The reducer case (`apps/web/src/routes/ketik/hooks/chatLifecycle.ts:108`) is correct for both cases: `recovering` → idle, and `legacy` is set to the loaded turn, which may be null.
+- The name says "legacy", so the next reader will assume that modern recovery uses a different path.
+- **Change:** rename the event to `recovery-finished` in the `ChatEvent` union, the reducer case and the dispatch site. Keep the payload `{ turn: KetikServerSession["pendingTurn"] }`. Add one line above the reducer case saying that it ends both modern and legacy recovery, and that `turn` is the server's legacy pending turn or `null`.
+- No behavior change. `rg -n "legacy-recovered" apps/web` must return nothing afterwards.
+
+### Note 2: W2 `resetDraft` no longer re-enables the form mid-save (document only)
+
+- **Fact:** `apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts:356–358`. `resetDraft()` runs from the effect on `[isOpen, settings]` and now dispatches `ready` only when `!isSavingPhase(saveLifecycle.current.phase)`.
+- Before W2, a `settings` change during a save (for example the global save's refetch) dispatched `ready`. The form then looked enabled, but the ref guard ignored clicks.
+- Now the form stays in its saving phase until the save itself settles. This is the intended reading of "one explicit status union". It is a small visible change, and it is an improvement.
+- **Change:** add a two-line comment above the `isSavingPhase` check in `resetDraft` that states this. No code change.
+
+### W3 tasks and verification
+
+1. Drift-check both facts above at HEAD.
+2. Apply note 1 (rename and comment) and note 2 (comment).
+3. Run:
+   - `pnpm --dir apps/web exec playwright test '(^|/)ketik-client-lifecycle\.spec\.ts$' '(^|/)ketik-server-chat-turns\.spec\.ts$' --reporter=line --workers=1`
+   - `pnpm --filter @trainers/web typecheck`
+   - `pnpm --filter @trainers/web lint`
+   - `git diff --check`
+
+   No new test: the existing W1 specs already cover both recovery paths, and this is a rename.
+
+4. Commit with `- refactor(ketik): name chat recovery completion for both recovery paths` in `CHANGELOG.md` and a `Verified:` trailer in the last paragraph, next to `Co-Authored-By`. (Commit `545f3577` had its trailer in a separate paragraph, and the observe-mode hook logged it as missing.)
