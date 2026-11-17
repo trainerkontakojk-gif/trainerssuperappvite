@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- docs(ketik): keep scenario editor open state single-sourced in the implicit-state plan
+
 - docs(ketik): correct the consumer_closed guard facts in the implicit-state plan
 
 - docs(ketik): plan removing the scenario-editor and consumer_closed implicit state machines
