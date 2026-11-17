@@ -118,6 +118,10 @@ export default defineConfig({
       testMatch: "ketik-session-api-*.spec.ts",
     },
     {
+      name: "ketik-consumer-close-real-backend",
+      testMatch: "ketik-consumer-close-api.spec.ts",
+    },
+    {
       name: "ketik-consumer-prompt-real-backend",
       testMatch: "ketik-consumer-prompt-api.spec.ts",
     },
