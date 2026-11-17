@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- refactor(ketik): derive settings save guards from reducer snapshot
+
 - refactor(ketik): move legacy chat turn lifecycle into reducer
 
 - docs(ketik): plan moving the last client lifecycle decisions from refs into reducers

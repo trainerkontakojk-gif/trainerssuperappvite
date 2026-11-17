@@ -55,6 +55,65 @@ const mocks: ApiMock[] = [
 
 test.beforeAll(() => assertLocalDevOnlyTarget());
 test.setTimeout(90000);
+
+test("KETIK settings blocks double save and reset while a save is in flight", async ({
+  page,
+}) => {
+  let settingsWrites = 0;
+  let templateWrites = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const audit = await openHermeticShell(page, {
+    path: "/ketik",
+    auth: { role: "admin" },
+    expectedThirdPartyHosts: ["randomuser.me"],
+    apiMocks: mocks,
+    beforeNavigate: async () => {
+      await page.route("**/api/v1/ketik/templates", async (route) => {
+        templateWrites++;
+        await route.fulfill({ json: ok(null) });
+      });
+      await page.route("**/api/v1/ketik/settings", async (route) => {
+        if (route.request().method() !== "PUT") return route.fallback();
+        settingsWrites++;
+        await gate;
+        await route.fulfill({
+          json: ok(null),
+          headers: { "x-settings-version": "2026-11-08T01:02:00.000Z" },
+        });
+      });
+    },
+  });
+  try {
+    const menu = page.getByRole("navigation", { name: "Menu KETIK" });
+    await expect(menu).toBeVisible({ timeout: 20000 });
+    await menu.getByRole("button", { name: /^Pengaturan/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Pengaturan KETIK" });
+    await expect(dialog).toBeVisible({ timeout: 20000 });
+    const save = dialog.getByRole("button", { name: "Simpan", exact: true });
+    await save.dblclick();
+    await expect.poll(() => settingsWrites).toBe(1);
+    const reset = dialog.getByRole("button", {
+      name: "Pulihkan bawaan",
+      exact: true,
+    });
+    await expect(reset).toBeDisabled();
+    await reset.evaluate((button: HTMLButtonElement) => button.click());
+    await expect(
+      dialog.getByRole("button", { name: "Menyimpan…" }),
+    ).toBeDisabled();
+    expect(settingsWrites).toBe(1);
+    expect(templateWrites).toBeLessThanOrEqual(1);
+    release();
+    await expect(dialog).toBeHidden();
+    expect(settingsWrites).toBe(1);
+    expectHermetic(audit);
+  } finally {
+    release();
+  }
+});
 for (const contract of [
   "partial result",
   "retry",

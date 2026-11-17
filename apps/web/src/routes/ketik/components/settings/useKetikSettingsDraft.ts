@@ -1,4 +1,4 @@
-import { useState, useEffect, useReducer, useRef } from "react";
+import { useState, useEffect, useReducer, useRef, useCallback } from "react";
 import type {
   KetikAppSettings,
   KetikScenario,
@@ -145,6 +145,13 @@ const durationToInputValue = (val: number | undefined): string => {
 
 type SettingsSavePhase =
   "ready" | "saving-global" | "saving-personal" | "resetting" | "failed";
+function isSavingPhase(phase: SettingsSavePhase): boolean {
+  return (
+    phase === "saving-global" ||
+    phase === "saving-personal" ||
+    phase === "resetting"
+  );
+}
 type SettingsSaveState = {
   phase: SettingsSavePhase;
   error: string | null;
@@ -202,10 +209,12 @@ export function useKetikSettingsDraft({
     error: null,
     acknowledgedGlobal: null,
   });
-  const isSaving =
-    saveState.phase === "saving-global" ||
-    saveState.phase === "saving-personal" ||
-    saveState.phase === "resetting";
+  const saveLifecycle = useRef(saveState);
+  const transition = useCallback((action: SettingsSaveAction) => {
+    saveLifecycle.current = settingsSaveReducer(saveLifecycle.current, action);
+    saveDispatch(action);
+  }, []);
+  const isSaving = isSavingPhase(saveState.phase);
   // Keep the shared ACK for this source snapshot, including after discarding
   // personal edits. A freshly loaded settings object supersedes this ACK.
   const acknowledged =
@@ -215,7 +224,6 @@ export function useKetikSettingsDraft({
   const effectiveSettings = acknowledged
     ? { ...settings, globalQuickTemplates: acknowledged.templates }
     : settings;
-  const saveInFlightRef = useRef(false);
   const [templateScope, setTemplateScope] = useState<"global" | "personal">(
     "global",
   );
@@ -347,7 +355,8 @@ export function useKetikSettingsDraft({
 
   function resetDraft() {
     setLocalSettings(toKetikDraft(effectiveSettings));
-    saveDispatch({ type: "ready" });
+    if (!isSavingPhase(saveLifecycle.current.phase))
+      transition({ type: "ready" });
     const nextDurationMode = classifyDurationMode(settings.simulationDuration);
     setDurationMode(nextDurationMode);
     setCustomInputValue(
@@ -379,7 +388,7 @@ export function useKetikSettingsDraft({
   };
 
   const handleSave = async () => {
-    if (saveInFlightRef.current) return;
+    if (isSavingPhase(saveLifecycle.current.phase)) return;
     const scenarioDirty = scenarioForm.isDirty(localSettings.scenarios);
     const consumerDirty = consumerForm.isDirty(localSettings.consumerTypes);
     const localTemplateLayers = getKetikTemplateLayers(localSettings);
@@ -471,13 +480,10 @@ export function useKetikSettingsDraft({
       personalQuickTemplates: nextPersonalTemplates,
     });
 
-    saveInFlightRef.current = true;
-    saveDispatch({
+    transition({
       type: "start",
       phase: globalTemplatesChanged ? "saving-global" : "saving-personal",
     });
-    let sharedAcknowledged = acknowledged !== null;
-    let savingPersonal = false;
     try {
       if (globalTemplatesChanged) {
         if (!onSaveTemplates)
@@ -485,14 +491,12 @@ export function useKetikSettingsDraft({
             "Template standar belum bisa disimpan. Muat ulang pengaturan.",
           );
         await onSaveTemplates(nextGlobalTemplates);
-        sharedAcknowledged = true;
-        saveDispatch({
+        transition({
           type: "global-saved",
           source: settings,
           templates: nextGlobalTemplates,
         });
       }
-      savingPersonal = true;
       await onSave(settingsToSave);
       if (scenarioDirty) scenarioForm.close();
       if (consumerDirty) consumerForm.close();
@@ -503,7 +507,7 @@ export function useKetikSettingsDraft({
       ) {
         templateForm.close();
       }
-      saveDispatch({ type: "ready" });
+      transition({ type: "ready" });
       onClose();
     } catch (e) {
       const reason = getSettingsSaveErrorMessage(
@@ -511,21 +515,19 @@ export function useKetikSettingsDraft({
         "Gagal menyimpan pengaturan.",
       );
       const message =
-        savingPersonal && sharedAcknowledged
+        saveLifecycle.current.phase === "saving-personal" &&
+        saveLifecycle.current.acknowledgedGlobal?.source === settings
           ? `Template standar sudah tersimpan, tetapi pengaturan pribadi belum tersimpan. ${reason}`
           : reason;
-      saveDispatch({ type: "failed", error: message });
+      transition({ type: "failed", error: message });
       notify.error(message);
-    } finally {
-      saveInFlightRef.current = false;
     }
   };
 
   /** Pulihkan bawaan dan langsung simpan; konfirmasi ada di pemanggil. */
   const handleResetDefaults = async () => {
-    if (saveInFlightRef.current) return;
-    saveInFlightRef.current = true;
-    saveDispatch({ type: "start", phase: "resetting" });
+    if (isSavingPhase(saveLifecycle.current.phase)) return;
+    transition({ type: "start", phase: "resetting" });
     try {
       const resetTemplateLayers = getKetikTemplateLayers(localSettings);
       const resetPersonalTemplates = localSettings.personalQuickTemplates || [];
@@ -543,17 +545,15 @@ export function useKetikSettingsDraft({
       scenarioForm.close();
       consumerForm.close();
       templateForm.close();
-      saveDispatch({ type: "ready" });
+      transition({ type: "ready" });
       onClose();
     } catch (e) {
       const message = getSettingsSaveErrorMessage(
         e,
         "Gagal menyimpan pengaturan.",
       );
-      saveDispatch({ type: "failed", error: message });
+      transition({ type: "failed", error: message });
       notify.error(message);
-    } finally {
-      saveInFlightRef.current = false;
     }
   };
 
