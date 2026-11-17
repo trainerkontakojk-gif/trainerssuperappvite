@@ -86,7 +86,8 @@ function transitionPoll(
 
 type HostWork =
   | { phase: "waiting" | "claiming" | "release_timed_out" }
-  | { phase: "processing" | "releasing"; claim: KetikReviewClaim };
+  | { phase: "processing"; claim: KetikReviewClaim }
+  | { phase: "releasing"; claim: KetikReviewClaim; promise: Promise<boolean> };
 type HostState =
   | { status: "idle" }
   | { status: "running"; work: HostWork }
@@ -110,13 +111,10 @@ type HostEvent =
     }
   | {
       type:
-        | "claimed"
-        | "release"
-        | "release_finished"
-        | "release_timed_out"
-        | "release_failed";
+        "claimed" | "release_finished" | "release_timed_out" | "release_failed";
       claim: KetikReviewClaim;
-    };
+    }
+  | { type: "release"; claim: KetikReviewClaim; promise: Promise<boolean> };
 
 class HostTransitionError extends Error {
   override name = "HostTransitionError";
@@ -153,6 +151,7 @@ class HostTransitionError extends Error {
  * faulted                 fault                         noop
  * Every other state/event or mismatched claim is illegal (throws).
  *
+ * The release event carries its promise; releasing cannot exist without it.
  * Repeated release attempts join in releaseWithin, never dispatch twice. A late
  * RPC after timeout cannot dispatch another completion (Promise.race settled).
  * Cycle cleanup joins any shutdown release before cycle_finished/loop_stopped,
@@ -222,7 +221,7 @@ function transitionHost(state: HostState, event: HostEvent): HostState {
           : {}),
         work:
           event.type === "release"
-            ? { phase: "releasing", claim: event.claim }
+            ? { phase: "releasing", claim: event.claim, promise: event.promise }
             : {
                 phase:
                   event.type === "release_timed_out"
@@ -287,7 +286,6 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
     }
   };
   // Resource handles only; lifecycle decisions come from HostState.
-  let releasePromise: Promise<boolean> | null = null;
   let loopPromise: Promise<void> | null = null;
   let wake: (() => void) | null = null;
   let unsubscribe: (() => void) | null = null;
@@ -311,9 +309,12 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
       host.work.phase === "releasing" &&
       host.work.claim === claim
     )
-      return releasePromise!;
-    transitionHostState({ type: "release", claim });
-    releasePromise = (async () => {
+      return host.work.promise;
+    // Install the complete state before starting I/O. An illegal transition
+    // throws before any RPC is sent; every valid join gets this same promise.
+    const release = Promise.withResolvers<boolean>();
+    transitionHostState({ type: "release", claim, promise: release.promise });
+    void (async () => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         const released = await Promise.race([
@@ -336,10 +337,9 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         throw error;
       } finally {
         if (timer) clearTimeout(timer);
-        releasePromise = null;
       }
-    })();
-    return releasePromise;
+    })().then(release.resolve, release.reject);
+    return release.promise;
   }
 
   async function runCycle() {
@@ -519,7 +519,9 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         lastSuccessfulPollAt: lastPollAt
           ? new Date(lastPollAt).toISOString()
           : null,
-        errorClass,
+        // Derive the terminal diagnostic from state so late poll/provider
+        // completions cannot overwrite it with a null or transient error.
+        errorClass: host.status === "faulted" ? "HostFaulted" : errorClass,
       };
     },
   };

@@ -190,3 +190,39 @@ Verdict: **PASS for owned implementation**, with the explicit R4 test exception 
 - **R3 remains open:** `Promise.race` abandons but does not cancel provider work; a re-claim can incur concurrent AI calls for the same session. DB token/expiry fencing protects publication, not AI cost. Separate AbortSignal plumbing through processor/provider clients is still needed and was not implemented. No matching known-limitations section exists in the scoped canonical docs, so no new R3 section was invented.
 - Canonical architecture/deployment text now includes `faulted` and state-derived shutdown outcomes. Existing report-only drift remains: deployment debug step 4 points at removed `ketik-service.ts`, and the legacy unit-command subsection remains. Entrypoint `stopping` and API `shutdownStarted` flags are existing wrapper lifecycles deliberately outside this runtime task. The local Wiki copies contain no worker-host lifecycle mirror to synchronize; their canonical-doc links remain valid.
 - Pushing this task to `main` triggers Railway auto-deploy as noted in the approved plan. A successful push is not evidence of a successful deployment. No Railway deploy command, production smoke test, or remote Supabase mutation was performed.
+
+## Approved follow-up: release promise invariant and fault health — 2026-11-17
+
+Baseline `2db9eb54`; Fajar approved review points 2–3. Lane B with an inline mini-spec: keep the same transitions, deadlines, claim fencing, shutdown and health JSON shape; require the release promise in the `releasing` variant and expose the terminal fault diagnostic through the existing `errorClass`. Direct implementation, no delegation. R3, provider/RPC cancellation, poll scheduling, process-host guards, DB, test harnesses, and deployment verification remain out of scope. The three unrelated untracked plans were preserved.
+
+### Implementation and review
+
+- `HostWork` now separates `processing` from `{ phase: "releasing"; claim; promise }`. Only the `release` event requires the promise. `transitionHost` remains pure and stores that handle with the claim; stop preserves it with the work snapshot. There is no nullable `releasePromise` variable or non-null assertion.
+- `releaseWithin` uses `Promise.withResolvers<boolean>()` to create the awaitable first, installs the complete state, then starts the existing bounded I/O and forwards its result/rejection. This standard built-in is available within the repo's Node 22+ engine floor and ESNext TypeScript target; no dependency/config change. Illegal release dispatch throws before sending an RPC. Valid concurrent joins return exactly the state-owned promise; timeout, RPC failure and success retain their existing events and timer cleanup.
+- `health().errorClass` derives `HostFaulted` directly from `host.status === "faulted"`, rather than storing another copy of terminal state in mutable diagnostics. This also prevents a late poll/provider diagnostic from hiding the fault. All other health keys/values, including ordinary `ReleaseTimeout` and its reset after a successful poll, are unchanged. The generic loop fault log's `eventType: "fault"` remains unchanged; no new event or raw-error logging was added.
+- `docs/deployment.md` documents the state-owned release handle and `HostFaulted`; `CHANGELOG.md` records the single follow-up commit. This appendix is execution evidence, not a new product plan.
+- Thermo-nuclear self-review: **PASS**, no independent review claimed. Reviewed event/type exhaustiveness, complete promise installation before I/O, shared-promise success/rejection propagation, no RPC on rejected dispatch, stop/deadline overlap, terminal health precedence, unchanged JSON shape, and preserved shutdown outcomes.
+- **The existing R4 exception is retained: fault-path / `HostFaulted` verification is review only, not an executed test.** No fault injection, new test, unit test, assertion weakening, or judge/config edit was made. Existing release E2E is characterization/regression, not a new bug RED.
+
+### Commands and evidence
+
+All logs/traces are ignored under `artifacts/ketik-review-host-polish/`; local JWT-bearing traces are not committed. Fresh disposable workdir `scratch/ketik-review-host-polish-20261117`, project `ketik-review-host-polish-test-20261117`, API/DB loopback **55721/55722**, canonical migrations symlinked and seeds disabled. The existing provider HTTP fixture and egress guard were inspected; no production/paid provider/remote DB or `.env*` edit.
+
+- `supabase start --workdir "$PWD/scratch/ketik-review-host-polish-20261117" --exclude studio,mailpit,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta` → **0**, `stack-start.log`.
+- Before product edits: `E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-host-polish-20261117" pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-deadline\.spec\.ts$' --config=playwright.api.config.ts --project=ketik-review-worker-real-backend --reporter=line --workers=1 --trace on --max-failures=1 --output="$PWD/artifacts/ketik-review-host-polish/baseline-results"` → **0**, **6 passed**, `baseline.log`. Same command after implementation with `focused-results` output → **0**, **6 passed**, `focused.log`.
+- Full regression command, once per project, serially:
+
+  ```bash
+  E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-review-host-polish-20261117" pnpm --dir apps/web exec playwright test '(^|/)ketik-review-worker-api-(deadline|host|publication)\.spec\.ts$' --config=playwright.api.config.ts --project=<project> --reporter=line --workers=1 --trace on --max-failures=1 --output="$PWD/artifacts/ketik-review-host-polish/<host>-results"
+  ```
+
+  `ketik-review-worker-real-backend` / `standalone` → **0**, **34 passed, 1 embedded-only wake skip**, `standalone.log`; `ketik-review-worker-embedded-real-backend` / `embedded` → **0**, **34 passed, 1 standalone-only health skip**, `embedded.log`. No retry, flake or unexplained failure.
+
+- `pnpm --filter @trainers/api typecheck` → **0**, `typecheck.log`.
+- `pnpm --dir apps/api exec eslint src/workers/ketik-review-worker-runtime.ts` → **0**, `eslint.log`.
+- `pnpm --filter @trainers/api build` → **0**, `build.log`. Root build/lint/typecheck not repeated for this Lane B scope; no test/shared-type file changed.
+- `GRAPHIFY_MAX_WORKERS=1 graphify update .` → **0**, `graphify-update.log`; generated cache not staged. Pre-change Graphify query optional for this known-local Lane B change; callers verified via live imports. Context7 not needed: only standard Promise language APIs and existing internal APIs were used.
+- Scoped Prettier and `git diff --check` → **0**, `format-check.log` / `acceptance.log`. Acceptance grep confirms no `releasePromise` identifier/non-null assertion remains and `HostFaulted` is derived only at the health output boundary.
+- Local read-only fixture counts → **0** with all six counts zero, `cleanup-counts.log`; `supabase stop --workdir "$PWD/scratch/ketik-review-host-polish-20261117" --no-backup` → **0**, `stack-stop.log`. No task-owned worker/Playwright/lock process/container remained.
+
+One commit/push to `main` after the above gates, with the executed checks in its `Verified:` trailer; actual SHA/result reported in the final response. Push triggers Railway auto-deploy, but neither the prior nor new deployment was inspected or claimed successful. R3 and the previously reported legacy deployment debug pointer/unit-command drift remain unchanged; no new doc/code inconsistency was found.
