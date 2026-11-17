@@ -259,6 +259,70 @@ test("deadline release timeout degrades health and completes another job while P
   }
 });
 
+test("shutdown after an earlier claim release timeout exits cleanly with no active claim", async () => {
+  const first = await seedSession();
+  expect((await request("/review", trainer, { sessionId: first })).status).toBe(
+    202,
+  );
+  await startWorker({
+    KETIK_REVIEW_WORKER_DEADLINE_MS: "1000",
+    KETIK_REVIEW_WORKER_INTERVAL_MS: "5000",
+  });
+  await expect.poll(() => suite.providerCalls).toBe(1);
+  const old = await job(first);
+  const child = worker!;
+  const exited = new Promise<void>((resolve) =>
+    child.once("exit", () => resolve()),
+  );
+  const unlock = await lockHistory(first);
+  try {
+    await expect
+      .poll(blockedSettlements, { timeout: 5000, intervals: [50] })
+      .toBe(1);
+    await expect
+      .poll(
+        () =>
+          workerLog.includes("ketik_review_worker.deadline_release_timeout"),
+        { timeout: 5000, intervals: [50] },
+      )
+      .toBe(true);
+    if (!embedded()) {
+      const response = await guarded(healthUrl());
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        active: false,
+        errorClass: "ReleaseTimeout",
+      });
+    }
+    child.kill("SIGTERM");
+    await expect.poll(() => child.exitCode, { timeout: 5000 }).toBe(0);
+    await exited;
+    expect(workerLog).not.toContain(
+      "ketik_review_worker.shutdown_claim_fenced",
+    );
+    expect(workerLog).not.toContain(
+      "ketik_review_worker.shutdown_recovery_deferred",
+    );
+    expect(await job(first)).toMatchObject({
+      status: "processing",
+      attempt_count: 1,
+      lease_token: old.lease_token,
+    });
+    await test.info().attach("earlier-timeout-shutdown-evidence", {
+      body: JSON.stringify({ exitCode: child.exitCode, workerLog }),
+      contentType: "application/json",
+    });
+  } finally {
+    if (child.exitCode === null && child.signalCode === null)
+      child.kill("SIGKILL");
+    await exited;
+    await unlock();
+    suite.providerMode = "success";
+    releaseProvider();
+    await stopWorker();
+  }
+});
+
 test("a healthy deadline release invalidates its token and late provider output cannot publish", async () => {
   const first = await seedSession();
   const second = await seedSession();

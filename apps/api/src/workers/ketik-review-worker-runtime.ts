@@ -90,45 +90,136 @@ type HostWork =
 type HostState =
   | { status: "idle" }
   | { status: "running"; work: HostWork }
-  | { status: "stopping"; work: HostWork }
-  | { status: "stopped" };
-type HostEvent =
-  | { type: "start" | "claim" | "cycle_finished" | "stop" | "loop_stopped" }
   | {
-      type: "claimed" | "release" | "release_finished" | "release_timed_out";
+      status: "stopping";
+      work: HostWork;
+      claimAtStop: KetikReviewClaim | null;
+      outcome: "clean" | "recovery_deferred";
+    }
+  | { status: "stopped"; outcome: "clean" | "recovery_deferred" }
+  | { status: "faulted" };
+type HostEvent =
+  | {
+      type:
+        | "start"
+        | "claim"
+        | "cycle_finished"
+        | "stop"
+        | "loop_stopped"
+        | "fault";
+    }
+  | {
+      type:
+        | "claimed"
+        | "release"
+        | "release_finished"
+        | "release_timed_out"
+        | "release_failed";
       claim: KetikReviewClaim;
     };
 
+class HostTransitionError extends Error {
+  override name = "HostTransitionError";
+  constructor(
+    readonly eventType: HostEvent["type"],
+    readonly stateStatus: HostState["status"],
+  ) {
+    super(
+      eventType === "start"
+        ? "WORKER_ALREADY_STARTED"
+        : "ILLEGAL_HOST_TRANSITION",
+    );
+  }
+}
+
+/**
+ * Transition table (R = running, S = stopping; matching claim uses identity):
+ * State/phase             Event                         Next / noop
+ * idle                    start                         R/waiting
+ * idle                    stop                          stopped/clean
+ * R/*                     stop                          S/same work, snapshot claim, clean
+ * S/*, stopped, faulted   stop                          noop
+ * R/waiting|timed_out     claim                         R/claiming
+ * R|S/claiming            claimed                       same status/processing
+ * R|S/processing          release (matching claim)      same status/releasing
+ * R|S/releasing           release_finished|failed (same) same status/waiting
+ * R|S/releasing           release_timed_out (same)      same status/release_timed_out;
+ *                                                       S defers iff claim === claimAtStop
+ * R|S/claiming|processing  cycle_finished                same status/waiting
+ * R|S/waiting|timed_out    cycle_finished                noop (preserve timeout)
+ * any except faulted      loop_stopped                  stopped (preserve stop outcome)
+ * faulted                 loop_stopped                  noop
+ * any except faulted      fault                         faulted
+ * faulted                 fault                         noop
+ * Every other state/event or mismatched claim is illegal (throws).
+ *
+ * Repeated release attempts join in releaseWithin, never dispatch twice. A late
+ * RPC after timeout cannot dispatch another completion (Promise.race settled).
+ * Cycle cleanup joins any shutdown release before cycle_finished/loop_stopped,
+ * including when provider completion races it. Thus releasing/cycle_finished
+ * and completion for a no-longer-active claim are bugs, not stale-event noops.
+ */
 function transitionHost(state: HostState, event: HostEvent): HostState {
+  if (event.type === "fault")
+    return state.status === "faulted" ? state : { status: "faulted" };
   if (event.type === "start") {
-    if (state.status !== "idle") throw new Error("WORKER_ALREADY_STARTED");
+    if (state.status !== "idle")
+      throw new HostTransitionError(event.type, state.status);
     return { status: "running", work: { phase: "waiting" } };
   }
   if (event.type === "stop") {
-    if (state.status === "idle") return { status: "stopped" };
+    if (state.status === "idle") return { status: "stopped", outcome: "clean" };
     return state.status === "running"
-      ? { ...state, status: "stopping" }
+      ? {
+          ...state,
+          status: "stopping",
+          claimAtStop: activeClaim(state),
+          outcome: "clean",
+        }
       : state;
   }
-  if (event.type === "loop_stopped") return { status: "stopped" };
-  if (state.status !== "running" && state.status !== "stopping") return state;
+  if (event.type === "loop_stopped") {
+    if (state.status === "faulted") return state;
+    return {
+      status: "stopped",
+      outcome:
+        state.status === "stopping" || state.status === "stopped"
+          ? state.outcome
+          : "clean",
+    };
+  }
+  if (state.status !== "running" && state.status !== "stopping")
+    throw new HostTransitionError(event.type, state.status);
   const work = state.work;
   switch (event.type) {
     case "claim":
-      return state.status === "running" &&
+      if (
+        state.status === "running" &&
         (work.phase === "waiting" || work.phase === "release_timed_out")
-        ? { ...state, work: { phase: "claiming" } }
-        : state;
+      )
+        return { ...state, work: { phase: "claiming" } };
+      break;
     case "claimed":
-      return work.phase === "claiming"
-        ? { ...state, work: { phase: "processing", claim: event.claim } }
-        : state;
+      if (work.phase === "claiming")
+        return { ...state, work: { phase: "processing", claim: event.claim } };
+      break;
     case "release":
     case "release_finished":
     case "release_timed_out":
-      if (!("claim" in work) || work.claim !== event.claim) return state;
+    case "release_failed":
+      if (
+        !("claim" in work) ||
+        work.claim !== event.claim ||
+        work.phase !== (event.type === "release" ? "processing" : "releasing")
+      )
+        break;
       return {
         ...state,
+        ...(state.status === "stopping" &&
+        event.type === "release_timed_out" &&
+        event.claim === state.claimAtStop
+          ? { outcome: "recovery_deferred" as const }
+          : {}),
         work:
           event.type === "release"
             ? { phase: "releasing", claim: event.claim }
@@ -141,10 +232,13 @@ function transitionHost(state: HostState, event: HostEvent): HostState {
       };
     case "cycle_finished":
       // Preserve the explicit timeout outcome until the next admission attempt.
-      return work.phase === "release_timed_out" || work.phase === "waiting"
-        ? state
-        : { ...state, work: { phase: "waiting" } };
+      if (work.phase === "release_timed_out" || work.phase === "waiting")
+        return state;
+      if (work.phase === "claiming" || work.phase === "processing")
+        return { ...state, work: { phase: "waiting" } };
+      break;
   }
+  throw new HostTransitionError(event.type, state.status);
 }
 
 function activeClaim(state: HostState): KetikReviewClaim | null {
@@ -164,8 +258,33 @@ class ReleaseTimeout extends Error {
 export function createKetikReviewWorker(config: KetikWorkerConfig) {
   const workerId = `ketik-${randomUUID()}`;
   let host: HostState = { status: "idle" };
+  // Avoid carrying TypeScript's pre-await narrowing across concurrent transitions.
+  const currentHost = (): HostState => host;
+  const faultHost = (
+    eventType: HostEvent["type"],
+    stateStatus: HostState["status"],
+  ) => {
+    if (host.status === "faulted") return;
+    host = transitionHost(host, { type: "fault" });
+    unsubscribe?.();
+    unsubscribe = null;
+    wake?.();
+    console.error(
+      JSON.stringify({
+        event: "ketik_review_worker.host_faulted",
+        eventType,
+        stateStatus,
+      }),
+    );
+  };
   const transitionHostState = (event: HostEvent) => {
-    host = transitionHost(host, event);
+    try {
+      host = transitionHost(host, event);
+    } catch (error) {
+      if (error instanceof HostTransitionError)
+        faultHost(error.eventType, error.stateStatus);
+      throw error;
+    }
   };
   // Resource handles only; lifecycle decisions come from HostState.
   let releasePromise: Promise<boolean> | null = null;
@@ -187,7 +306,12 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
   ): Promise<boolean> {
     // Deadline and shutdown can meet while a release is in flight. Join that
     // bounded attempt rather than issuing a second settlement RPC.
-    if (releasePromise) return releasePromise;
+    if (
+      (host.status === "running" || host.status === "stopping") &&
+      host.work.phase === "releasing" &&
+      host.work.claim === claim
+    )
+      return releasePromise!;
     transitionHostState({ type: "release", claim });
     releasePromise = (async () => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -201,8 +325,14 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         transitionHostState({ type: "release_finished", claim });
         return released;
       } catch (error) {
-        if (error instanceof ReleaseTimeout)
-          transitionHostState({ type: "release_timed_out", claim });
+        if (!(error instanceof HostTransitionError))
+          transitionHostState({
+            type:
+              error instanceof ReleaseTimeout
+                ? "release_timed_out"
+                : "release_failed",
+            claim,
+          });
         throw error;
       } finally {
         if (timer) clearTimeout(timer);
@@ -243,7 +373,8 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
           );
         }),
       ]);
-      if (result === "deadline") {
+      // Shutdown may already have fenced this claim while the provider ran.
+      if (result === "deadline" && activeClaim(host) === claim) {
         try {
           const released = await releaseWithin(
             claim,
@@ -269,15 +400,30 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
   }
   async function loop() {
     try {
-      while (host.status === "running") {
+      while (currentHost().status === "running") {
         try {
-          await runCycle();
+          try {
+            await runCycle();
+          } finally {
+            // Provider completion/error may race shutdown's bounded release.
+            // Join before clearing the work or marking the loop stopped.
+            if (
+              (host.status === "running" || host.status === "stopping") &&
+              host.work.phase === "releasing"
+            )
+              await releaseWithin(
+                host.work.claim,
+                Math.min(config.shutdownMs, 20_000),
+              );
+          }
         } catch (error) {
+          if (error instanceof HostTransitionError) throw error;
           errorClass = error instanceof Error ? error.name : "DatabaseError";
           transition("error");
           log("ketik_review_worker.cycle_failed");
         } finally {
-          transitionHostState({ type: "cycle_finished" });
+          if (host.status !== "faulted")
+            transitionHostState({ type: "cycle_finished" });
         }
         if (host.status !== "running") break;
         if (pollState.wakePending) {
@@ -304,11 +450,11 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
   async function shutdown() {
     if (shutdownPromise) return shutdownPromise;
     shutdownPromise = (async () => {
-      const claimAtShutdown = activeClaim(host);
       transitionHostState({ type: "stop" });
       unsubscribe?.();
       unsubscribe = null;
       wake?.();
+      if (currentHost().status === "faulted") throw new ReleaseTimeout();
       let timer: ReturnType<typeof setTimeout> | undefined;
       const settled = await Promise.race([
         (loopPromise ?? Promise.resolve()).then(
@@ -322,7 +468,11 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
       if (timer) clearTimeout(timer);
       // A deadline release may time out and finish the loop during this grace
       // period. That is deferred recovery, not a successfully fenced shutdown.
-      if (claimAtShutdown && errorClass === "ReleaseTimeout")
+      if (
+        host.status === "faulted" ||
+        ((host.status === "stopping" || host.status === "stopped") &&
+          host.outcome === "recovery_deferred")
+      )
         throw new ReleaseTimeout();
       const claim = activeClaim(host);
       if (!settled && claim) {
@@ -342,7 +492,10 @@ export function createKetikReviewWorker(config: KetikWorkerConfig) {
         transition("wake");
         wake?.();
       });
-      loopPromise = loop();
+      // Attach immediately: a rejected embedded loop must not crash the API.
+      // Transition errors already faulted the host; any other loop failure must
+      // also stop admission rather than becoming a plausible healthy success.
+      loopPromise = loop().catch(() => faultHost("fault", host.status));
     },
     shutdown,
     health() {

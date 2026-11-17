@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-17
 
+- refactor(ketik): derive review worker shutdown outcome from host state and reject illegal transitions
+
 - chore(agents): add verify skill, Verified commit trailer gate in observe mode, zero Playwright retries, and flaky-test and three-round escalation rules
 
 - docs(ketik): align review troubleshooting and lease guidance with current worker behavior
