@@ -5,6 +5,7 @@ import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import {
   KETIK_ERROR_MESSAGES,
+  KETIK_PROMPT_LIMITS,
   KETIK_SESSION_ERRORS,
   ketikQuickTemplateSchema,
   ketikAppSettingsSchema,
@@ -116,7 +117,36 @@ ketik.put(
 ketik.put(
   "/settings",
   requireCapability("ketik.settings.write"),
-  zValidator("json", ketikAppSettingsSchema),
+  zValidator("json", ketikAppSettingsSchema, (result, c) => {
+    if (result.success) return;
+
+    let message = "Pengaturan KETIK tidak valid. Periksa kembali isian Anda.";
+    for (const { code, path } of result.error.issues) {
+      const [section, scenarioIndex, field, imageIndex] = path;
+      if (
+        code !== "too_big" ||
+        path.length !== 4 ||
+        section !== "scenarios" ||
+        typeof scenarioIndex !== "number" ||
+        field !== "imageAlts" ||
+        typeof imageIndex !== "number"
+      ) {
+        continue;
+      }
+
+      // On failure the validator hook supplies the raw input in result.data.
+      const rawTitle = result.data.scenarios?.[scenarioIndex]?.title;
+      const title = typeof rawTitle === "string" ? rawTitle.trim() : "";
+      const scenarioLabel = title || `ke-${scenarioIndex + 1}`;
+      message = `Keterangan gambar #${imageIndex} pada skenario "${scenarioLabel}" melebihi ${KETIK_PROMPT_LIMITS.imageAlt} karakter.`;
+      break;
+    }
+
+    return c.json(
+      { success: false, error: { code: "VALIDATION_ERROR", message } },
+      400,
+    );
+  }),
   async (c) => {
     const body = c.req.valid("json");
     try {

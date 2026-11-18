@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-18
+
+- fix(ketik): allow longer scenario image descriptions
+
 ## 2026-11-17
 
 - test(ketik): reapply later migrations in rollback round trips and guard the list

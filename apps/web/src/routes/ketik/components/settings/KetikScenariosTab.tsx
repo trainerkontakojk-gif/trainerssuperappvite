@@ -448,45 +448,53 @@ export function KetikScenariosTab({
             {scenarioForm.draft.images &&
               scenarioForm.draft.images.length > 0 && (
                 <div className="mt-2 flex gap-3 overflow-x-auto pb-2">
-                  {scenarioForm.draft.images.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="flex w-28 shrink-0 flex-col gap-1.5"
-                    >
-                      <div className="group relative h-20 w-28">
-                        <img
-                          src={img}
-                          alt={
-                            scenarioForm.draft.imageAlts?.[idx] ||
-                            `Preview ${idx + 1}`
-                          }
-                          className="h-full w-full rounded-md border border-border object-cover"
+                  {scenarioForm.draft.images.map((img, idx) => {
+                    const alt = scenarioForm.draft.imageAlts?.[idx] ?? "";
+                    const counterId = `ketik-image-alt-counter-${idx}`;
+                    return (
+                      <div
+                        key={idx}
+                        className="flex w-64 max-w-full shrink-0 flex-col gap-2"
+                      >
+                        <div className="relative h-20 w-28">
+                          <img
+                            src={img}
+                            alt={alt || `Preview ${idx + 1}`}
+                            className="h-full w-full rounded-md border border-border object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon-sm"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="absolute top-1 right-1 rounded-full shadow"
+                            aria-label={`Hapus gambar ${idx + 1}`}
+                          >
+                            <X data-icon="inline" />
+                          </Button>
+                          <span className="absolute bottom-1 left-1 rounded-md bg-foreground/75 px-1.5 text-xs font-medium text-background">
+                            #{idx}
+                          </span>
+                        </div>
+                        <SettingsTextarea
+                          rows={4}
+                          value={alt}
+                          onChange={(e) => handleAltChange(idx, e.target.value)}
+                          placeholder="Keterangan gambar..."
+                          maxLength={KETIK_PROMPT_LIMITS.imageAlt}
+                          aria-label={`Keterangan gambar ${idx + 1}`}
+                          aria-describedby={counterId}
+                          className="field-sizing-fixed"
                         />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon-sm"
-                          onClick={() => handleRemoveImage(idx)}
-                          className="absolute -top-2 -right-2 rounded-full shadow"
-                          aria-label={`Hapus gambar ${idx + 1}`}
+                        <p
+                          id={counterId}
+                          className="text-right text-xs text-muted-foreground"
                         >
-                          <X data-icon="inline" />
-                        </Button>
-                        <span className="absolute bottom-1 left-1 rounded-md bg-foreground/75 px-1.5 text-xs font-medium text-background">
-                          #{idx}
-                        </span>
+                          {alt.length}/{KETIK_PROMPT_LIMITS.imageAlt}
+                        </p>
                       </div>
-                      <SettingsInput
-                        type="text"
-                        value={scenarioForm.draft.imageAlts?.[idx] ?? ""}
-                        onChange={(e) => handleAltChange(idx, e.target.value)}
-                        placeholder="Keterangan gambar..."
-                        maxLength={KETIK_PROMPT_LIMITS.imageAlt}
-                        aria-label={`Keterangan gambar ${idx + 1}`}
-                        className="h-8 min-h-8 bg-background px-2 text-xs"
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
           </div>

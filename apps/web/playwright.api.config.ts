@@ -125,6 +125,10 @@ export default defineConfig({
       name: "ketik-consumer-prompt-real-backend",
       testMatch: "ketik-consumer-prompt-api.spec.ts",
     },
+    {
+      name: "ketik-settings-image-alt-real-backend",
+      testMatch: "ketik-settings-image-alt-api.spec.ts",
+    },
     { name: "tna-real-backend", testMatch: "tna-*-api.spec.ts" },
     {
       name: "user-peserta-link-real-backend",

@@ -36,7 +36,7 @@ export const KETIK_PROMPT_LIMITS = {
   scenarioScript: 20_000,
   consumerDescription: 4_000,
   chatMessageText: 20_000,
-  imageAlt: 500,
+  imageAlt: 2000,
 } as const;
 
 export interface PacingMeta {

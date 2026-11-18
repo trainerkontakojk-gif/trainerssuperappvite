@@ -51,6 +51,7 @@ const image = {
     "base64",
   ),
 };
+type SavedScenario = { title: string; images?: string[]; imageAlts?: string[] };
 
 async function openEditor(page: Page) {
   const dialog = page.getByRole("dialog", { name: "Pengaturan KETIK" });
@@ -62,9 +63,7 @@ async function openEditor(page: Page) {
 
 async function setup(
   page: Page,
-  onWrite?: (body: {
-    scenarios: { title: string; images?: string[] }[];
-  }) => void,
+  onWrite?: (body: { scenarios: SavedScenario[] }) => void,
 ) {
   const audit = await openHermeticShell(page, {
     path: "/ketik",
@@ -115,6 +114,36 @@ test("scenario image preview is saved in settings", async ({ page }) => {
         )?.images,
     )
     .toEqual([`data:image/png;base64,${image.buffer.toString("base64")}`]);
+  expectHermetic(audit);
+});
+
+test("long scenario image description is editable and saves with its counter", async ({ page }) => {
+  let saved: SavedScenario[] | undefined;
+  const { audit, dialog } = await setup(page, (body) => {
+    saved = body.scenarios;
+  });
+  await dialog.locator('input[type="file"]').setInputFiles(image);
+  const alt = dialog.getByRole("textbox", { name: "Keterangan gambar 1" });
+  await expect(alt).toBeVisible();
+  expect(await alt.evaluate((element) => element.tagName)).toBe("TEXTAREA");
+  await expect(alt).toHaveAttribute("maxlength", "2000");
+
+  const description = "Baris pertama\nBaris kedua ".padEnd(1500, "a");
+  await alt.fill(description);
+  await expect(alt).toHaveValue(description);
+  await expect(dialog.getByText("1500/2000", { exact: true })).toBeVisible();
+
+  const fullDescription = description.padEnd(2000, "b");
+  await alt.fill(fullDescription);
+  await alt.press("X");
+  await expect(alt).toHaveValue(fullDescription);
+  await expect(dialog.getByText("2000/2000", { exact: true })).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Terapkan" }).click();
+  await dialog.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(saved?.find((scenario) => scenario.title === "Skenario lampiran")?.imageAlts)
+    .toEqual([fullDescription]);
   expectHermetic(audit);
 });
 
