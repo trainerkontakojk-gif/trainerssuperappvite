@@ -29,6 +29,29 @@ export const appendKetikSessionMessageSchema = z.strictObject({
 export const requestKetikSessionResponseSchema = z.strictObject({
   requestId: z.uuid(),
 });
+export const revealKetikSessionResponseSchema = z.strictObject({
+  requestId: z.uuid(),
+  expectedAgentVersion: z.number().int().min(0),
+  expectedRetryCount: z.union([z.literal(0), z.literal(1)]),
+});
+export type RevealKetikSessionResponse = z.infer<
+  typeof revealKetikSessionResponseSchema
+>;
+
+type PendingResponseBase = { requestId: string; retryCount: 0 | 1 };
+export type KetikPendingResponse = PendingResponseBase &
+  (
+    | { status: "processing" | "failed"; leaseExpiresAt: string | null }
+    | { status: "retry_ready"; leaseExpiresAt: null }
+    | {
+        status: "held";
+        leaseExpiresAt: null;
+        contextAgentVersion: number;
+        typingChars: number;
+        closing: boolean;
+      }
+  );
+
 export const finishKetikSessionSchema = z.strictObject({});
 export type KetikSessionTurnRequest = z.infer<typeof ketikSessionTurnSchema>;
 export type AppendKetikSessionMessageRequest = z.infer<
@@ -51,12 +74,7 @@ export interface KetikServerSession {
   consumerClosed: boolean;
   provenance: "server_v1";
   awaitingResponse: boolean;
-  pendingResponse: {
-    requestId: string;
-    status: "processing" | "failed";
-    retryCount: number;
-    leaseExpiresAt: string | null;
-  } | null;
+  pendingResponse: KetikPendingResponse | null;
   pendingTurn:
     | (KetikSessionTurnRequest & {
         status: "processing" | "failed";

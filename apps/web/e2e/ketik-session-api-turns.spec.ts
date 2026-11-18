@@ -11,6 +11,8 @@ import {
   setupKetikSessionSuite,
   teardownKetikSessionSuite,
   start,
+  reveal,
+  respondAndReveal,
 } from "./helpers/ketikSessionApiHarness";
 
 test.describe.configure({ mode: "serial" });
@@ -18,6 +20,119 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(setupKetikSessionSuite);
 
 test.afterAll(teardownKetikSessionSuite);
+
+test("held responses stay outside the transcript and history until reveal", async () => {
+  const live = await start();
+  const path = `/sessions/${live.id}`;
+  const appended = await api(trainer, `${path}/messages`, "POST", {
+    requestId: randomUUID(),
+    expectedAgentVersion: 0,
+    text: "Tolong jelaskan tagihannya.",
+  });
+  expect(appended.status).toBe(200);
+  const transcript = (await appended.json()).data.messages;
+  const requestId = randomUUID();
+  const generated = await api(trainer, `${path}/respond`, "POST", {
+    requestId,
+  });
+  expect(generated.status).toBe(200);
+  expect((await generated.json()).data.messages).toEqual(transcript);
+  const reloaded = await api(trainer, path);
+  expect((await reloaded.json()).data).toMatchObject({
+    messages: transcript,
+    pendingResponse: { requestId, status: "held", contextAgentVersion: 1 },
+  });
+  const finished = await api(trainer, `${path}/finish`, "POST", {});
+  expect(finished.status).toBe(200);
+  expect((await finished.json()).data.messages).toEqual(transcript);
+  const lateReveal = await api(trainer, `${path}/reveal`, "POST", {
+    requestId,
+    expectedAgentVersion: 1,
+    expectedRetryCount: 0,
+  });
+  expect(lateReveal.status).toBe(200);
+  expect((await lateReveal.json()).data.messages).toEqual(transcript);
+});
+
+test("reveal refreshes stale context once and waits for the latest version before publishing", async () => {
+  const live = await start();
+  const path = `/sessions/${live.id}`;
+  const requestId = randomUUID();
+  const respond = () => api(trainer, `${path}/respond`, "POST", { requestId });
+  const revealAt = (expectedAgentVersion: number, expectedRetryCount = 0) =>
+    reveal(live.id, requestId, expectedAgentVersion, expectedRetryCount);
+  const append = async (expectedAgentVersion: number, text: string) => {
+    const result = await api(trainer, `${path}/messages`, "POST", {
+      requestId: randomUUID(),
+      expectedAgentVersion,
+      text,
+    });
+    expect(result.status).toBe(200);
+  };
+  async function data(result: Response) {
+    expect(result.status).toBe(200);
+    return (await result.json()).data;
+  }
+
+  const calls = suite.providerCalls;
+  const previousText = suite.providerText;
+  try {
+    await append(0, "Konteks satu.");
+    suite.providerText = "Jawaban usang.";
+    expect((await data(await respond())).pendingResponse).toMatchObject({
+      status: "held",
+      contextAgentVersion: 1,
+      retryCount: 0,
+    });
+    await append(1, "Konteks dua khusus untuk regenerasi.");
+    expect((await data(await revealAt(1))).pendingResponse.status).toBe("held");
+    const queued = await data(await revealAt(2));
+    expect(queued.pendingResponse).toMatchObject({
+      status: "retry_ready",
+      retryCount: 1,
+    });
+    expect(queued.messages.slice(1)).toHaveLength(2);
+    expect(suite.providerCalls).toBe(calls + 1);
+
+    suite.providerText = "Jawaban dengan konteks dua.[BREAK]Pesan kedua.";
+    const regenerated = await data(await respond());
+    expect(regenerated.pendingResponse).toMatchObject({
+      status: "held",
+      contextAgentVersion: 2,
+      retryCount: 1,
+    });
+    expect(suite.providerPayloads.at(-1)).toContain(
+      "Konteks dua khusus untuk regenerasi.",
+    );
+    expect((await data(await revealAt(2))).pendingResponse.status).toBe("held");
+    await append(2, "Konteks tiga saat balasan sudah ditahan.");
+    expect((await data(await revealAt(2, 1))).messages.slice(1)).toHaveLength(
+      3,
+    );
+    const published = await data(await revealAt(3, 1));
+    expect(published.pendingResponse).toBeNull();
+    expect(
+      published.messages
+        .slice(1)
+        .map((message: { text: string }) => message.text),
+    ).toEqual([
+      "Konteks satu.",
+      "Konteks dua khusus untuk regenerasi.",
+      "Konteks tiga saat balasan sudah ditahan.",
+      "Jawaban dengan konteks dua.",
+      "Pesan kedua.",
+    ]);
+    expect((await data(await revealAt(3, 1))).messages).toEqual(
+      published.messages,
+    );
+    expect(suite.providerCalls).toBe(calls + 2);
+    expect(
+      (await data(await api(trainer, `${path}/finish`, "POST", {}))).messages,
+    ).toEqual(published.messages);
+  } finally {
+    suite.providerText = previousText;
+  }
+});
 
 test("server creates an immutable owner-scoped session, and strict input rejects browser authority", async () => {
   const requestId = randomUUID();
@@ -268,6 +383,19 @@ test("agent messages persist immediately and a changed AI context is discarded t
     const completed = await response;
     expect(completed.status).toBe(200);
     const data = (await completed.json()).data;
+    expect(data.pendingResponse).toMatchObject({
+      status: "held",
+      contextAgentVersion: 1,
+    });
+    expect(suite.providerCalls).toBe(callsBefore + 1);
+    const queued = await reveal(session.id, responseRequestId, 2);
+    expect(queued.status).toBe(200);
+    expect((await queued.json()).data.pendingResponse.status).toBe(
+      "retry_ready",
+    );
+    const published = await respondAndReveal(session.id, 2, responseRequestId);
+    expect(published.status).toBe(200);
+    const current = (await published.json()).data;
     expect(suite.providerCalls).toBe(callsBefore + 2);
     const usageAfter = await createAdmin(env)
       .from("ai_usage_logs")
@@ -285,15 +413,15 @@ test("agent messages persist immediately and a changed AI context is discarded t
     expect(suite.providerPayloads[1]).toContain(
       "Pesan kedua harus ikut konteks terbaru.",
     );
-    expect(data.awaitingResponse).toBe(false);
+    expect(current.awaitingResponse).toBe(false);
     expect(
-      data.messages.filter(
+      current.messages.filter(
         (message: { sender: string }) => message.sender === "consumer",
       ),
     ).toHaveLength(2);
 
     const reloaded = await api(trainer, `/sessions/${session.id}`);
-    expect((await reloaded.json()).data.messages).toEqual(data.messages);
+    expect((await reloaded.json()).data.messages).toEqual(current.messages);
     const replay = await api(
       trainer,
       `/sessions/${session.id}/respond`,
@@ -305,88 +433,6 @@ test("agent messages persist immediately and a changed AI context is discarded t
   } finally {
     suite.providerGate = null;
     release?.();
-    await response;
-  }
-});
-
-test("a second context change supersedes the bounded retry and leaves a fresh response pending", async () => {
-  const session = await start();
-  const append = async (expectedAgentVersion: number, text: string) => {
-    const response = await api(
-      trainer,
-      `/sessions/${session.id}/messages`,
-      "POST",
-      { requestId: randomUUID(), expectedAgentVersion, text },
-    );
-    expect(response.status).toBe(200);
-    return (await response.json()).data;
-  };
-  await append(0, "Konteks awal.");
-
-  let firstEntered!: () => void;
-  let secondEntered!: () => void;
-  let releaseFirst!: () => void;
-  let releaseSecond!: () => void;
-  const firstStarted = new Promise<void>((resolve) => {
-    firstEntered = resolve;
-  });
-  const secondStarted = new Promise<void>((resolve) => {
-    secondEntered = resolve;
-  });
-  const firstGate = new Promise<void>((resolve) => {
-    releaseFirst = resolve;
-  });
-  const secondGate = new Promise<void>((resolve) => {
-    releaseSecond = resolve;
-  });
-  let attempt = 0;
-  suite.providerGate = async () => {
-    attempt++;
-    if (attempt === 1) {
-      firstEntered();
-      await firstGate;
-    } else if (attempt === 2) {
-      secondEntered();
-      await secondGate;
-    }
-  };
-  const callsBefore = suite.providerCalls;
-  const response = api(trainer, `/sessions/${session.id}/respond`, "POST", {
-    requestId: randomUUID(),
-  });
-  try {
-    await firstStarted;
-    await append(1, "Konteks yang memicu satu pengulangan.");
-    releaseFirst();
-    await secondStarted;
-    await append(2, "Konteks yang datang saat pengulangan.");
-    releaseSecond();
-
-    const superseded = await response;
-    expect(superseded.status).toBe(200);
-    const pending = (await superseded.json()).data;
-    expect(suite.providerCalls).toBe(callsBefore + 2);
-    expect(pending.awaitingResponse).toBe(true);
-    expect(
-      pending.messages.filter(
-        (message: { sender: string }) => message.sender === "consumer",
-      ),
-    ).toHaveLength(0);
-
-    suite.providerGate = null;
-    const fresh = await api(
-      trainer,
-      `/sessions/${session.id}/respond`,
-      "POST",
-      { requestId: randomUUID() },
-    );
-    expect(fresh.status).toBe(200);
-    expect((await fresh.json()).data.awaitingResponse).toBe(false);
-    expect(suite.providerCalls).toBe(callsBefore + 3);
-  } finally {
-    suite.providerGate = null;
-    releaseFirst?.();
-    releaseSecond?.();
     await response;
   }
 });

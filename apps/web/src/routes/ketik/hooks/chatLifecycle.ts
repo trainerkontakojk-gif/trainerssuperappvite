@@ -6,7 +6,8 @@ export type ResponseStatus =
   | "idle"
   | "recovering"
   | "requesting"
-  | "revealing"
+  | "holding"
+  | "publishing"
   | "blocked"
   | "recovery-failed"
   | "legacy-retrying";
@@ -14,6 +15,7 @@ export interface ChatState {
   append:
     { status: "idle" | "saving" } | { status: "blocked"; message: string };
   response: ResponseStatus;
+  revealAt: number;
   legacy: KetikServerSession["pendingTurn"];
   phase: "active" | "expired" | "closed";
   messages: ChatMessage[];
@@ -30,8 +32,8 @@ export type ChatEvent =
   | { type: "append-failed"; message: string }
   | { type: "append-retry" }
   | { type: "response-start" }
-  | { type: "response-published" }
-  | { type: "response-finish" }
+  | { type: "reveal-start" }
+  | { type: "response-ready"; revealAt: number | null }
   | { type: "recovery-finished"; turn: KetikServerSession["pendingTurn"] }
   | { type: "legacy-finished" }
   | { type: "response-failed" }
@@ -92,19 +94,16 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
             error: state.error?.kind === "response" ? null : state.error,
           }
         : state;
-    case "response-published":
-      return state.response === "requesting"
-        ? { ...state, response: "revealing" }
+    case "reveal-start":
+      return state.response === "idle" || state.response === "holding"
+        ? { ...state, response: "publishing" }
         : state;
-    case "response-finish":
-      return [
-        "requesting",
-        "revealing",
-        "recovering",
-        "legacy-retrying",
-      ].includes(state.response)
-        ? { ...state, response: "idle" }
-        : state;
+    case "response-ready":
+      return {
+        ...state,
+        response: event.revealAt === null ? "idle" : "holding",
+        revealAt: event.revealAt ?? 0,
+      };
     // Ends modern or legacy recovery; turn is the server's legacy pending turn or null.
     case "recovery-finished":
       return state.response === "recovering"

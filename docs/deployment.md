@@ -552,6 +552,16 @@ kedua fungsi baru, tanpa menghapus sesi/history/ledger. Jangan rollback DB saat
 API baru masih melayani traffic. Apply/rollback/reapply pada DB disposable tidak
 mencatat history migrasi CLI dan tidak mengizinkan apply remote.
 
+### KETIK deferred consumer replies — schema-first (`20261118120000`)
+
+`20261118120000_ketik_deferred_consumer_replies.sql` menunggu penerapan di
+production. Setelah mendapat izin eksplisit, hentikan chat writes KETIK selama
+pergantian schema, API, dan web. Terapkan migrasi sebelum deploy API dan web yang
+memakai alur `respond` dan `reveal`. Publikasi ditahan sampai pemanggilan
+`reveal`, sehingga API dan web perlu dirilis bersama. Untuk rollback, hentikan
+chat writes dan pulihkan API serta web versi sebelumnya sebelum menjalankan
+`rollback_20261118120000_ketik_deferred_consumer_replies.sql`.
+
 ### SIDAK business dates — bounded rollout (`20261001120000`)
 
 Perubahan tanggal bisnis SIDAK (heatmap) adalah **schema-first**: migrasi harus

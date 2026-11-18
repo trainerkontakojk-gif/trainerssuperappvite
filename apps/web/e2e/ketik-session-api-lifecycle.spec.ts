@@ -11,6 +11,8 @@ import {
   setupKetikSessionSuite,
   teardownKetikSessionSuite,
   start,
+  reveal,
+  respondAndReveal,
 } from "./helpers/ketikSessionApiHarness";
 
 test.describe.configure({ mode: "serial" });
@@ -64,15 +66,7 @@ test("after expiry the consumer closes once with a reason and the agent can stil
     });
   expect((await append("Ada yang bisa dibantu?", 0)).status).toBe(200);
   suite.providerText = "Tagihan saya ganda.";
-  const replied = await api(
-    trainer,
-    `/sessions/${session.id}/respond`,
-    "POST",
-    {
-      requestId: randomUUID(),
-    },
-  );
-  expect(replied.status).toBe(200);
+  expect((await respondAndReveal(session.id, 1)).status).toBe(200);
   // The consumer spoke last, so a normal claim would be a no-op.
   const expired = await db
     .from("ketik_sessions")
@@ -84,14 +78,7 @@ test("after expiry the consumer closes once with a reason and the agent can stil
   suite.providerText =
     "Ya sudah kak, saya ada urusan dulu. Nanti saya hubungi lagi.";
   const calls = suite.providerCalls;
-  const closing = await api(
-    trainer,
-    `/sessions/${session.id}/respond`,
-    "POST",
-    {
-      requestId: randomUUID(),
-    },
-  );
+  const closing = await respondAndReveal(session.id, 1);
   expect(closing.status).toBe(200);
   const closed = (await closing.json()).data;
   expect(suite.providerCalls).toBe(calls + 1);
@@ -144,13 +131,7 @@ test("expired closing response stays observable while processing and failed, the
     ).status,
   ).toBe(200);
   suite.providerText = "Tagihan saya ganda.";
-  expect(
-    (
-      await api(trainer, `/sessions/${session.id}/respond`, "POST", {
-        requestId: randomUUID(),
-      })
-    ).status,
-  ).toBe(200);
+  expect((await respondAndReveal(session.id, 1)).status).toBe(200);
   const ordinary = (
     await (await api(trainer, `/sessions/${session.id}`)).json()
   ).data;
@@ -224,7 +205,13 @@ test("expired closing response stays observable while processing and failed, the
       { requestId },
     );
     expect(retry.status).toBe(200);
-    const closed = (await retry.json()).data;
+    expect((await retry.json()).data.pendingResponse).toMatchObject({
+      status: "held",
+      closing: true,
+    });
+    const revealed = await reveal(session.id, requestId, 1);
+    expect(revealed.status).toBe(200);
+    const closed = (await revealed.json()).data;
     expect(closed.consumerClosed).toBe(true);
     expect(closed.awaitingResponse).toBe(false);
     expect(closed.pendingResponse).toBeNull();
@@ -308,14 +295,7 @@ test("a closing after the consumer already said goodbye adds no message", async 
     ).error,
   ).toBeNull();
   suite.providerText = "[NO_RESPONSE]";
-  const closing = await api(
-    trainer,
-    `/sessions/${session.id}/respond`,
-    "POST",
-    {
-      requestId: randomUUID(),
-    },
-  );
+  const closing = await respondAndReveal(session.id, 1);
   expect(closing.status).toBe(200);
   const data = (await closing.json()).data;
   expect(data.consumerClosed).toBe(true);

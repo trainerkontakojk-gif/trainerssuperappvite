@@ -182,6 +182,16 @@ test("JWTs only read own operational rows and cannot mutate or execute session R
         },
       ],
       [
+        "reveal_ketik_session_response",
+        {
+          p_user_id: identity.userId,
+          p_session_id: active.id,
+          p_request_id: randomUUID(),
+          p_expected_agent_version: 0,
+          p_expected_retry_count: 0,
+        },
+      ],
+      [
         "fail_ketik_session_response",
         {
           p_user_id: identity.userId,

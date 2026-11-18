@@ -101,6 +101,7 @@ const SERVICE_ROLE_ONLY_BY_DESIGN = [
   "public.refund_practice_quota(uuid,text,text)",
   "public.resolve_practice_limit(uuid,text,date)",
   "public.retire_telefun_openai_scoring(uuid,text,jsonb)",
+  "public.reveal_ketik_session_response(uuid,uuid,uuid,integer,integer)",
   "public.revoke_user_sessions(uuid)",
   "public.scenario_attachment_backfill_apply(text,uuid[],text[],text[])",
   "public.scenario_attachment_backfill_columns(text)",

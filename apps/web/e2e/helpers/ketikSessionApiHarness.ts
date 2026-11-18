@@ -71,6 +71,38 @@ export async function api(
   });
 }
 
+export function reveal(
+  id: string,
+  requestId: string,
+  expectedAgentVersion: number,
+  expectedRetryCount = 0,
+) {
+  return api(trainer, `/sessions/${id}/reveal`, "POST", {
+    requestId,
+    expectedAgentVersion,
+    expectedRetryCount,
+  });
+}
+
+export async function respondAndReveal(
+  id: string,
+  expectedAgentVersion: number,
+  requestId = randomUUID(),
+) {
+  const result = await api(trainer, `/sessions/${id}/respond`, "POST", {
+    requestId,
+  });
+  expect(result.status).toBe(200);
+  const { pendingResponse } = (await result.json()).data;
+  expect(pendingResponse).toMatchObject({ requestId, status: "held" });
+  return reveal(
+    id,
+    requestId,
+    expectedAgentVersion,
+    pendingResponse.retryCount,
+  );
+}
+
 export async function setupKetikSessionSuite() {
   // A failed setup must not make teardown delete the previous file's users.
   trainer = undefined as unknown as Identity;

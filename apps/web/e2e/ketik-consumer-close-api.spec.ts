@@ -12,6 +12,8 @@ import {
   setupKetikSessionSuite,
   teardownKetikSessionSuite,
   start,
+  reveal,
+  respondAndReveal,
 } from "./helpers/ketikSessionApiHarness";
 
 test.describe.configure({ mode: "serial" });
@@ -36,14 +38,7 @@ async function closeWithResponse() {
   await append(session.id);
   suite.providerText = "[NO_RESPONSE]";
   try {
-    const response = await api(
-      trainer,
-      `/sessions/${session.id}/respond`,
-      "POST",
-      {
-        requestId: randomUUID(),
-      },
-    );
+    const response = await respondAndReveal(session.id, 1);
     expect(response.status).toBe(200);
     expect((await response.json()).data.consumerClosed).toBe(true);
   } finally {
@@ -86,7 +81,7 @@ test("closed consumer reply refuses new turn and response claims", async () => {
   }
 });
 
-test("reply published after expiry closes the consumer and preserves its last word", async () => {
+test("expiry retires a normal pending reply and publishes one goodbye", async () => {
   const session = await start();
   await append(session.id);
   let release!: () => void;
@@ -102,8 +97,9 @@ test("reply published after expiry closes the consumer and preserves its last wo
     entered();
     await gate;
   };
+  const requestId = randomUUID();
   const pending = api(trainer, `/sessions/${session.id}/respond`, "POST", {
-    requestId: randomUUID(),
+    requestId,
   });
   try {
     await started;
@@ -116,8 +112,25 @@ test("reply published after expiry closes the consumer and preserves its last wo
     const result = await pending;
     expect(result.status).toBe(200);
     const data = (await result.json()).data;
-    expect(data.consumerClosed).toBe(true);
-    expect(data.messages.at(-1)).toMatchObject({
+    expect(data.pendingResponse).toMatchObject({
+      status: "held",
+      closing: false,
+    });
+    const retired = await reveal(session.id, requestId, 1);
+    expect(retired.status).toBe(200);
+    expect((await retired.json()).data.messages).toEqual(data.messages);
+    suite.providerGate = null;
+    suite.providerText = "Waktunya sudah habis, saya pamit dulu.";
+    const goodbye = await respondAndReveal(session.id, 1);
+    expect(goodbye.status).toBe(200);
+    const closed = (await goodbye.json()).data;
+    expect(closed.consumerClosed).toBe(true);
+    expect(
+      closed.messages.filter(
+        (message: { sender: string }) => message.sender === "consumer",
+      ),
+    ).toHaveLength(1);
+    expect(closed.messages.at(-1)).toMatchObject({
       sender: "consumer",
       text: suite.providerText,
     });
@@ -190,11 +203,10 @@ test("local rollback restores prior functions without data loss and reapply rest
     p_session_id: session.id,
     p_event: "consumer_close",
   };
-  // Reapplying only this migration is HEAD while no later one redefines its RPCs.
   expect(
     laterMigrationsRedefiningRollback("20261116180000"),
     "A later migration redefines a rolled-back RPC; reapply it after this migration",
-  ).toEqual([]);
+  ).toEqual(["20261118120000_ketik_deferred_consumer_replies.sql"]);
   try {
     fixtureSql(
       sql(
@@ -221,6 +233,9 @@ test("local rollback restores prior functions without data loss and reapply rest
   } finally {
     fixtureSql(
       sql("migrations/20261116180000_ketik_consumer_close_transition.sql"),
+    );
+    fixtureSql(
+      sql("migrations/20261118120000_ketik_deferred_consumer_replies.sql"),
     );
   }
   expect(snapshot()).toBe(before);

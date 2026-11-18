@@ -10,7 +10,7 @@ import {
   DRAFT_IDLE_MS,
   isSlowEligible,
   MAX_TYPING_HOLD_MS,
-  QUIET_WINDOW_MS,
+  quietWindowMs,
   readingMs,
   REALISTIC_RANGES,
   TRAINING_FAST_RANGES,
@@ -54,38 +54,27 @@ function isAgentTyping(draft: AgentDraftState, now: number): boolean {
   return draft.active && now - draft.at < DRAFT_IDLE_MS;
 }
 
-function agentTextsSinceConsumer(
-  messages: readonly ChatMessage[],
-  queued: readonly QueuedMessage[],
-): string[] {
+function agentTextsSinceConsumer(messages: readonly ChatMessage[]): string[] {
   const texts: string[] = [];
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index];
     if (message.sender === "consumer") break;
     if (message.sender === "agent") texts.unshift(message.text);
   }
-  return [...texts, ...queued.map((message) => message.text)];
+  return texts;
 }
 
-/**
- * Server messages plus not-yet-acknowledged agent bubbles and delivery ticks.
- *
- * `hidden` holds consumer replies that a response already published but that
- * are still being "typed"; they are dropped from every render until their own
- * reveal moment, so a concurrent append cannot leak them early.
- */
 function presentMessages(
   list: ChatMessage[],
   state: {
     open: boolean;
     queued: QueuedMessage[];
     read: Set<string>;
-    hidden: ReadonlySet<string>;
   },
 ) {
   const known = new Set(list.map((message) => message.id));
   const all: ChatMessage[] = [
-    ...list.filter((message) => !state.hidden.has(message.id)),
+    ...list,
     ...state.queued
       .filter((message) => state.open && !known.has(message.requestId))
       .map((message) => ({
@@ -113,23 +102,72 @@ function presentMessages(
   return all;
 }
 
-/**
- * Persists every agent message immediately, then requests one consumer response
- * after the agent pauses. The response service discards and regenerates once if
- * another durable agent message arrives while AI generation is in flight.
- *
- * The replies that response publishes are still typed out one at a time: the
- * consumer reads everything since its last reply, then types each message for
- * as long as it would take a person, exactly like before replies moved to their
- * own endpoint. Otherwise a fast AI would answer a long reply in one second.
- */
+function lastAgentTimestamp(session: KetikServerSession): number {
+  for (let index = session.messages.length - 1; index >= 0; index--) {
+    const message = session.messages[index];
+    if (message.sender === "agent") return Date.parse(message.timestamp) || 0;
+  }
+  return 0;
+}
+
+function mergeResponseSnapshot(
+  current: KetikServerSession,
+  received: KetikServerSession,
+) {
+  return received.state === "active" && received.version < current.version
+    ? { ...current, pendingResponse: received.pendingResponse }
+    : received;
+}
+
+function heldReplyDeadline(
+  session: KetikServerSession,
+  slow: { total: number; consecutive: number },
+): number | null {
+  const held = session.pendingResponse;
+  if (held?.status !== "held") return null;
+  const now = Date.now();
+  const mode = session.config.responsePacingMode;
+  const factor = consumerSpeedFactor(session.config.consumerType.id);
+  const turns = session.messages.filter(
+    (message) => message.sender === "consumer",
+  ).length;
+  const remaining = (Date.parse(session.expiresAt) - now) / 1000;
+  let band =
+    turns === 0 ? "greeting_reply" : classifyTextBand(held.typingChars);
+  if (
+    mode === "realistic" &&
+    isSlowEligible({
+      consumerTurnIndex: turns,
+      consecutiveSlowCount: slow.consecutive,
+      totalSlowCount: slow.total,
+      sessionDurationMinutes: session.config.simulationDuration,
+      remainingSeconds: remaining,
+      elapsedSeconds: (now - Date.parse(session.startedAt)) / 1000,
+      totalDurationSeconds: session.config.simulationDuration * 60,
+    })
+  ) {
+    band = "slow";
+    slow.total++;
+    slow.consecutive++;
+  } else {
+    slow.consecutive = 0;
+  }
+  const ranges =
+    mode === "training_fast" ? TRAINING_FAST_RANGES : REALISTIC_RANGES;
+  const range = ranges[band]!;
+  return (
+    now +
+    (remaining < 20
+      ? boundedRandom(1000, 3000)
+      : boundedRandom(range.minMs, range.maxMs) * factor)
+  );
+}
+
 export function useServerKetikChat(initial: KetikServerSession) {
   const current = useRef(initial);
   const mounted = useRef(true);
   const queued = useRef<QueuedMessage[]>([]);
   const read = useRef(new Set<string>());
-  /** Published consumer replies that are still waiting for their reveal. */
-  const hidden = useRef(new Set<string>());
   /** Slow-reply bookkeeping: a rarer, longer think per session. */
   const slow = useRef({ total: 0, consecutive: 0 });
   const [state, dispatch] = useReducer(
@@ -137,15 +175,19 @@ export function useServerKetikChat(initial: KetikServerSession) {
     initial,
     (session): ChatState => {
       const pending = session.pendingResponse ?? session.pendingTurn;
+      const revealAt = heldReplyDeadline(session, { total: 0, consecutive: 0 });
       return {
+        revealAt: revealAt ?? 0,
         append: { status: "idle" },
         legacy: session.pendingTurn,
         response:
-          pending?.status === "processing"
-            ? "recovering"
-            : pending?.status === "failed"
-              ? "blocked"
-              : "idle",
+          revealAt !== null
+            ? "holding"
+            : pending?.status === "processing"
+              ? "recovering"
+              : pending?.status === "failed"
+                ? "blocked"
+                : "idle",
         phase:
           session.consumerClosed || session.state !== "active"
             ? "closed"
@@ -156,7 +198,6 @@ export function useServerKetikChat(initial: KetikServerSession) {
           open: session.state === "active",
           queued: [],
           read: new Set(),
-          hidden: new Set(),
         }),
         queuedCount: 0,
         error:
@@ -180,22 +221,12 @@ export function useServerKetikChat(initial: KetikServerSession) {
     initial.pendingResponse?.requestId ?? null,
   );
   const responseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pause = useRef<{
-    timer: ReturnType<typeof setTimeout>;
-    resolve: () => void;
-    draftHold: boolean;
-  } | null>(null);
   const agentDraft = useRef<AgentDraftState>({ active: false, at: 0 });
   /** Closing requests the server did not answer with a goodbye yet. */
   const closingAttempts = useRef(0);
   const requestResponseRef = useRef<() => void>(() => {});
   const scheduleResponseRef = useRef<() => void>(() => {});
-  const latestAgent = [...initial.messages]
-    .reverse()
-    .find((message) => message.sender === "agent");
-  const lastSendAt = useRef(
-    latestAgent ? Date.parse(latestAgent.timestamp) || 0 : 0,
-  );
+  const lastSendAt = useRef(lastAgentTimestamp(initial));
 
   const refreshMessages = useCallback(
     () =>
@@ -205,7 +236,6 @@ export function useServerKetikChat(initial: KetikServerSession) {
           open: current.current.state === "active",
           queued: queued.current,
           read: read.current,
-          hidden: hidden.current,
         }),
         queuedCount: queued.current.length,
       }),
@@ -218,15 +248,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
     const wasActive = agentDraft.current.active;
     const active = text.trim().length > 0;
     agentDraft.current = { active, at: Date.now() };
-    if (wasActive && !active) {
-      scheduleResponseRef.current();
-      if (pause.current?.draftHold) {
-        const pending = pause.current;
-        clearTimeout(pending.timer);
-        pause.current = null;
-        pending.resolve();
-      }
-    }
+    if (wasActive && !active) scheduleResponseRef.current();
   }, []);
 
   useEffect(() => {
@@ -234,11 +256,6 @@ export function useServerKetikChat(initial: KetikServerSession) {
     return () => {
       mounted.current = false;
       if (responseTimer.current) clearTimeout(responseTimer.current);
-      if (pause.current) {
-        clearTimeout(pause.current.timer);
-        pause.current.resolve();
-        pause.current = null;
-      }
     };
   }, []);
 
@@ -258,58 +275,64 @@ export function useServerKetikChat(initial: KetikServerSession) {
     if (responseTimer.current) clearTimeout(responseTimer.current);
     responseTimer.current = null;
     const session = current.current;
+    const chat = lifecycle.current;
     if (
-      lifecycle.current.response !== "idle" ||
-      lifecycle.current.append.status === "blocked" ||
+      (chat.response !== "idle" && chat.response !== "holding") ||
+      chat.append.status !== "idle" ||
       queued.current.length > 0 ||
       session.state !== "active" ||
       session.consumerClosed
     )
       return;
-    if (owesClosing(session)) {
-      // A browser clock ahead of the server gets a no-op until the server
-      // agrees the time is up; retry slowly instead of in a tight loop.
-      responseTimer.current = setTimeout(
-        () => requestResponseRef.current(),
-        closingAttempts.current ? 2000 : 0,
-      );
-      return;
-    }
-    if (!needsResponse(session)) return;
+
+    const closing = owesClosing(session);
+    const pending = session.pendingResponse;
+    const held = pending?.status === "held" ? pending : null;
+    if (!held && !closing && !needsResponse(session)) return;
+
     const mode = session.config.responsePacingMode;
     const factor = consumerSpeedFactor(session.config.consumerType.id);
-    const texts = agentTextsSinceConsumer(session.messages, []);
-    const dueAt =
-      lastSendAt.current +
-      Math.max(QUIET_WINDOW_MS[mode] * factor, readingMs(texts, mode) * factor);
-    const holdUntil = Math.min(
-      dueAt + MAX_TYPING_HOLD_MS[mode],
-      Date.parse(session.expiresAt),
-    );
+    const lastSent = Math.max(lastSendAt.current, lastAgentTimestamp(session));
+    const quietUntil =
+      lastSent +
+      Math.max(
+        quietWindowMs(mode),
+        readingMs(agentTextsSinceConsumer(session.messages), mode) * factor,
+      );
+    const changed = held && held.contextAgentVersion !== session.agentVersion;
+    const needsRetry = changed && held?.retryCount === 0;
+    let dueAt = Math.max(quietUntil, held && !needsRetry ? chat.revealAt : 0);
+    if (closing) {
+      if (held?.closing) {
+        dueAt = Math.max(
+          changed ? quietUntil : 0,
+          needsRetry ? 0 : chat.revealAt,
+        );
+      } else if (pending?.status !== "retry_ready") {
+        // A browser clock ahead of the server may receive a no-op.
+        dueAt = Date.now() + (closingAttempts.current ? 2000 : 0);
+      }
+    }
+    const expires = Date.parse(session.expiresAt);
+    const holdUntil = Math.min(dueAt + MAX_TYPING_HOLD_MS[mode], expires);
     const requestWhenReady = () => {
       responseTimer.current = null;
       const now = Date.now();
-      const latest = current.current;
-      const remainingMs = Date.parse(latest.expiresAt) - now;
       const draft = agentDraft.current;
       if (
-        !owesClosing(latest) &&
-        remainingMs >= TYPING_HOLD_EXPIRY_THRESHOLD_MS &&
+        expires - now >= TYPING_HOLD_EXPIRY_THRESHOLD_MS &&
         now < holdUntil &&
         isAgentTyping(draft, now)
       ) {
         const nextAt = Math.min(draft.at + DRAFT_IDLE_MS, holdUntil);
-        responseTimer.current = setTimeout(
-          requestWhenReady,
-          Math.max(0, nextAt - now),
-        );
+        responseTimer.current = setTimeout(requestWhenReady, nextAt - now);
         return;
       }
       requestResponseRef.current();
     };
     responseTimer.current = setTimeout(
       requestWhenReady,
-      Math.max(0, dueAt - Date.now()),
+      Math.max(0, (closing ? dueAt : Math.min(dueAt, expires)) - Date.now()),
     );
   }, []);
   useEffect(() => {
@@ -345,7 +368,12 @@ export function useServerKetikChat(initial: KetikServerSession) {
             text: next.text,
           });
           if (!mounted.current) return;
-          current.current = result;
+          if (result.version >= current.current.version) {
+            current.current = {
+              ...result,
+              pendingResponse: current.current.pendingResponse,
+            };
+          }
           queued.current.shift();
           refreshMessages();
           transition({
@@ -370,158 +398,82 @@ export function useServerKetikChat(initial: KetikServerSession) {
     }
   }, [initial.id, refreshMessages, transition]);
 
+  const syncResponse = useCallback(
+    (loaded: KetikServerSession, prior: KetikServerSession) => {
+      const next = loaded.pendingResponse;
+      const previous = prior.pendingResponse;
+      responseRequestId.current = next?.requestId ?? null;
+      if (next?.status === "failed") {
+        transition({ type: "response-failed" });
+      } else if (next?.status === "held") {
+        const sameHold =
+          previous?.status === "held" &&
+          next.requestId === previous.requestId &&
+          next.retryCount === previous.retryCount;
+        transition({
+          type: "response-ready",
+          revealAt:
+            sameHold && lifecycle.current.revealAt
+              ? lifecycle.current.revealAt
+              : heldReplyDeadline(loaded, slow.current),
+        });
+      } else {
+        transition({ type: "response-ready", revealAt: null });
+      }
+    },
+    [transition],
+  );
+
   const requestResponse = useCallback(async () => {
+    const chat = lifecycle.current;
     if (
-      lifecycle.current.response !== "idle" ||
-      lifecycle.current.append.status !== "idle" ||
+      (chat.response !== "idle" && chat.response !== "holding") ||
+      chat.append.status !== "idle" ||
       queued.current.length > 0 ||
       !mounted.current
-    ) {
-      scheduleResponseRef.current();
+    )
       return;
-    }
+
     const session = current.current;
     if (session.state !== "active" || session.consumerClosed) return;
     if (!needsResponse(session) && !owesClosing(session)) return;
-    if (owesClosing(session)) closingAttempts.current++;
-    transition({ type: "response-start" });
+    const pending = session.pendingResponse;
+    const held = pending?.status === "held" ? pending : null;
+    if (!held && owesClosing(session)) closingAttempts.current++;
+    transition({ type: held ? "reveal-start" : "response-start" });
     for (const message of session.messages)
       if (message.sender === "agent") read.current.add(message.id);
     refreshMessages();
-    // The consumer reads everything since its last reply before typing, so the
-    // pacing clock starts there — not when the AI happens to finish.
-    const mode = session.config.responsePacingMode;
-    const factor = consumerSpeedFactor(session.config.consumerType.id);
-    const readEnd =
-      lastSendAt.current +
-      readingMs(agentTextsSinceConsumer(session.messages, []), mode) * factor;
-    const knownIds = new Set(session.messages.map((message) => message.id));
-    const previousConsumerCount = session.messages.filter(
-      (message) => message.sender === "consumer",
-    ).length;
-    /** Resolves early on unmount, so a pending reveal never leaks a timer. */
-    const wait = (ms: number, draftHold = false) =>
-      new Promise<void>((resolve) => {
-        const timer = setTimeout(
-          () => {
-            if (pause.current?.timer === timer) {
-              pause.current = null;
-            }
-            resolve();
-          },
-          Math.max(0, ms),
-        );
-        pause.current = {
-          timer,
-          resolve,
-          draftHold,
-        };
-      });
-    const waitForAgentIdle = async (holdUntil: number) => {
-      while (mounted.current) {
-        const now = Date.now();
-        const latest = current.current;
-        const remainingMs = Date.parse(latest.expiresAt) - now;
-        const draft = agentDraft.current;
-        if (
-          owesClosing(latest) ||
-          remainingMs < TYPING_HOLD_EXPIRY_THRESHOLD_MS ||
-          now >= holdUntil ||
-          !isAgentTyping(draft, now)
-        )
-          return;
-        const nextAt = Math.min(draft.at + DRAFT_IDLE_MS, holdUntil);
-        await wait(Math.max(0, nextAt - now), true);
-      }
-    };
-    const requestId = responseRequestId.current ?? crypto.randomUUID();
+    const requestId =
+      session.pendingResponse?.requestId ??
+      responseRequestId.current ??
+      crypto.randomUUID();
     responseRequestId.current = requestId;
     try {
-      const result = await ketikApi.requestResponse(initial.id, { requestId });
-      if (!mounted.current) return;
-      current.current = result;
-      responseRequestId.current = null;
-      // Replies published by this response, held back until their reveal.
-      const replies = result.messages.filter(
-        (message) => message.sender === "consumer" && !knownIds.has(message.id),
-      );
-      for (const reply of replies) hidden.current.add(reply.id);
-      transition({ type: "response-published" });
-      refreshMessages();
-      if (replies.length > 0) {
-        const ranges =
-          mode === "training_fast" ? TRAINING_FAST_RANGES : REALISTIC_RANGES;
-        const remaining = Math.max(
-          0,
-          (Date.parse(result.expiresAt) - Date.now()) / 1000,
-        );
-        let firstBand: string =
-          previousConsumerCount === 0
-            ? "greeting_reply"
-            : classifyTextBand(replies[0]!.text.length);
-        if (
-          mode !== "training_fast" &&
-          isSlowEligible({
-            consumerTurnIndex: previousConsumerCount,
-            consecutiveSlowCount: slow.current.consecutive,
-            totalSlowCount: slow.current.total,
-            sessionDurationMinutes: result.config.simulationDuration,
-            remainingSeconds: remaining,
-            elapsedSeconds: (Date.now() - Date.parse(result.startedAt)) / 1000,
-            totalDurationSeconds: result.config.simulationDuration * 60,
+      const result = held
+        ? await ketikApi.revealResponse(initial.id, {
+            requestId,
+            expectedAgentVersion: session.agentVersion,
+            expectedRetryCount: held.retryCount,
           })
-        ) {
-          firstBand = "slow";
-          slow.current.total++;
-          slow.current.consecutive++;
-        } else {
-          slow.current.consecutive = 0;
-        }
-        let showAt = readEnd;
-        for (const [index, reply] of replies.entries()) {
-          const range = ranges[index === 0 ? firstBand : "follow_up"]!;
-          showAt += boundedRandom(range.minMs, range.maxMs) * factor;
-          let planned = Math.max(0, showAt - Date.now());
-          if (remaining < 20) planned = boundedRandom(1000, 3000);
-          else if (planned > remaining * 1000 - 5000)
-            planned = boundedRandom(
-              1000,
-              Math.max(1000, remaining * 1000 - 5000),
-            );
-          await wait(
-            Math.min(planned, Date.parse(result.expiresAt) - Date.now()),
-          );
-          if (!mounted.current) return;
-          const revealHoldUntil = Math.min(
-            showAt + MAX_TYPING_HOLD_MS[mode],
-            Date.parse(result.expiresAt) - 5000,
-          );
-          await waitForAgentIdle(revealHoldUntil);
-          if (!mounted.current) return;
-          hidden.current.delete(reply.id);
-          refreshMessages();
-          showAt = Math.max(showAt, Date.now());
-        }
-      }
+        : await ketikApi.requestResponse(initial.id, { requestId });
+      if (!mounted.current) return;
+      const loaded = mergeResponseSnapshot(current.current, result);
+      current.current = loaded;
       transition({
         type: "session",
-        closed: result.consumerClosed || result.state !== "active",
+        closed: loaded.consumerClosed || loaded.state !== "active",
       });
+      syncResponse(loaded, session);
     } catch {
-      if (!mounted.current) return;
-      transition({ type: "response-failed" });
+      if (mounted.current) transition({ type: "response-failed" });
     } finally {
-      hidden.current.clear();
       if (mounted.current) {
-        transition({ type: "response-finish" });
-        // Re-render from the authoritative session so an interrupted reveal
-        // never leaves a published reply invisible.
         refreshMessages();
-        // A message appended during the request/reveal still needs its reply.
         scheduleResponseRef.current();
       }
     }
-  }, [initial.id, refreshMessages, transition]);
+  }, [initial.id, refreshMessages, syncResponse, transition]);
   useEffect(() => {
     requestResponseRef.current = () => void requestResponse();
   }, [requestResponse]);
@@ -538,7 +490,8 @@ export function useServerKetikChat(initial: KetikServerSession) {
       try {
         const loaded = await ketikApi.getSession(initial.id);
         if (cancelled) return;
-        current.current = loaded;
+        const previous = current.current;
+        current.current = mergeResponseSnapshot(previous, loaded);
         refreshMessages();
         transition({
           type: "session",
@@ -549,14 +502,8 @@ export function useServerKetikChat(initial: KetikServerSession) {
           loaded.pendingTurn?.status === "processing";
         if (!stillProcessing) {
           transition({ type: "recovery-finished", turn: loaded.pendingTurn });
-          responseRequestId.current =
-            loaded.pendingResponse?.status === "failed"
-              ? loaded.pendingResponse.requestId
-              : null;
-          if (
-            loaded.pendingResponse?.status === "failed" ||
-            loaded.pendingTurn?.status === "failed"
-          ) {
+          syncResponse(current.current, previous);
+          if (loaded.pendingTurn?.status === "failed") {
             transition({ type: "response-failed" });
           } else if (queued.current.length) {
             void processAppends();
@@ -577,7 +524,14 @@ export function useServerKetikChat(initial: KetikServerSession) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [initial.id, state.response, processAppends, refreshMessages, transition]);
+  }, [
+    initial.id,
+    state.response,
+    processAppends,
+    refreshMessages,
+    syncResponse,
+    transition,
+  ]);
 
   const send = (text: string) => {
     if (current.current.state !== "active" || queued.current.length >= 20) {
@@ -606,7 +560,7 @@ export function useServerKetikChat(initial: KetikServerSession) {
       return;
     }
     if (
-      ["recovering", "requesting", "revealing", "legacy-retrying"].includes(
+      ["recovering", "requesting", "publishing", "legacy-retrying"].includes(
         lifecycle.current.response,
       )
     )
@@ -643,7 +597,11 @@ export function useServerKetikChat(initial: KetikServerSession) {
       void processAppends();
     } else {
       transition({ type: "response-retry" });
-      void requestResponse();
+      if (current.current.pendingResponse?.status === "held") {
+        scheduleResponseRef.current();
+      } else {
+        void requestResponse();
+      }
     }
   };
 
@@ -651,12 +609,15 @@ export function useServerKetikChat(initial: KetikServerSession) {
     messages: state.messages,
     isLoading:
       state.append.status === "saving" ||
-      ["recovering", "requesting", "revealing", "legacy-retrying"].includes(
+      ["recovering", "requesting", "publishing", "legacy-retrying"].includes(
         state.response,
       ),
-    isConsumerTyping: ["recovering", "requesting", "revealing"].includes(
-      state.response,
-    ),
+    isConsumerTyping: [
+      "recovering",
+      "requesting",
+      "holding",
+      "publishing",
+    ].includes(state.response),
     queuedCount: state.queuedCount,
     error:
       state.append.status === "blocked"

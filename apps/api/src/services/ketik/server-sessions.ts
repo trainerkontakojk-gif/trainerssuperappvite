@@ -12,6 +12,7 @@ import {
   type KetikSessionTurnRequest,
   type KetikSessionHistoryItem,
   type RequestKetikSessionResponse,
+  type RevealKetikSessionResponse,
   type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import type { Actor } from "../../middleware/role";
@@ -63,8 +64,17 @@ type TurnRow = {
 };
 type ResponseRow = {
   request_id: string;
-  status: "processing" | "failed" | "completed" | "superseded";
-  retry_count: number;
+  status:
+    | "processing"
+    | "failed"
+    | "held"
+    | "retry_ready"
+    | "completed"
+    | "superseded";
+  context_agent_version: number;
+  typing_chars: number | null;
+  closing: boolean | null;
+  retry_count: 0 | 1;
   lease_expires_at: string | null;
 };
 type RpcName =
@@ -75,6 +85,7 @@ type RpcName =
   | "append_ketik_session_message"
   | "claim_ketik_session_response"
   | "settle_ketik_session_response"
+  | "reveal_ketik_session_response"
   | "fail_ketik_session_response"
   | "finish_ketik_session";
 async function rpc<T>(
@@ -123,7 +134,9 @@ async function rowToSession(
       .maybeSingle(),
     client
       .from("ketik_session_responses")
-      .select("request_id,status,retry_count,lease_expires_at")
+      .select(
+        "request_id,status,retry_count,lease_expires_at,context_agent_version,typing_chars,closing",
+      )
       .eq("session_id", row.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -155,18 +168,7 @@ async function rowToSession(
     consumerClosed: row.consumer_closed,
     provenance: "server_v1",
     awaitingResponse,
-    pendingResponse:
-      row.state === "active" &&
-      awaitingResponse &&
-      response &&
-      (response.status === "processing" || response.status === "failed")
-        ? {
-            requestId: response.request_id,
-            status: response.status,
-            retryCount: response.retry_count,
-            leaseExpiresAt: response.lease_expires_at,
-          }
-        : null,
+    pendingResponse: awaitingResponse ? pendingResponse(response) : null,
     pendingTurn:
       row.state === "active" && turn
         ? {
@@ -178,6 +180,40 @@ async function rowToSession(
           }
         : null,
   };
+}
+function pendingResponse(
+  row: ResponseRow | null,
+): KetikServerSession["pendingResponse"] {
+  if (!row) return null;
+  const base = { requestId: row.request_id, retryCount: row.retry_count };
+  switch (row.status) {
+    case "held":
+      if (row.typing_chars === null || row.closing === null)
+        throw new KetikSessionError("SESSION_FAILED");
+      return {
+        ...base,
+        status: "held",
+        leaseExpiresAt: null,
+        contextAgentVersion: row.context_agent_version,
+        typingChars: row.typing_chars,
+        closing: row.closing,
+      };
+    case "retry_ready":
+      return { ...base, status: "retry_ready", leaseExpiresAt: null };
+    case "processing":
+    case "failed":
+      return {
+        ...base,
+        status:
+          row.status === "processing" &&
+          Date.parse(row.lease_expires_at ?? "") <= Date.now()
+            ? "failed"
+            : row.status,
+        leaseExpiresAt: row.lease_expires_at,
+      };
+    default:
+      return null;
+  }
 }
 export async function getServerKetikSession(
   userId: string,
@@ -366,30 +402,23 @@ export async function requestServerKetikResponse(
   if (claimed.replay || claimed.noop || !claimed.lease)
     return rowToSession(claimed.session);
 
-  let snapshot = claimed.session;
   try {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const generated = await generateServerConsumerMessages(
-        snapshot,
-        userId,
-        claimed.closing === true,
-      );
-      const settled = await rpc<{
-        action: "retry" | "published" | "superseded";
-        session: SessionRow;
-      }>("settle_ketik_session_response", {
-        p_user_id: userId,
-        p_session_id: id,
-        p_request_id: request.requestId,
-        p_lease: claimed.lease,
-        p_messages: generated.messages,
-        p_closed: generated.closed,
-        p_lease_seconds: leaseSeconds,
-      });
-      snapshot = settled.session;
-      if (settled.action !== "retry") return rowToSession(snapshot);
-    }
-    return rowToSession(snapshot);
+    const closing = claimed.closing === true;
+    const generated = await generateServerConsumerMessages(
+      claimed.session,
+      userId,
+      closing,
+    );
+    const held = await rpc<SessionRow>("settle_ketik_session_response", {
+      p_user_id: userId,
+      p_session_id: id,
+      p_request_id: request.requestId,
+      p_lease: claimed.lease,
+      p_messages: generated.messages,
+      p_closed: generated.closed,
+      p_lease_seconds: leaseSeconds,
+    });
+    return rowToSession(held);
   } catch (error) {
     // Best effort: a lost lease must not mask the provider/DB error the caller sees.
     await rpc<boolean>("fail_ketik_session_response", {
@@ -400,6 +429,21 @@ export async function requestServerKetikResponse(
     }).catch(() => false);
     throw error;
   }
+}
+
+export async function revealServerKetikResponse(
+  userId: string,
+  id: string,
+  request: RevealKetikSessionResponse,
+) {
+  const row = await rpc<SessionRow>("reveal_ketik_session_response", {
+    p_user_id: userId,
+    p_session_id: id,
+    p_request_id: request.requestId,
+    p_expected_agent_version: request.expectedAgentVersion,
+    p_expected_retry_count: request.expectedRetryCount,
+  });
+  return rowToSession(row);
 }
 
 export async function sendServerKetikTurn(

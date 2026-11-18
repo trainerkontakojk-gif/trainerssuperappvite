@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-18
 
+- fix(ketik): defer consumer replies and preserve the quiet window
+
 - fix(ketik): allow longer scenario image descriptions
 
 ## 2026-11-17

@@ -15,6 +15,7 @@ import type {
   KetikServerSession,
   KetikSessionTurnRequest,
   RequestKetikSessionResponse,
+  RevealKetikSessionResponse,
   KetikAssignmentSnapshot,
   AssignKetikConfiguration,
   ManagedUser,
@@ -70,6 +71,13 @@ export const ketikApi = {
   requestResponse: async (id: string, body: RequestKetikSessionResponse) =>
     unwrapResponse(
       await serverClient.sessions[":id"].respond.$post({
+        param: { id },
+        json: body,
+      }),
+    ) as Promise<KetikServerSession>,
+  revealResponse: async (id: string, body: RevealKetikSessionResponse) =>
+    unwrapResponse(
+      await serverClient.sessions[":id"].reveal.$post({
         param: { id },
         json: body,
       }),

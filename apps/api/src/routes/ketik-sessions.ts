@@ -7,6 +7,7 @@ import {
   startKetikSessionSchema,
   ketikSessionTurnSchema,
   requestKetikSessionResponseSchema,
+  revealKetikSessionResponseSchema,
   finishKetikSessionSchema,
 } from "@trainers/types";
 import { getActor, requireCapability } from "../middleware/role";
@@ -23,6 +24,7 @@ import {
   startServerKetikSession,
   getServerKetikSession,
   requestServerKetikResponse,
+  revealServerKetikResponse,
   sendServerKetikTurn,
   finishServerKetikSession,
   KetikSessionError,
@@ -138,6 +140,26 @@ export const ketikSessions = new Hono<{ Variables: Variables }>()
         return c.json({
           success: true,
           data: await requestServerKetikResponse(
+            getActor(c).id,
+            c.req.valid("param").id,
+            c.req.valid("json"),
+          ),
+        });
+      } catch (error) {
+        return failure(c, error);
+      }
+    },
+  )
+  .post(
+    "/:id/reveal",
+    requireCapability("ketik.use"),
+    zValidator("param", idSchema),
+    zValidator("json", revealKetikSessionResponseSchema),
+    async (c) => {
+      try {
+        return c.json({
+          success: true,
+          data: await revealServerKetikResponse(
             getActor(c).id,
             c.req.valid("param").id,
             c.req.valid("json"),

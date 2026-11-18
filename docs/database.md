@@ -160,6 +160,23 @@ erDiagram
 
 ## Tabel Utama
 
+### KETIK — publikasi balasan pada reveal
+
+Migration `20261118120000_ketik_deferred_consumer_replies.sql` menambahkan
+status `held` dan `retry_ready`. Klaim provider memakai lease pada status
+`processing`. Hasil valid mengisi `held`, lalu lease dilepas. Reveal pertama
+dengan konteks usang mengosongkan payload dan menandai `retry_ready` dengan
+retry count 1. Klaim berikutnya mengambil konteks terbaru. Setelah regenerasi,
+reveal menerima versi durable terbaru yang sudah ditunggu browser. Versi asli
+yang dipakai provider tetap tercatat di `context_agent_version`. Publikasi
+mengubah status menjadi `completed` dan memasukkan seluruh batch ke transkrip
+di bawah lock sesi yang sama. Finalisasi dan expiry menandai hold yang tidak
+terpakai sebagai `superseded`. Expiry meninggalkan satu permintaan pamitan.
+
+Payload hold hanya tersedia bagi service role. Owner JWT dapat membaca metadata
+status dan pacing melalui RLS. Rollback mengosongkan payload hold dan
+mempertahankan pesan yang sudah dipublikasikan, history, dan catatan usage.
+
 ### `qa_temuan` — tanggal bisnis (opsional)
 
 | Kolom             | Tipe        | Arti                                                                                          |

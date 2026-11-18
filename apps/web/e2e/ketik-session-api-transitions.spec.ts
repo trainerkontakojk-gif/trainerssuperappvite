@@ -14,6 +14,8 @@ import {
   setupKetikSessionSuite,
   teardownKetikSessionSuite,
   start,
+  reveal,
+  respondAndReveal,
 } from "./helpers/ketikSessionApiHarness";
 
 test.describe.configure({ mode: "serial" });
@@ -51,6 +53,11 @@ test("HTTP chat status transitions all pass through the central SQL transition f
       api(trainer, `/sessions/${active.id}/respond`, "POST", { requestId });
     expect((await respond()).status).toBe(200);
     expect(await responseStatus(active.id, requestId)).toEqual({
+      status: "held",
+      lease: null,
+    });
+    expect((await reveal(active.id, requestId, 1)).status).toBe(200);
+    expect(await responseStatus(active.id, requestId)).toEqual({
       status: "completed",
       lease: null,
     });
@@ -73,15 +80,8 @@ test("HTTP chat status transitions all pass through the central SQL transition f
       lease: null,
     });
     suite.failProvider = false;
-    // Another client may have recovered with a new request ID. Retrying the
-    // older failed ID after that reply becomes terminal without another AI call.
-    expect(
-      (
-        await api(trainer, `/sessions/${active.id}/respond`, "POST", {
-          requestId: randomUUID(),
-        })
-      ).status,
-    ).toBe(200);
+    // Recovery with a new request still needs an explicit reveal.
+    expect((await respondAndReveal(active.id, 2)).status).toBe(200);
     const recoveredCalls = suite.providerCalls;
     expect(
       (
@@ -362,7 +362,11 @@ test("response reclaim expires the old lease and late provider output cannot rep
       { requestId },
     );
     expect(reclaimed.status).toBe(200);
-    const published = (await reclaimed.json()).data;
+    const held = (await reclaimed.json()).data;
+    expect(held.pendingResponse).toMatchObject({ requestId, status: "held" });
+    const revealed = await reveal(active.id, requestId, 1);
+    expect(revealed.status).toBe(200);
+    const published = (await revealed.json()).data;
     expect(
       published.messages.filter(
         (m: { sender: string }) => m.sender === "consumer",
@@ -550,6 +554,7 @@ test("local rollback restores previous RPCs without data loss and reapply resume
   const reapply = [
     "20261116160000_ketik_session_status_transitions.sql",
     "20261116180000_ketik_consumer_close_transition.sql",
+    "20261118120000_ketik_deferred_consumer_replies.sql",
   ];
   expect(
     laterMigrationsRedefiningRollback("20261116160000"),
@@ -606,4 +611,45 @@ test("local rollback restores previous RPCs without data loss and reapply resume
   expect(
     (await api(trainer, `/sessions/${active.id}/finish`, "POST", {})).status,
   ).toBe(200);
+});
+
+test("rollback discards held payloads and preserves durable messages and history", async () => {
+  const id = (await start()).id;
+  await append(id);
+  const requestId = randomUUID();
+  const generated = await api(trainer, `/sessions/${id}/respond`, "POST", {
+    requestId,
+  });
+  expect(generated.status).toBe(200);
+  const held = (await generated.json()).data;
+  expect(held.pendingResponse).toMatchObject({ requestId, status: "held" });
+
+  const version = "20261118120000";
+  const file = `${version}_ketik_deferred_consumer_replies.sql`;
+  const sql = (path: string) =>
+    readFileSync(new URL(`../../../supabase/${path}`, import.meta.url), "utf8");
+  expect(laterMigrationsRedefiningRollback(version)).toEqual([]);
+  try {
+    fixtureSql(sql(`rollbacks/rollback_${file}`));
+    expect(
+      fixtureSql(
+        `SELECT status FROM public.ketik_session_responses WHERE session_id = '${id}' AND request_id = '${requestId}'`,
+      ),
+    ).toBe("superseded");
+    expect(
+      fixtureSql(`SELECT count(*) FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'ketik_session_responses' AND column_name = 'held_messages'`),
+    ).toBe("0");
+  } finally {
+    fixtureSql(sql(`migrations/${file}`));
+  }
+  const restored = await api(trainer, `/sessions/${id}`);
+  expect(restored.status).toBe(200);
+  expect((await restored.json()).data).toMatchObject({
+    messages: held.messages,
+    pendingResponse: null,
+  });
+  const finished = await api(trainer, `/sessions/${id}/finish`, "POST", {});
+  expect(finished.status).toBe(200);
+  expect((await finished.json()).data.messages).toEqual(held.messages);
 });

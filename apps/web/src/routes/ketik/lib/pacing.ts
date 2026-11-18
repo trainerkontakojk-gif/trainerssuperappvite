@@ -1,6 +1,8 @@
 export type SessionPhase = "active" | "expired" | "closed";
 
-export function classifyTextBand(textLength: number): "short" | "normal" | "long" {
+export function classifyTextBand(
+  textLength: number,
+): "short" | "normal" | "long" {
   if (textLength <= 25) return "short";
   if (textLength <= 90) return "normal";
   return "long";
@@ -21,10 +23,18 @@ export function readingMs(
 }
 
 /** Pause after the agent's last send before the turn goes out. */
-export const QUIET_WINDOW_MS = { realistic: 8000, training_fast: 3000 } as const;
+export const QUIET_WINDOW_MS = {
+  realistic: 8000,
+  training_fast: 3000,
+} as const;
+const QUIET_WINDOW_FLOOR_MS = { realistic: 6000, training_fast: 3000 } as const;
+
+export function quietWindowMs(mode: keyof typeof QUIET_WINDOW_MS): number {
+  return Math.max(QUIET_WINDOW_MS[mode], QUIET_WINDOW_FLOOR_MS[mode]);
+}
 
 /** A non-empty agent draft is idle after this much time without edits. */
-export const DRAFT_IDLE_MS = 5000;
+export const DRAFT_IDLE_MS = 12000;
 
 /** Maximum extra time a draft may hold a consumer response. */
 export const MAX_TYPING_HOLD_MS = {
@@ -82,7 +92,10 @@ export function isSlowEligible(params: {
   return Math.random() < 0.15;
 }
 
-export const REALISTIC_RANGES: Record<string, { minMs: number; maxMs: number }> = {
+export const REALISTIC_RANGES: Record<
+  string,
+  { minMs: number; maxMs: number }
+> = {
   short: { minMs: 1000, maxMs: 3000 },
   normal: { minMs: 5000, maxMs: 10000 },
   long: { minMs: 10000, maxMs: 20000 },
@@ -91,7 +104,10 @@ export const REALISTIC_RANGES: Record<string, { minMs: number; maxMs: number }> 
   greeting_reply: { minMs: 2000, maxMs: 6000 },
 };
 
-export const TRAINING_FAST_RANGES: Record<string, { minMs: number; maxMs: number }> = {
+export const TRAINING_FAST_RANGES: Record<
+  string,
+  { minMs: number; maxMs: number }
+> = {
   short: { minMs: 800, maxMs: 1500 },
   normal: { minMs: 2000, maxMs: 4000 },
   long: { minMs: 4000, maxMs: 7000 },

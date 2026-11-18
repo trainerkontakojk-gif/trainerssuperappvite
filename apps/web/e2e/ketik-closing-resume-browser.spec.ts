@@ -10,7 +10,7 @@ import {
 import { APP_ORIGIN } from "./helpers/hermeticShell";
 import { tnaApiRequest } from "./helpers/tnaApi";
 
-test("real JWT reload recovers a processing goodbye and retries a failed goodbye only explicitly", async ({
+test("real JWT reload recovers a processing, failed and held goodbye", async ({
   page,
 }) => {
   test.skip(
@@ -49,13 +49,7 @@ test("real JWT reload recovers a processing goodbye and retries a failed goodbye
       ).status,
     ).toBe(200);
     suite.providerText = "Tagihan saya ganda.";
-    expect(
-      (
-        await api(trainer, `/sessions/${session.id}/respond`, "POST", {
-          requestId: randomUUID(),
-        })
-      ).status,
-    ).toBe(200);
+    expect((await harness.respondAndReveal(session.id, 1)).status).toBe(200);
     expect(
       (
         await db
@@ -162,17 +156,32 @@ test("real JWT reload recovers a processing goodbye and retries a failed goodbye
     await expect(room.getByRole("alert")).toContainText(
       "Balasan konsumen belum tersedia",
     );
-    await page.waitForTimeout(3000); // Includes both expiry scheduling and a polling interval.
+    await page.clock.install();
+    await page.clock.runFor(3000); // Traverses expiry scheduling and a recovery polling interval.
     expect(browserResponses).toEqual([]);
     expect(suite.providerCalls).toBe(failedCalls);
 
     suite.failProvider = false;
     suite.providerText =
       "Saya ada urusan dulu, nanti saya hubungi lagi ya kak.";
+    const held = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/respond"),
+    );
     await room.getByRole("button", { name: "Coba minta balasan lagi" }).click();
-    await expect(
-      room.getByText(suite.providerText, { exact: true }),
-    ).toBeVisible({ timeout: 10000 });
+    expect((await (await held).json()).data.pendingResponse).toMatchObject({
+      requestId,
+      status: "held",
+      closing: true,
+    });
+    const goodbye = room.getByText(suite.providerText, { exact: true });
+    await expect(goodbye).toHaveCount(0);
+    await page.reload();
+    await expect(room).toBeVisible({ timeout: 20000 });
+    await expect(goodbye).toHaveCount(0);
+    await page.clock.runFor(3500);
+    await expect(goodbye).toBeVisible({ timeout: 10000 });
     await expect(
       room.getByText(/Konsumen telah mengakhiri chat/),
     ).toBeVisible();

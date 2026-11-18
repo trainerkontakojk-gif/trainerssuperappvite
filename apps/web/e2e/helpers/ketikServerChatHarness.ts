@@ -114,6 +114,7 @@ export async function openTypingChat(
     };
     await route.fulfill({ json: { success: true, data: live } });
   });
+  let held: KetikServerSession["messages"] = [];
   let responseAt: number | null = null;
   let responseCalls = 0;
   let resolveResponseStarted!: () => void;
@@ -124,23 +125,77 @@ export async function openTypingChat(
     responseAt = Date.now();
     responseCalls++;
     resolveResponseStarted();
+    const { requestId } = route.request().postDataJSON() as {
+      requestId: string;
+    };
+    const context = live.messages.filter(
+      (message) => message.sender === "agent",
+    );
     const replies = options.responseMessages ?? [
-      { id: "reply-default", text: "Saya sudah membaca penjelasanmu." },
+      {
+        id: `reply-${responseCalls}`,
+        text: `Balasan untuk ${context.map((message) => message.text).join(" dan ")}`,
+      },
     ];
+    held = replies.map((reply) => ({
+      ...reply,
+      sender: "consumer",
+      timestamp: new Date().toISOString(),
+    }));
     live = {
       ...live,
-      version: live.version + replies.length,
-      awaitingResponse: false,
-      messages: [
-        ...live.messages,
-        ...replies.map((reply) => ({
-          id: reply.id,
-          sender: "consumer" as const,
-          text: reply.text,
-          timestamp: new Date().toISOString(),
-        })),
-      ],
+      pendingResponse: {
+        requestId,
+        status: "held",
+        contextAgentVersion: live.agentVersion,
+        retryCount: live.pendingResponse?.retryCount ?? 0,
+        leaseExpiresAt: null,
+        typingChars: held.reduce(
+          (length, reply) => length + reply.text.length,
+          0,
+        ),
+        closing: false,
+      },
     };
+    return route.fulfill({ json: { success: true, data: live } });
+  });
+
+  await page.route(sessionPath + "/reveal", async (route) => {
+    const pending = live.pendingResponse;
+    const body = route.request().postDataJSON() as {
+      requestId: string;
+      expectedAgentVersion: number;
+      expectedRetryCount: number;
+    };
+    if (
+      pending?.status === "held" &&
+      pending.requestId === body.requestId &&
+      live.agentVersion === body.expectedAgentVersion &&
+      pending.retryCount === body.expectedRetryCount
+    ) {
+      if (
+        pending.retryCount === 0 &&
+        pending.contextAgentVersion !== live.agentVersion
+      ) {
+        live = {
+          ...live,
+          pendingResponse: {
+            requestId: pending.requestId,
+            status: "retry_ready",
+            retryCount: 1,
+            leaseExpiresAt: null,
+          },
+        };
+      } else {
+        live = {
+          ...live,
+          version: live.version + 1,
+          messages: [...live.messages, ...held],
+          pendingResponse: null,
+          awaitingResponse: false,
+        };
+      }
+    }
     await route.fulfill({ json: { success: true, data: live } });
   });
 
