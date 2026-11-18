@@ -31,7 +31,7 @@
     "@google/genai": "^2.29.0",
     "@hono/node-server": "^2.1.6",
     "@hono/zod-validator": "^0.9.1",
-    "@supabase/supabase-js": "^2.117.3",
+    "@supabase/supabase-js": "^2.119.0",
     "@trainers/types": "workspace:*",
     "hono": "^4.13.16",
     "sharp": "0.35.5",
