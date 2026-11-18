@@ -238,7 +238,7 @@ test("selectable pricing matches catalogs and policies without retired or realti
   expect(active.map((row) => row.model_id).sort()).toEqual(
     [...expectedIds].sort(),
   );
-  expect(active).toHaveLength(9);
+  expect(active).toHaveLength(11);
   expect(
     active.every(
       (row) =>
@@ -268,6 +268,8 @@ test("selectable pricing matches catalogs and policies without retired or realti
       "gemini-3.5-flash-lite",
       "gpt-6-luna",
       "deepseek-v4.1-flash-1017",
+      "claude-sonnet-5-5",
+      "claude-opus-5-5",
     ].sort(),
   );
   expect(

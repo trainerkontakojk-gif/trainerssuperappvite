@@ -55,3 +55,13 @@ Lane D: a new AI provider, a new secret (`SUMOPOD_API_KEY`), and AI usage loggin
    `git diff --check`.
 4. Docs: model registry note in `docs/architecture.md` if it lists providers;
    CHANGELOG entry.
+
+## Follow-up (2026-11-18): Claude Sonnet 5.5 and Opus 5.5
+
+- Ids `claude-sonnet-5-5` and `claude-opus-5-5` from the live SumoPod `/v1/models`
+  list join `TEXT_MODELS` and `KETIK_PDKT_MODEL_IDS`; no Telefun registry.
+- Live check: both accept `temperature` but ignore `response_format`
+  `json_schema` (fenced JSON with extra fields). KETIK review and PDKT parse via
+  `extractJsonObjectText`, which strips fences, so no adapter change.
+- E2E: `sumopod-models-api.spec.ts` routes each SumoPod model to SumoPod;
+  `monitoring-models-api-policy.spec.ts` active pricing inventory 9 -> 11.

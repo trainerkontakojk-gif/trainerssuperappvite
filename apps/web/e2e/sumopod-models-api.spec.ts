@@ -11,7 +11,8 @@ import {
 import { tnaApiRequest } from "./helpers/tnaApi";
 
 /**
- * SumoPod text models (GPT 6 Luna, DeepSeek V4.1 Flash).
+ * SumoPod text models (GPT 6 Luna, DeepSeek V4.1 Flash, Claude Sonnet 5.5,
+ * Claude Opus 5.5).
  * Real JWT, Hono router, and local database; SumoPod is stubbed in fetch, so
  * no request leaves the machine and the real key is never used.
  */
@@ -19,7 +20,12 @@ import { tnaApiRequest } from "./helpers/tnaApi";
 test.describe.configure({ mode: "serial" });
 const env = readLoopbackEnv();
 const ns = `sumopod-${randomUUID().slice(0, 8)}`;
-const SUMOPOD_MODEL_IDS = ["gpt-6-luna", "deepseek-v4.1-flash-1017"];
+const SUMOPOD_MODEL_IDS = [
+  "gpt-6-luna",
+  "deepseek-v4.1-flash-1017",
+  "claude-sonnet-5-5",
+  "claude-opus-5-5",
+];
 let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
 let app: Hono;
 let guardedFetch: typeof fetch;
@@ -211,15 +217,15 @@ test("a KETIK session on GPT 6 Luna gets its consumer reply from SumoPod and log
   ]);
 });
 
-test("DeepSeek V4.1 Flash routes to SumoPod with its own model id", async () => {
-  const session = await startKetikSession("deepseek-v4.1-flash-1017");
-  const turn = await sendTurn(session.id, "Halo, ada yang bisa dibantu?");
-  expect(turn.status).toBe(200);
-  expect(sumopodCalls.map((call) => call.body.model)).toEqual([
-    "deepseek-v4.1-flash-1017",
-  ]);
-  expect(geminiCalls).toBe(0);
-});
+for (const modelId of SUMOPOD_MODEL_IDS.slice(1)) {
+  test(`${modelId} routes to SumoPod with its own model id`, async () => {
+    const session = await startKetikSession(modelId);
+    const turn = await sendTurn(session.id, "Halo, ada yang bisa dibantu?");
+    expect(turn.status).toBe(200);
+    expect(sumopodCalls.map((call) => call.body.model)).toEqual([modelId]);
+    expect(geminiCalls).toBe(0);
+  });
+}
 
 test("without SUMOPOD_API_KEY the turn fails closed and nothing is sent", async () => {
   const session = await startKetikSession("gpt-6-luna");

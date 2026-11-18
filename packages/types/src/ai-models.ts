@@ -490,6 +490,24 @@ export const TEXT_MODELS: AiModelInfo[] = [
     timeoutMs: 120_000,
     capabilities: { supportsText: true, supportsImage: false },
   },
+  {
+    id: "claude-sonnet-5-5",
+    name: "Claude Sonnet 5.5",
+    description:
+      "Model Claude Sonnet via SumoPod untuk role play dan analisis teks.",
+    provider: "sumopod",
+    timeoutMs: 180_000,
+    capabilities: { supportsText: true, supportsImage: false },
+  },
+  {
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    description:
+      "Model Claude Opus via SumoPod, paling teliti namun lebih lambat dan mahal.",
+    provider: "sumopod",
+    timeoutMs: 180_000,
+    capabilities: { supportsText: true, supportsImage: false },
+  },
 ];
 
 /** Explicit KETIK/PDKT choices; adding Hydrogen retains Flash and Flash-Lite. */
@@ -499,6 +517,8 @@ export const KETIK_PDKT_MODEL_IDS = [
   "gemini-3.5-flash-lite",
   "gpt-6-luna",
   "deepseek-v4.1-flash-1017",
+  "claude-sonnet-5-5",
+  "claude-opus-5-5",
 ] as const;
 
 export const KETIK_PDKT_MODELS: AiModelInfo[] = TEXT_MODELS.filter((model) =>
