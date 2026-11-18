@@ -126,6 +126,10 @@ export default defineConfig({
       testMatch: "ketik-consumer-prompt-api.spec.ts",
     },
     {
+      name: "sumopod-models-real-backend",
+      testMatch: "sumopod-models-api.spec.ts",
+    },
+    {
       name: "ketik-settings-image-alt-real-backend",
       testMatch: "ketik-settings-image-alt-api.spec.ts",
     },

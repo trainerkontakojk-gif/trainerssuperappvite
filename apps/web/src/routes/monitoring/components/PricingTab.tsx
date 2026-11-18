@@ -36,6 +36,7 @@ export function buildPricingUpdatePayload(entry: PricingEntry) {
 const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",
   openai: "OpenAI",
+  sumopod: "SumoPod",
   unknown: "Lainnya",
 };
 const COLUMN_COUNT = 7;

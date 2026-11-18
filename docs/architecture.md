@@ -36,7 +36,7 @@ graph TD
     ViteApp -->|WebSocket Voice| TelefunProxy[Telefun Node Proxy]
     TelefunProxy -->|Provider Adapter| RealtimeProvider[Realtime Provider]
     RealtimeProvider -->|Gemini Live only| GeminiLive[Gemini Live API]
-    HonoAPI -->|AI Analysis| AIProviders[Gemini / OpenAI]
+    HonoAPI -->|AI Analysis| AIProviders[Gemini / SumoPod]
 ```
 
 ### Penjelasan Alur:
@@ -47,7 +47,7 @@ graph TD
 4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage. Frontend memakai `supabase-js` langsung hanya untuk Auth dan satu upload Storage: rekaman Telefun (`apps/web/src/routes/telefun/sessionFinalizer.ts`, bucket privat `telefun-recordings`, sampai 50 MB, dijaga RLS Storage per pemilik). Upload ini adalah pengecualian yang disetujui Fajar (2026-11-16) dari aturan backend-first di `AGENTS.md`, karena file sebesar itu tidak layak dilewatkan API; jangan menambah mutasi frontend lain. Foto Profiler di-upload lewat `POST /api/v1/profiler/foto` (`profiler.write`; data URL JPEG/PNG/WebP/GIF maks. 5 MB, tipe dicek dari isi byte, disimpan apa adanya lewat service role di `profiler-foto/<peserta id>/…`). Supabase Realtime tidak dipakai (tidak ada `.channel()`/`postgres_changes`).
 5. **RLS (Row Level Security)**: Memastikan keamanan data di tingkat database berdasarkan role user (Admin, Trainer, Leader, Agent).
 6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio hanya ke Gemini Live. Metadata OpenAI Realtime yang tersisa adalah historical compatibility dan tidak menjadi provider adapter atau start path.
-7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang aktifnya hanya Gemini dan OpenAI direct. Semua AI calls dicatat ke `ai_usage_logs`.
+7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang aktifnya Gemini dan SumoPod. SumoPod (`apps/api/src/lib/sumopod.ts`, OpenAI-compatible Chat Completions, kunci `SUMOPOD_API_KEY`) melayani model teks GPT 6 Luna dan DeepSeek V4.1 Flash untuk KETIK, PDKT, dan kebijakan tugas teks; tanpa kunci, model itu gagal tertutup. Telefun, `telefun_assessment`, dan `sidak_forecast` tetap Gemini saja. Wrapper OpenAI direct tersisa untuk kompatibilitas legacy. Semua AI calls dicatat ke `ai_usage_logs`.
 8. **Shared Types (`packages/types`)**: Zod schemas dan TypeScript interfaces yang dipakai bersama oleh frontend dan backend.
 
 ### Telefun realtime boundary (Gemini-only; historical cleanup retained)

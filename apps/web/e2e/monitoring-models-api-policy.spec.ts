@@ -238,9 +238,13 @@ test("selectable pricing matches catalogs and policies without retired or realti
   expect(active.map((row) => row.model_id).sort()).toEqual(
     [...expectedIds].sort(),
   );
-  expect(active).toHaveLength(7);
+  expect(active).toHaveLength(9);
   expect(
-    active.every((row) => row.provider === "gemini" && row.editable === true),
+    active.every(
+      (row) =>
+        (row.provider === "gemini" || row.provider === "sumopod") &&
+        row.editable === true,
+    ),
   ).toBe(true);
   for (const path of ["/models", "/models?module=default"]) {
     const response = await call("GET", path);
@@ -258,7 +262,13 @@ test("selectable pricing matches catalogs and policies without retired or realti
       .map((model: { id: string }) => model.id)
       .sort(),
   ).toEqual(
-    ["gemini-4-hydrogen", "gemini-3.8-flash", "gemini-3.5-flash-lite"].sort(),
+    [
+      "gemini-4-hydrogen",
+      "gemini-3.8-flash",
+      "gemini-3.5-flash-lite",
+      "gpt-6-luna",
+      "deepseek-v4.1-flash-1017",
+    ].sort(),
   );
   expect(
     policies.items.find((item) => item.task === "ketik_review_fallback"),
@@ -472,11 +482,11 @@ test("legacy KETIK snapshots and PDKT evaluation requests cannot call retired pr
 
 test("Gemini-only tasks reject GPT and hide it from eligible options", async () => {
   for (const task of ["sidak_forecast", "telefun_assessment"]) {
-    const res = await call("PUT", `/monitoring/models/${task}`, {
-      modelId: "gpt-5.4-mini",
-    });
-    expect(res.status).toBe(400);
-    expect((await res.json()).error.code).toBe("MODEL_NOT_ELIGIBLE");
+    for (const modelId of ["gpt-5.4-mini", "gpt-6-luna"]) {
+      const res = await call("PUT", `/monitoring/models/${task}`, { modelId });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error.code).toBe("MODEL_NOT_ELIGIBLE");
+    }
   }
   const body = await call("GET", "/monitoring/models").then((r) => r.json());
   for (const task of ["sidak_forecast", "telefun_assessment"]) {

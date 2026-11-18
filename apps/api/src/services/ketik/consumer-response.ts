@@ -9,7 +9,7 @@ import {
   DEFAULT_KETIK_SCENARIOS,
 } from "@trainers/types";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenAIContent } from "../../lib/openai";
+import { generateCompatibleContent } from "../../lib/ai-text";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { UsageContext } from "../../lib/ai-usage";
 import {
@@ -424,7 +424,7 @@ ATURAN BALASAN:
   const { modelId, provider } = resolveModelProvider(
     coerceKetikPdktModelId(config.selectedModel),
   );
-  const usesConservativeTemperature = provider === "openai";
+  const usesConservativeTemperature = provider !== "gemini";
 
   const providerSystemInstruction =
     usesConservativeTemperature && hasScript
@@ -478,11 +478,14 @@ ATURAN BALASAN:
   };
 
   try {
-    // Temperature is OpenAI-only; Gemini uses its model default.
+    // Temperature is for OpenAI-style providers; Gemini uses its default.
     const response =
-      provider === "openai"
-        ? await generateOpenAIContent({ ...callPayload, temperature: 0.55 })
-        : await generateGeminiContent(callPayload);
+      provider === "gemini"
+        ? await generateGeminiContent(callPayload)
+        : await generateCompatibleContent(provider, {
+            ...callPayload,
+            temperature: 0.55,
+          });
 
     if (!response.success) {
       return { success: false, error: response.error || "AI tidak tersedia." };

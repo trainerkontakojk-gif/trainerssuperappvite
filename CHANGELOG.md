@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-18
 
+- feat(ai): add SumoPod GPT 6 Luna and DeepSeek V4.1 Flash as selectable text models (not Telefun)
+
 - feat(ketik): show message times to the second and response times in Telaah
 
 - docs(ketik): record the deferred-replies migration applied to production

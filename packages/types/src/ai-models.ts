@@ -34,7 +34,7 @@ export interface AiModelInfo {
   supportsTemperature?: boolean;
 }
 
-export type AIProvider = "gemini" | "openai";
+export type AIProvider = "gemini" | "openai" | "sumopod";
 export type AiModelModule =
   "ketik" | "pdkt" | "qa-analyzer" | "telefun" | "default";
 
@@ -472,6 +472,24 @@ export const TEXT_MODELS: AiModelInfo[] = [
     },
   },
   GEMINI_31_FLASH_LIVE_MODEL,
+  // SumoPod: OpenAI-compatible gateway (ai.sumopod.com). Text only; never a
+  // Telefun model, which must stay on Gemini Live.
+  {
+    id: "gpt-6-luna",
+    name: "GPT 6 Luna",
+    description: "Model GPT 6 via SumoPod untuk role play dan analisis teks.",
+    provider: "sumopod",
+    timeoutMs: 180_000,
+    capabilities: { supportsText: true, supportsImage: false },
+  },
+  {
+    id: "deepseek-v4.1-flash-1017",
+    name: "DeepSeek V4.1 Flash",
+    description: "Model DeepSeek cepat via SumoPod untuk percakapan teks.",
+    provider: "sumopod",
+    timeoutMs: 120_000,
+    capabilities: { supportsText: true, supportsImage: false },
+  },
 ];
 
 /** Explicit KETIK/PDKT choices; adding Hydrogen retains Flash and Flash-Lite. */
@@ -479,6 +497,8 @@ export const KETIK_PDKT_MODEL_IDS = [
   "gemini-4-hydrogen",
   "gemini-3.8-flash",
   "gemini-3.5-flash-lite",
+  "gpt-6-luna",
+  "deepseek-v4.1-flash-1017",
 ] as const;
 
 export const KETIK_PDKT_MODELS: AiModelInfo[] = TEXT_MODELS.filter((model) =>

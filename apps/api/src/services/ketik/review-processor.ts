@@ -6,7 +6,7 @@ import {
   type KetikReviewModels,
 } from "../../lib/ai-model-policy";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenAIContent } from "../../lib/openai";
+import { generateCompatibleContent } from "../../lib/ai-text";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { UsageContext } from "../../lib/ai-usage";
 import { extractJsonObjectText } from "./shared-utils";
@@ -44,7 +44,7 @@ async function generateKetikReviewAiResponse(options: {
   const primaryModel = resolveModelProvider(options.models.primary);
   const fallbackModel = resolveModelProvider(options.models.fallback);
 
-  // Try primary model (Gemini or OpenAI based on registry)
+  // Try primary model (provider from the registry)
   try {
     let primaryResp: { success: boolean; text?: string; error?: string };
     const schema = (
@@ -76,7 +76,7 @@ async function generateKetikReviewAiResponse(options: {
         abortSignal: options.signal,
       });
     } else {
-      primaryResp = await generateOpenAIContent({
+      primaryResp = await generateCompatibleContent(primaryModel.provider, {
         model: primaryModel.modelId,
         systemInstruction: options.systemInstruction,
         contents: options.contents,
@@ -109,18 +109,7 @@ async function generateKetikReviewAiResponse(options: {
   // Fallback model
   try {
     let fallbackResp: { success: boolean; text?: string; error?: string };
-    if (fallbackModel.provider === "openai") {
-      fallbackResp = await generateOpenAIContent({
-        model: fallbackModel.modelId,
-        systemInstruction: options.systemInstruction,
-        contents: options.contents,
-        responseMimeType: "application/json",
-        usageContext,
-        userId: options.userId,
-        sanitizeOutput: false,
-        signal: options.signal,
-      });
-    } else {
+    if (fallbackModel.provider === "gemini") {
       fallbackResp = await generateGeminiContent({
         model: fallbackModel.modelId,
         systemInstruction: options.systemInstruction,
@@ -130,6 +119,17 @@ async function generateKetikReviewAiResponse(options: {
         userId: options.userId,
         sanitizeOutput: false,
         abortSignal: options.signal,
+      });
+    } else {
+      fallbackResp = await generateCompatibleContent(fallbackModel.provider, {
+        model: fallbackModel.modelId,
+        systemInstruction: options.systemInstruction,
+        contents: options.contents,
+        responseMimeType: "application/json",
+        usageContext,
+        userId: options.userId,
+        sanitizeOutput: false,
+        signal: options.signal,
       });
     }
     return fallbackResp;

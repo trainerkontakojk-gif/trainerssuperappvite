@@ -17,7 +17,6 @@ import {
 } from "@trainers/types";
 import type { AiModelModule } from "@trainers/types";
 
-type TextImageAIProvider = Extract<AIProvider, "gemini" | "openai">;
 export {
   AI_MODELS,
   SELECTABLE_MODELS,
@@ -72,21 +71,23 @@ export function normalizeModelId(modelId?: string | null): string {
   return LEGACY_ALIASES[modelId] || modelId;
 }
 
-export function getProviderFromModelId(modelId: string): TextImageAIProvider {
+export function getProviderFromModelId(modelId: string): AIProvider {
   const normalized = normalizeModelId(modelId);
-  return (MODEL_REGISTRY.find((model) => model.id === normalized)?.provider ??
-    "gemini") as TextImageAIProvider;
+  return (
+    MODEL_REGISTRY.find((model) => model.id === normalized)?.provider ??
+    "gemini"
+  );
 }
 
 export function resolveModelProvider(modelId?: string | null): {
   modelId: string;
-  provider: TextImageAIProvider;
+  provider: AIProvider;
   isFallback: boolean;
   timeoutMs?: number;
 } {
   const normalized = normalizeModelId(modelId);
   const found = MODEL_REGISTRY.find((m) => m.id === normalized);
-  if (found && (found.provider === "gemini" || found.provider === "openai")) {
+  if (found) {
     return {
       modelId: found.id,
       provider: found.provider,

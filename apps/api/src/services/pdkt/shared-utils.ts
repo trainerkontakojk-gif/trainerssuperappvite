@@ -2,11 +2,11 @@ import { coerceKetikPdktModelId } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenAIContent } from "../../lib/openai";
+import { generateCompatibleContent } from "../../lib/ai-text";
 
 /**
  * Shared AI caller for PDKT services.
- * Handles provider routing between Gemini and OpenAI.
+ * Handles provider routing between Gemini and the OpenAI-style providers.
  */
 export async function callAI(options: {
   model: string;
@@ -30,13 +30,14 @@ export async function callAI(options: {
     userId: options.userId,
   };
 
-  // Temperature is OpenAI-only; Gemini deprecated sampling parameters.
-  return provider === "openai"
-    ? await generateOpenAIContent({
+  // Temperature is for OpenAI-style providers; Gemini deprecated sampling
+  // parameters.
+  return provider === "gemini"
+    ? await generateGeminiContent(payload)
+    : await generateCompatibleContent(provider, {
         ...payload,
         temperature: options.temperature ?? 0.7,
-      })
-    : await generateGeminiContent(payload);
+      });
 }
 
 /**
