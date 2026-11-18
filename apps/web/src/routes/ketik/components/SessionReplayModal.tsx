@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "../../../components/ui/dialog";
+import { formatMessageClock, messageDate } from "../utils/messageTiming";
 
 interface SessionReplayModalProps {
   isOpen: boolean;
@@ -207,10 +208,14 @@ export function SessionReplayModal({
                         className={`text-xs font-black uppercase tracking-widest mt-2 flex items-center gap-1.5 opacity-60 ${isAgent ? "justify-end" : "justify-start"}`}
                       >
                         <Clock className="w-2.5 h-2.5" />
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {(() => {
+                          const sentAt = messageDate(msg);
+                          return sentAt ? (
+                            <time dateTime={msg.timestamp}>
+                              {formatMessageClock(sentAt)}
+                            </time>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                   </motion.div>

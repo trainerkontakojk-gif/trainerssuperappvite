@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Check, CheckCheck } from "lucide-react";
 import type { ChatMessage } from "@trainers/types";
+import { formatMessageClock, messageDate } from "../../utils/messageTiming";
 
 interface KetikMessageBubbleProps {
   message: ChatMessage;
@@ -94,6 +95,7 @@ export function KetikMessageBubble({
 }: KetikMessageBubbleProps) {
   const isAgent = message.sender === "agent";
   const shouldReduceMotion = useReducedMotion();
+  const sentAt = messageDate(message);
 
   return (
     <motion.div
@@ -127,14 +129,11 @@ export function KetikMessageBubble({
         <div
           className={`mt-2 flex items-center justify-end gap-2 text-[13px] font-medium tabular-nums ${isAgent ? "text-module-ketik-foreground/80" : "text-muted-foreground"}`}
         >
-          <span>
-            {message.timestamp
-              ? new Date(message.timestamp).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : ""}
-          </span>
+          {sentAt && (
+            <time dateTime={message.timestamp}>
+              {formatMessageClock(sentAt)}
+            </time>
+          )}
           {isAgent && <TickIcon status={message.status} />}
         </div>
       </div>

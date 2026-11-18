@@ -25,6 +25,12 @@ import {
   type KetikReviewFailure,
 } from "../hooks/useKetikReviewStatus";
 import { numberMessages } from "../utils/reviewDisplay";
+import {
+  formatMessageClock,
+  formatResponseGap,
+  messageDate,
+  responseGaps,
+} from "../utils/messageTiming";
 import { downloadKetikTranscript } from "../utils/transcript";
 import { buildQuoteMarks, pointLetter } from "../utils/quoteMarks";
 import { KetikReviewMessage } from "./KetikReviewMessage";
@@ -82,6 +88,10 @@ export function KetikReviewStage({
     [session.messages],
   );
   const numbers = useMemo(() => numberMessages(messages), [messages]);
+  const gaps = useMemo(() => responseGaps(messages), [messages]);
+  const hasConsumerGap = [...gaps.values()].some(
+    (gap) => gap.sender === "consumer",
+  );
   const pdf = useKetikReviewPdf(
     review.phase === "ready" && !review.rerunFailed
       ? {
@@ -266,16 +276,19 @@ export function KetikReviewStage({
             }}
             anomalies={anomalies}
           />
+          {hasConsumerGap && (
+            <p className="text-[13px] text-muted-foreground">
+              Respons konsumen termasuk jeda simulasi dan waktu AI menyusun
+              balasan.
+            </p>
+          )}
           <ol className="flex flex-col gap-3">
             {messages.map((message) => {
               if (message.sender === "system") return null;
               const number = numbers.get(message.id);
               const isAgent = message.sender === "agent";
-              const timestamp = message.timestamp
-                ? new Date(message.timestamp)
-                : null;
-              const hasValidTimestamp =
-                timestamp !== null && Number.isFinite(timestamp.getTime());
+              const timestamp = messageDate(message);
+              const gap = gaps.get(message.id);
               const flagged = typosByMessage.has(message.id);
               const answers = answersByMessage.get(message.id);
               const marker =
@@ -335,21 +348,27 @@ export function KetikReviewStage({
                           Menjawab poin {answers.join(", ")}
                         </span>
                       )}
-                      {hasValidTimestamp && (
-                        <time
-                          dateTime={message.timestamp}
+                      {timestamp && (
+                        <span
                           className={cn(
-                            "mt-1 block text-right text-[13px] font-medium tabular-nums",
+                            "mt-1 flex flex-wrap items-baseline justify-end gap-x-2 text-[13px] font-medium tabular-nums",
                             isAgent
                               ? "text-module-ketik-foreground"
                               : "text-muted-foreground",
                           )}
                         >
-                          {timestamp.toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </time>
+                          {gap && (
+                            <span>
+                              {gap.sender === "agent"
+                                ? "Respons agen"
+                                : "Respons konsumen"}
+                              : {formatResponseGap(gap.ms)}
+                            </span>
+                          )}
+                          <time dateTime={message.timestamp}>
+                            {formatMessageClock(timestamp)}
+                          </time>
+                        </span>
                       )}
                     </div>
                   </li>

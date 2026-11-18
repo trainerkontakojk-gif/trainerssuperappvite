@@ -141,7 +141,7 @@ test.describe("KETIK ruang chat (hermetic)", () => {
 
   test("chat tanpa petunjuk sesi, akhiri dengan konfirmasi, lalu masuk tahap Telaah", async ({
     page,
-  }) => {
+  }, info) => {
     const savedAt = new Date().toISOString();
     const audit = await open(
       page,
@@ -269,6 +269,20 @@ test.describe("KETIK ruang chat (hermetic)", () => {
     ).toBeVisible({
       timeout: 15000,
     });
+    // Each bubble shows its time to the second, so response times can be read.
+    const bubbleTimes = room.locator(`time[datetime="${savedAt}"]`);
+    await expect(bubbleTimes).toHaveCount(2);
+    const expectedClock = await page.evaluate(
+      (value) =>
+        new Date(value).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      savedAt,
+    );
+    await expect(bubbleTimes).toHaveText([expectedClock, expectedClock]);
+    await room.screenshot({ path: info.outputPath("chat-bubble-times.png") });
 
     await page.route(`**/api/v1/ketik/history/${CHAT_ID}`, (route) => {
       audit.mockedApi.push(`GET /api/v1/ketik/history/${CHAT_ID}`);

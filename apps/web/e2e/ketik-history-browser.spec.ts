@@ -184,13 +184,13 @@ test("Telaah shows consumer and agent timestamps without inventing legacy times"
         id: "consumer",
         sender: "consumer",
         text: "Pertanyaan konsumen",
-        timestamp: "2026-06-09T03:04:00.000Z",
+        timestamp: "2026-06-09T03:04:07.000Z",
       },
       {
         id: "agent",
         sender: "agent",
         text: "Balasan agen",
-        timestamp: "2026-06-09T03:06:00.000Z",
+        timestamp: "2026-06-09T03:06:49.000Z",
       },
       { id: "legacy", sender: "consumer", text: "Pesan lama tanpa waktu" },
       {
@@ -218,8 +218,8 @@ test("Telaah shows consumer and agent timestamps without inventing legacy times"
     waitForUrl: /\/ketik/,
   });
   for (const [index, timestamp] of [
-    "2026-06-09T03:04:00.000Z",
-    "2026-06-09T03:06:00.000Z",
+    "2026-06-09T03:04:07.000Z",
+    "2026-06-09T03:06:49.000Z",
   ].entries()) {
     const time = page.getByTestId(`ketik-message-${index + 1}`).locator("time");
     await expect(time).toBeVisible();
@@ -229,10 +229,21 @@ test("Telaah shows consumer and agent timestamps without inventing legacy times"
         new Date(value).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
+          second: "2-digit",
         }),
       timestamp,
     );
     await expect(time).toHaveText(expected);
+  }
+  await expect(
+    page.getByTestId("ketik-message-2").getByText("Respons agen: 2 mnt 42 dtk"),
+  ).toBeVisible();
+  // A message without a valid time has no response gap, and neither has
+  // the one after it.
+  for (const number of [1, 3, 4]) {
+    await expect(
+      page.getByTestId(`ketik-message-${number}`).getByText(/^Respons /),
+    ).toHaveCount(0);
   }
   for (const number of [3, 4]) {
     await expect(page.getByTestId(`ketik-message-${number}`)).toBeAttached();
@@ -253,6 +264,104 @@ test("Telaah shows consumer and agent timestamps without inventing legacy times"
     ).toBe(true);
     await page.screenshot({
       path: info.outputPath(`review-times-${width}.png`),
+      fullPage: true,
+    });
+  }
+  expectHermetic(audit);
+});
+
+test("Telaah shows agent and consumer response times between turns", async ({
+  page,
+}, info) => {
+  const at = (time: string) => `2026-06-09T${time}.000Z`;
+  const session = {
+    ...history[204],
+    messages: [
+      {
+        id: "a1",
+        sender: "agent",
+        text: "Selamat pagi",
+        timestamp: at("03:00:00"),
+      },
+      {
+        id: "c1",
+        sender: "consumer",
+        text: "Pagi, kak",
+        timestamp: at("03:00:12"),
+      },
+      {
+        id: "c2",
+        sender: "consumer",
+        text: "Tagihan dobel",
+        timestamp: at("03:00:12"),
+      },
+      {
+        id: "a2",
+        sender: "agent",
+        text: "Baik, saya cek",
+        timestamp: at("03:01:05"),
+      },
+      {
+        id: "a3",
+        sender: "agent",
+        text: "Mohon ditunggu",
+        timestamp: at("03:01:30"),
+      },
+      { id: "c3", sender: "consumer", text: "Oke", timestamp: at("03:02:00") },
+      {
+        id: "a4",
+        sender: "agent",
+        text: "Sudah saya cek",
+        timestamp: at("04:03:10"),
+      },
+    ],
+  };
+  const apiMocks = mocks().map((mock) =>
+    mock.path === `/api/v1/ketik/history/${session.id}`
+      ? {
+          ...mock,
+          body: {
+            success: true,
+            data: { ...session, previousFinalScore: null },
+          },
+        }
+      : mock,
+  );
+  const audit = await openHermeticShell(page, {
+    path: `/ketik?sesi=${session.id}&tahap=telaah`,
+    apiMocks,
+    waitForUrl: /\/ketik/,
+  });
+  const gaps: Record<number, string | null> = {
+    1: null,
+    2: "Respons konsumen: 12 dtk",
+    3: null,
+    4: "Respons agen: 53 dtk",
+    5: null,
+    6: "Respons konsumen: 30 dtk",
+    7: "Respons agen: 1 jam 01 mnt 10 dtk",
+  };
+  for (const [number, gap] of Object.entries(gaps)) {
+    const message = page.getByTestId(`ketik-message-${number}`);
+    await expect(message).toBeAttached();
+    if (gap)
+      await expect(message.getByText(gap, { exact: true })).toBeVisible();
+    else await expect(message.getByText(/^Respons /)).toHaveCount(0);
+  }
+  await expect(
+    page.getByText(
+      "Respons konsumen termasuk jeda simulasi dan waktu AI menyusun balasan.",
+    ),
+  ).toBeVisible();
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: info.outputPath(`review-response-gaps-${width}.png`),
       fullPage: true,
     });
   }
@@ -280,6 +389,20 @@ test("server pages, search, replay and full filtered CSV have honest progress/fa
   });
   await trigger.click();
   await expect(page.getByRole("dialog")).toContainText("Transkrip sesi 0");
+  const replayTime = page.getByRole("dialog").locator("time").first();
+  await expect(replayTime).toBeVisible();
+  const replayIso = await replayTime.getAttribute("datetime");
+  await expect(replayTime).toHaveText(
+    await page.evaluate(
+      (value) =>
+        new Date(value ?? "").toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      replayIso,
+    ),
+  );
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
   control.slowSearch = true;
