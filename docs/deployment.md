@@ -554,8 +554,18 @@ mencatat history migrasi CLI dan tidak mengizinkan apply remote.
 
 ### KETIK deferred consumer replies — schema-first (`20261118120000`)
 
-`20261118120000_ketik_deferred_consumer_replies.sql` menunggu penerapan di
-production. Setelah mendapat izin eksplisit, hentikan chat writes KETIK selama
+**Status 2026-11-18:** diterapkan ke `ruosnjmtywcrghjgqugz` pukul 05:16 UTC
+lewat `supabase db query --linked -f` lalu `supabase migration repair --linked
+--status applied 20261118120000`; history Local = Remote. Readback: lima fungsi
+KETIK SECURITY INVOKER, hanya `service_role` yang punya EXECUTE. Sebelumnya push
+`97b24a8b` ke `main` ter-auto-deploy (Railway API dan Vercel web) tanpa migrasi
+pukul 05:07–05:08 UTC; API di-rollback ke build `83a380ec` pukul 05:11, lalu
+build `97b24a8b` di-deploy ulang setelah migrasi (05:17 UTC, health 200). Tidak
+ada sesi KETIK aktif saat pergantian. Pelajaran: Railway API dan Vercel web
+(`trainerssuperappvite-api`) sama-sama auto-deploy dari `main`, jadi commit
+schema-first tidak boleh di-push sebelum migrasi production diterapkan.
+
+Prosedur: setelah mendapat izin eksplisit, hentikan chat writes KETIK selama
 pergantian schema, API, dan web. Terapkan migrasi sebelum deploy API dan web yang
 memakai alur `respond` dan `reveal`. Publikasi ditahan sampai pemanggilan
 `reveal`, sehingga API dan web perlu dirilis bersama. Untuk rollback, hentikan

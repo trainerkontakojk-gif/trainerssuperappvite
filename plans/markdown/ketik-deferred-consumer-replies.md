@@ -75,4 +75,4 @@ E2E_KETIK_LIVE=1 E2E_SUPABASE_WORKDIR="$PWD/scratch/ketik-held-reply-20261118" p
 `supabase stop --workdir "$E2E_SUPABASE_WORKDIR"` stopped the disposable stack
 with exit 0. Root `pnpm typecheck`, `pnpm lint`, `pnpm build`, and
 `git diff --check` ran sequentially and each exited 0. Root lint reported
-baseline warnings and zero errors. The production migration remains pending.
+baseline warnings and zero errors. The production migration was applied on 2026-11-18 at 05:16 UTC (see docs/deployment.md).
