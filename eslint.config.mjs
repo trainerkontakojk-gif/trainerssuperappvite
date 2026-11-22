@@ -150,12 +150,12 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         {
-          selector: 'Literal[value=/^(gemini|gpt|claude|mimo)-/]',
+          selector: 'Literal[value=/^(gemini|gpt|claude|mimo)-(?!live$)/]',
           message:
             'Jangan tulis model id langsung. Ambil dari AI_TASK_DEFINITIONS (packages/types/src/ai-model-policy.ts) atau helper di apps/api/src/lib/ai-models.ts, supaya kebijakan model dan monitoring biaya tetap satu sumber.',
         },
         {
-          selector: 'TemplateElement[value.raw=/^(gemini|gpt|claude|mimo)-/]',
+          selector: 'TemplateElement[value.raw=/^(gemini|gpt|claude|mimo)-(?!live$)/]',
           message:
             'Jangan tulis model id langsung. Ambil dari AI_TASK_DEFINITIONS (packages/types/src/ai-model-policy.ts) atau helper di apps/api/src/lib/ai-models.ts, supaya kebijakan model dan monitoring biaya tetap satu sumber.',
         },
