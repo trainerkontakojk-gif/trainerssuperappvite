@@ -1,9 +1,14 @@
-import { Content, Modality, type ThinkingLevel } from "@google/genai";
+import {
+  Content,
+  GoogleGenAI,
+  Modality,
+  type ThinkingLevel,
+} from "@google/genai";
 import { randomUUID } from "crypto";
+import { getGeminiProxyFetch } from "./gemini-proxy";
 import {
   AI_MODELS,
   DEFAULT_AI_MODEL_ID,
-  getGeminiClient,
   getProviderFromModelId,
 } from "./ai-models";
 import { logAiUsage, UsageContext } from "./ai-usage";
@@ -14,6 +19,15 @@ export interface GeminiResponse {
   text?: string;
   images?: string[];
   error?: string;
+}
+
+function getGeminiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+  const fetch = getGeminiProxyFetch();
+  return new GoogleGenAI(
+    fetch ? { apiKey, httpOptions: { fetch } } : { apiKey },
+  );
 }
 
 function resolveResponseText(response: {

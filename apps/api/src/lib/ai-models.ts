@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-import { getGeminiProxyFetch } from "./gemini-proxy";
 import {
   AiModelInfo,
   AIProvider,
@@ -137,11 +135,4 @@ export function getImageGenerationMode(modelId: string): "native" | "none" {
     IMAGE_GENERATION_MODELS.find((m) => m.id === normalizeModelId(modelId))
       ?.capabilities?.imageGenerationMode ?? "none"
   );
-}
-
-export function getGeminiClient(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  const fetch = getGeminiProxyFetch();
-  return new GoogleGenAI(fetch ? { apiKey, httpOptions: { fetch } } : { apiKey });
 }

@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-22
+
+- chore(eslint): route AI SDK imports through usage wrappers
+
 ## 2026-11-18
 
 - feat(ai): add SumoPod Claude Sonnet 5.5 and Claude Opus 5.5 as selectable text models

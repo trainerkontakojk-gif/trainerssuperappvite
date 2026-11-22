@@ -84,6 +84,56 @@ export default tseslint.config(
     },
   },
 
+  // Provider client SDKs stay behind the API usage-logging wrappers.
+  {
+    files: ['apps/api/src/**/*.ts', 'apps/telefun/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@google/genai',
+              importNames: ['GoogleGenAI'],
+              allowTypeImports: true,
+              message:
+                'Panggil AI hanya melalui wrapper di apps/api/src/lib (gemini.ts / openai.ts / sumopod.ts). Wrapper mencatat logAiUsage() memakai UsageContext dan userId; client SDK langsung melewatkan pencatatan biaya. Import type/enum seperti Type atau Modality tetap boleh.',
+            },
+            {
+              name: 'openai',
+              importNames: ['default', 'OpenAI'],
+              allowTypeImports: true,
+              message:
+                'Panggil AI hanya melalui wrapper di apps/api/src/lib (gemini.ts / openai.ts / sumopod.ts). Wrapper mencatat logAiUsage() memakai UsageContext dan userId; client SDK langsung melewatkan pencatatan biaya. Import type/enum seperti Type atau Modality tetap boleh.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Gemini's usage-logging wrapper is the sole runtime client-construction site.
+  // It remains restricted from importing the separate OpenAI SDK.
+  {
+    files: ['apps/api/src/lib/gemini.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'openai',
+              importNames: ['default', 'OpenAI'],
+              allowTypeImports: true,
+              message:
+                'Panggil AI hanya melalui wrapper di apps/api/src/lib (gemini.ts / openai.ts / sumopod.ts). Wrapper mencatat logAiUsage() memakai UsageContext dan userId; client SDK langsung melewatkan pencatatan biaya. Import type/enum seperti Type atau Modality tetap boleh.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Vitest test files
   {
     files: ['**/*.test.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
