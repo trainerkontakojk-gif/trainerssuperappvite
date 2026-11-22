@@ -1,4 +1,5 @@
 import {
+  TELEFUN_OPENAI_WEBRTC_TRANSCRIPTION_MODEL_ID,
   TELEFUN_OPENAI_WEBRTC_MODEL_IDS,
   type TelefunWebRtcModelId,
 } from "@trainers/types";
@@ -65,7 +66,9 @@ export interface CanonicalPocSession {
   audio: {
     input: {
       format: { type: "audio/pcm"; rate: 24_000 };
-      transcription: { model: "gpt-4o-mini-transcribe" };
+      transcription: {
+        model: typeof TELEFUN_OPENAI_WEBRTC_TRANSCRIPTION_MODEL_ID;
+      };
       turn_detection: {
         type: "server_vad";
         // VAD owns speech chunking only. The browser serializes every
@@ -101,7 +104,9 @@ export function buildCanonicalWebRtcSession(
     audio: {
       input: {
         format: { type: "audio/pcm", rate: 24_000 },
-        transcription: { model: "gpt-4o-mini-transcribe" },
+        transcription: {
+          model: TELEFUN_OPENAI_WEBRTC_TRANSCRIPTION_MODEL_ID,
+        },
         turn_detection: {
           type: "server_vad",
           create_response: false,

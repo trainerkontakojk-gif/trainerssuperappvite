@@ -134,6 +134,35 @@ export default tseslint.config(
     },
   },
 
+  // Literal model IDs belong in the model registries or task policy.
+  {
+    files: ['apps/*/src/**/*.{ts,tsx}', 'packages/*/src/**/*.ts'],
+    ignores: [
+      'packages/types/src/ai-models.ts',
+      'packages/types/src/ai-model-policy.ts',
+      'apps/api/src/lib/ai-models.ts',
+      'apps/api/src/lib/ai-usage.ts',
+      '**/*.{test,spec,e2e}.{ts,tsx}',
+      '**/__tests__/**',
+      '**/e2e/**',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/^(gemini|gpt|claude|mimo)-/]',
+          message:
+            'Jangan tulis model id langsung. Ambil dari AI_TASK_DEFINITIONS (packages/types/src/ai-model-policy.ts) atau helper di apps/api/src/lib/ai-models.ts, supaya kebijakan model dan monitoring biaya tetap satu sumber.',
+        },
+        {
+          selector: 'TemplateElement[value.raw=/^(gemini|gpt|claude|mimo)-/]',
+          message:
+            'Jangan tulis model id langsung. Ambil dari AI_TASK_DEFINITIONS (packages/types/src/ai-model-policy.ts) atau helper di apps/api/src/lib/ai-models.ts, supaya kebijakan model dan monitoring biaya tetap satu sumber.',
+        },
+      ],
+    },
+  },
+
   // Vitest test files
   {
     files: ['**/*.test.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],

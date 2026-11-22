@@ -3,7 +3,10 @@ import {
   type TelefunAppSettings,
 } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
-import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
+import {
+  DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
+} from "@trainers/types";
 import type {
   SessionMetrics,
   SpeechSegment,
@@ -213,7 +216,7 @@ export class LiveSession {
     this.config = {
       ...config,
       telefunModelId: selection.model.id,
-      telefunTransport: "gemini-live",
+      telefunTransport: TELEFUN_GEMINI_LIVE_TRANSPORT,
     };
     this.audioConfiguration = getTelefunAudioConfiguration(selection.model.id);
   }

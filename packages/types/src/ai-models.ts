@@ -9,7 +9,13 @@ export interface AiModelCapabilities {
   imageOutputPriceUsdPerMillion?: number;
 }
 
-export type TelefunTransport = "gemini-live" | "openai-audio" | "openai-webrtc";
+export const TELEFUN_GEMINI_LIVE_TRANSPORT = "gemini-live" as const;
+export const TELEFUN_TRANSPORTS = [
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
+  "openai-audio",
+  "openai-webrtc",
+] as const;
+export type TelefunTransport = (typeof TELEFUN_TRANSPORTS)[number];
 
 export interface AiModelRealtimeMetadata {
   transport: TelefunTransport;
@@ -55,7 +61,7 @@ const GEMINI_38_LIVE_MODEL = {
   },
   availableModules: ["default", "telefun"],
   realtime: {
-    transport: "gemini-live",
+    transport: TELEFUN_GEMINI_LIVE_TRANSPORT,
     inputSampleRateHz: 16_000,
     outputSampleRateHz: 24_000,
     voiceProvider: "gemini",
@@ -76,7 +82,7 @@ const GEMINI_31_FLASH_LIVE_MODEL = {
   },
   availableModules: ["default", "telefun"],
   realtime: {
-    transport: "gemini-live",
+    transport: TELEFUN_GEMINI_LIVE_TRANSPORT,
     inputSampleRateHz: 16_000,
     outputSampleRateHz: 24_000,
     voiceProvider: "gemini",
@@ -99,7 +105,7 @@ export const TELEFUN_LIVE_MODELS = [
     },
     availableModules: ["telefun"],
     realtime: {
-      transport: "gemini-live",
+      transport: TELEFUN_GEMINI_LIVE_TRANSPORT,
       inputSampleRateHz: 16_000,
       outputSampleRateHz: 24_000,
       voiceProvider: "gemini",
@@ -167,6 +173,9 @@ export type TelefunWebRtcModelId = HistoricalTelefunOpenAiRealtimeModel["id"];
 /** @deprecated Historical cleanup identifiers only; never use for admission. */
 export const TELEFUN_OPENAI_WEBRTC_MODEL_IDS: readonly TelefunWebRtcModelId[] =
   TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS.map((model) => model.id);
+
+export const DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID: TelefunWebRtcModelId =
+  TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS[0].id;
 
 /**
  * @deprecated Retired configuration inputs are ignored. The empty set makes
@@ -353,7 +362,7 @@ export function normalizePersistedTelefunSettings<T>(
   const normalized: UnknownSettingsRecord = {
     ...settings,
     telefunModelId: DEFAULT_TELEFUN_LIVE_MODEL_ID,
-    telefunTransport: "gemini-live",
+    telefunTransport: TELEFUN_GEMINI_LIVE_TRANSPORT,
   };
   if (isHistoricalTelefunOpenAiRealtimeModelId(settings.selectedModel)) {
     normalized.selectedModel = DEFAULT_TELEFUN_LIVE_MODEL_ID;

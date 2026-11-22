@@ -5,6 +5,10 @@ import {
   DEFAULT_AI_MODEL_ID,
 } from "./ai-models";
 
+/** Provider model used only by the retired Telefun WebRTC session contract. */
+export const TELEFUN_OPENAI_WEBRTC_TRANSCRIPTION_MODEL_ID =
+  "gpt-4o-mini-transcribe";
+
 export const AI_TASKS = [
   "ketik_review",
   "ketik_review_fallback",

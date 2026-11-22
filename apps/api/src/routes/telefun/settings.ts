@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  TELEFUN_TRANSPORTS,
   getTelefunLiveModel,
   isRetiredTelefunOpenAiRealtimeSelection,
   isValidTelefunModelTransportPair,
@@ -77,7 +78,7 @@ export const telefunSettingsPayloadSchema = z
     identitySettings: z.any().optional(),
     telefunModelId: z.string().optional(),
     telefunTransport: z
-      .enum(["gemini-live", "openai-audio", "openai-webrtc"])
+      .enum(TELEFUN_TRANSPORTS)
       .optional(),
   })
   .passthrough()

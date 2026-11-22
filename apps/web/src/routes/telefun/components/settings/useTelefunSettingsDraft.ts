@@ -1,5 +1,8 @@
 import { useState, useEffect, useReducer, useRef } from "react";
-import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
+import {
+  DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
+} from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import {
   DEFAULT_TELEFUN_SETTINGS,
@@ -40,7 +43,7 @@ export function buildTelefunSettingsForSave(params: {
     params.selectedTelefunModel,
     params.selectedTelefunTransport ?? params.localSettings.telefunTransport,
   );
-  const persistedTransport = "gemini-live" as const;
+  const persistedTransport = TELEFUN_GEMINI_LIVE_TRANSPORT;
 
   const settingsToSave = {
     ...params.localSettings,
@@ -120,7 +123,7 @@ export function useTelefunSettingsDraft({
   const selectedTelefunModel =
     localSettings.telefunModelId || DEFAULT_TELEFUN_LIVE_MODEL_ID;
   const selectedTelefunTransport =
-    localSettings.telefunTransport || "gemini-live";
+    localSettings.telefunTransport || TELEFUN_GEMINI_LIVE_TRANSPORT;
 
   const scenarioForm = useCrudForm<Scenario>({
     generateId: () => `s-${Date.now()}`,
@@ -186,7 +189,7 @@ export function useTelefunSettingsDraft({
   const setSelectedTelefunTransport = (
     transport: AppSettings["telefunTransport"],
   ) => {
-    if (transport !== "gemini-live") return;
+    if (transport !== TELEFUN_GEMINI_LIVE_TRANSPORT) return;
     setLocalSettings((prev) => ({ ...prev, telefunTransport: transport }));
   };
 

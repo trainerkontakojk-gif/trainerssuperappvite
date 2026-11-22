@@ -1,4 +1,4 @@
-import { can } from "@trainers/types";
+import { can, TELEFUN_GEMINI_LIVE_TRANSPORT } from "@trainers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -319,7 +319,7 @@ export default function TelefunLanding() {
           ...settings,
           microphoneDeviceId,
           telefunModelId: normalizedSelection.model.id,
-          telefunTransport: "gemini-live",
+          telefunTransport: TELEFUN_GEMINI_LIVE_TRANSPORT,
           activeScenario: scenario,
           activeConsumerType: consumerType,
           scenarioTitle: scenario.title,

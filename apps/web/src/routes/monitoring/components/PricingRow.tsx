@@ -1,3 +1,4 @@
+import { isRetiredTelefunOpenAiRealtimeSelection } from "@trainers/types";
 import { Button } from "../../../components/ui/button";
 import type { PricingEntry } from "./PricingTab";
 import { formatPricingDate, formatUsdRate } from "../utils/formatting";
@@ -7,7 +8,7 @@ export function isHistoricalPricing(entry: PricingEntry): boolean {
   return (
     entry.historical === true ||
     entry.editable === false ||
-    entry.model_id.startsWith("gpt-realtime-")
+    isRetiredTelefunOpenAiRealtimeSelection({ modelId: entry.model_id })
   );
 }
 

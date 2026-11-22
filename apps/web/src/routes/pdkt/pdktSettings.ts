@@ -1,4 +1,4 @@
-import { coerceKetikPdktModelId } from "@trainers/types";
+import { AI_TASK_DEFINITIONS, coerceKetikPdktModelId } from "@trainers/types";
 import type {
   PdktConsumerType,
   PdktIdentity,
@@ -33,7 +33,8 @@ const CONSUMER_NAME_MENTION_PATTERNS = [
   "none",
 ] as const;
 
-export const DEFAULT_PDKT_MODEL_ID = "gemini-3.8-flash";
+export const DEFAULT_PDKT_MODEL_ID =
+  AI_TASK_DEFINITIONS.default_text.codeDefault;
 
 /**
  * Karakter konsumen cadangan bila katalog `/pdkt/consumer-types` belum

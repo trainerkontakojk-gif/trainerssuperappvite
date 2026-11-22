@@ -1,5 +1,7 @@
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
+  isRetiredTelefunOpenAiRealtimeSelection,
   normalizeTelefunLiveModelSelection,
   type NormalizedTelefunLiveModelSelection,
   type TelefunLiveModelWarningReason,
@@ -15,22 +17,11 @@ import {
 
 export type { TelefunTransport } from "@trainers/types";
 
-const HISTORICAL_OPENAI_REALTIME_MODEL_IDS = new Set([
-  "gpt-realtime-2.1",
-  "gpt-realtime-2.1-mini",
-]);
-
 export function isHistoricalTelefunOpenAiSelection(
   modelId: unknown,
   transport: unknown,
 ): boolean {
-  return (
-    (typeof modelId === "string" &&
-      (HISTORICAL_OPENAI_REALTIME_MODEL_IDS.has(modelId) ||
-        modelId.startsWith("gpt-realtime-"))) ||
-    transport === "openai-audio" ||
-    transport === "openai-webrtc"
-  );
+  return isRetiredTelefunOpenAiRealtimeSelection({ modelId, transport });
 }
 
 export function normalizeTelefunBrowserSelection(
@@ -611,5 +602,5 @@ export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
     voiceName: "",
   },
   telefunModelId: DEFAULT_TELEFUN_LIVE_MODEL_ID,
-  telefunTransport: "gemini-live",
+  telefunTransport: TELEFUN_GEMINI_LIVE_TRANSPORT,
 };

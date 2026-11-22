@@ -2,6 +2,7 @@ import {
   GEMINI_LIVE_PRICING,
   getTelefunLiveModel,
   resolveGeminiLiveFallbackPerMillion,
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
 } from "@trainers/types";
 import {
   calculateFinalLiveUsageCost,
@@ -28,7 +29,7 @@ export async function flushLiveUsage(
   const model = getTelefunLiveModel(modelId);
   if (
     model?.provider !== "gemini" ||
-    model.realtime.transport !== "gemini-live"
+    model.realtime.transport !== TELEFUN_GEMINI_LIVE_TRANSPORT
   ) {
     console.error(
       "[Telefun Usage] Refusing non-Gemini model for Gemini usage",
@@ -45,7 +46,8 @@ export async function flushLiveUsage(
       getBillingRate(),
     ]);
 
-    const usesGeminiLivePricing = model.realtime.transport === "gemini-live";
+    const usesGeminiLivePricing =
+      model.realtime.transport === TELEFUN_GEMINI_LIVE_TRANSPORT;
     const geminiFallback =
       resolveGeminiLiveFallbackPerMillion(usesGeminiLivePricing);
     const inputPricePerMillion =

@@ -1,5 +1,6 @@
 import type { ValidatedTelefunSessionConfigure } from "../server-protocol.js";
 import type { RealtimeProviderAdapter } from "./RealtimeProviderAdapter.js";
+import { TELEFUN_GEMINI_LIVE_TRANSPORT } from "@trainers/types";
 
 export interface RealtimeProviderRouterDependencies {
   createGeminiAdapter: (
@@ -18,7 +19,7 @@ export function createRealtimeProviderAdapter(
 ): RealtimeProviderRouterResult {
   if (
     configuration.model.provider !== "gemini" ||
-    configuration.model.realtime.transport !== "gemini-live"
+    configuration.model.realtime.transport !== TELEFUN_GEMINI_LIVE_TRANSPORT
   ) {
     return { ok: false, reason: "unsupported_provider" };
   }

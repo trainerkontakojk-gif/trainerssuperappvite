@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { TELEFUN_GEMINI_LIVE_TRANSPORT } from "@trainers/types";
 import { env } from "../env.js";
 import {
   assertTelefunWebRtcModelId,
@@ -150,7 +151,10 @@ export interface TelefunWebRtcDb {
     scopeKey: string;
     userId: string;
     sessionId?: string;
-    provider: "openai-webrtc" | "gemini-live" | "openai-websocket";
+    provider:
+      | "openai-webrtc"
+      | typeof TELEFUN_GEMINI_LIVE_TRANSPORT
+      | "openai-websocket";
     windowSeconds: number;
     requestLimit: number;
   }): Promise<{

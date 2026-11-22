@@ -1,4 +1,5 @@
 import { Context, Next } from "hono";
+import { TELEFUN_GEMINI_LIVE_TRANSPORT } from "@trainers/types";
 
 export interface TelefunDistributedRateLimitClient {
   rpc(
@@ -24,7 +25,10 @@ export async function consumeTelefunDistributedRateLimit(input: {
   client: TelefunDistributedRateLimitClient;
   userId: string;
   sessionId?: string;
-  provider: "openai-webrtc" | "gemini-live" | "openai-websocket";
+  provider:
+    | "openai-webrtc"
+    | typeof TELEFUN_GEMINI_LIVE_TRANSPORT
+    | "openai-websocket";
   scope: TelefunRateLimitScope;
   requestLimit: number;
   windowSeconds?: number;

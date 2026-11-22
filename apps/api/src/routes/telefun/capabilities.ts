@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { User } from "@supabase/supabase-js";
+import { DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID } from "../../lib/ai-models";
 
-const OPENAI_WEBRTC_MODEL_ID = "gpt-realtime-2.1" as const;
+const OPENAI_WEBRTC_MODEL_ID = DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID;
 const OPENAI_WEBRTC_TRANSPORT = "openai-webrtc" as const;
 
 type Variables = { user: User; profile: any };

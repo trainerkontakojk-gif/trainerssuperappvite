@@ -3,7 +3,10 @@
  * historical persistence paths kept for legacy WebRTC call finalization.
  */
 
-import { getTelefunLiveModel } from "@trainers/types";
+import {
+  getTelefunLiveModel,
+  isRetiredTelefunOpenAiRealtimeSelection,
+} from "@trainers/types";
 import {
   admin,
   getBillingRate,
@@ -406,7 +409,7 @@ export async function recordFailedOpenAIRealtimeUsage(
 ): Promise<boolean> {
   // Retired realtime IDs are never allowed to create a fresh usage audit,
   // even if a future registry edit accidentally exposes one again.
-  if (modelId.startsWith("gpt-realtime-")) return false;
+  if (isRetiredTelefunOpenAiRealtimeSelection({ modelId })) return false;
   const model = getTelefunLiveModel(modelId) as
     { provider: "openai"; id: string } | undefined;
   if (model?.provider !== "openai") return false;
@@ -459,7 +462,7 @@ export async function flushOpenAIRealtimeUsage(
 ): Promise<boolean> {
   // New Telefun OpenAI Realtime usage is permanently disabled. Keep the
   // historical calculation helpers above for immutable usage-read support.
-  if (modelId.startsWith("gpt-realtime-")) return false;
+  if (isRetiredTelefunOpenAiRealtimeSelection({ modelId })) return false;
   const model = getTelefunLiveModel(modelId) as
     { provider: "openai"; id: string } | undefined;
   if (model?.provider !== "openai") {

@@ -1,4 +1,7 @@
-import type { SessionMetrics } from "@trainers/types";
+import {
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
+  type SessionMetrics,
+} from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
 import { normalizeTelefunBrowserSelection } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
@@ -187,7 +190,7 @@ export function createTelefunTransport(
   const session: GeminiTelefunTransportSession = new LiveSession({
     ...config,
     telefunModelId: selection.model.id,
-    telefunTransport: "gemini-live",
+    telefunTransport: TELEFUN_GEMINI_LIVE_TRANSPORT,
   });
   return session;
 }

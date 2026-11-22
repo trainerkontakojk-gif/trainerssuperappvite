@@ -1,6 +1,10 @@
 import { randomUUID } from "crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { resolveModelProvider, supportsTemperature } from "./ai-models";
+import {
+  DEFAULT_OPENAI_MODEL_ID,
+  resolveModelProvider,
+  supportsTemperature,
+} from "./ai-models";
 import { logAiUsage, UsageContext } from "./ai-usage";
 import { sanitizeAiResponse } from "./ai-sanitize";
 
@@ -102,7 +106,7 @@ export async function generateOpenAIContent(options: {
   const requestId = `openai-${randomUUID()}`;
   const apiKey = process.env.OPENAI_API_KEY;
   const { modelId, timeoutMs } = resolveModelProvider(
-    options.model ?? "gpt-5.4-mini",
+    options.model ?? DEFAULT_OPENAI_MODEL_ID,
   );
   const logTerminal = async (
     status: "success" | "failed" | "timeout",

@@ -10,6 +10,7 @@ import {
   AI_MODELS,
   DEFAULT_AI_MODEL_ID,
   getProviderFromModelId,
+  supportsGeminiSystemInstruction,
 } from "./ai-models";
 import { logAiUsage, UsageContext } from "./ai-usage";
 import { sanitizeAiResponse } from "./ai-sanitize";
@@ -79,9 +80,8 @@ export async function generateGeminiContent(options: {
 
     const ai = getGeminiClient();
     const modelName = options.model || DEFAULT_AI_MODEL_ID;
-    const supportsSystemInstruction = !modelName.includes(
-      "gemini-3-flash-preview",
-    );
+    const supportsSystemInstruction =
+      supportsGeminiSystemInstruction(modelName);
 
     let systemInstruction: string | undefined;
     let contents = options.contents;
@@ -202,7 +202,7 @@ export async function generateGeminiContent(options: {
 
         if (inputTokens > 0 || outputTokens > 0) {
           await logAiUsage({
-            requestId: `gemini-${randomUUID()}`,
+            requestId: ["gemini", randomUUID()].join("-"),
             userId: options.userId,
             provider: getProviderFromModelId(modelName),
             modelId: modelName,

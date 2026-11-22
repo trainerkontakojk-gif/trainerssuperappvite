@@ -1,6 +1,7 @@
 import {
   getTelefunLiveModel,
   isGeminiLiveVoiceName,
+  TELEFUN_GEMINI_LIVE_TRANSPORT,
   type HistoricalTelefunOpenAiRealtimeModel,
   type TelefunLiveModel,
   type TelefunSessionConfigure,
@@ -69,7 +70,7 @@ export function parseTelefunSessionConfigure(
   if (
     !model ||
     model.provider !== "gemini" ||
-    model.realtime.transport !== "gemini-live"
+    model.realtime.transport !== TELEFUN_GEMINI_LIVE_TRANSPORT
   ) {
     return { ok: false, reason: "unknown_model" };
   }

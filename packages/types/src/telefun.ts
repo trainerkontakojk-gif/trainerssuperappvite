@@ -7,7 +7,7 @@ import type { TelefunTranscriptEntry } from "./telefun-transcript";
 export interface TelefunSessionConfigure {
   type: "telefun_session_configure";
   modelId: string;
-  transport: "gemini-live" | "openai-audio" | "openai-webrtc";
+  transport: TelefunTransport;
   voice: string;
   instructions: string;
   inputAudio: {

@@ -6,6 +6,7 @@ import {
   AI_TASK_DEFINITIONS,
   DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID,
   KETIK_PDKT_MODELS,
   TEXT_SIMULATION_MODELS,
   TEXT_MODELS,
@@ -20,6 +21,7 @@ export {
   SELECTABLE_MODELS,
   DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID,
   KETIK_PDKT_MODELS,
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
@@ -43,6 +45,9 @@ export const TELEFUN_ASSESSMENT_MODEL =
 // SIDAK dashboard forecast narration ("Perbarui Prediksi").
 export const SIDAK_FORECAST_MODEL =
   AI_TASK_DEFINITIONS.sidak_forecast.codeDefault;
+
+// Legacy OpenAI wrapper fallback; distinct from the Gemini default task policy.
+export const DEFAULT_OPENAI_MODEL_ID = "gpt-5.4-mini";
 
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (model) => model.provider === "gemini",
@@ -110,6 +115,10 @@ export function supportsTemperature(modelId?: string | null): boolean {
     MODEL_REGISTRY.find((model) => model.id === normalized)
       ?.supportsTemperature ?? true
   );
+}
+
+export function supportsGeminiSystemInstruction(modelId: string): boolean {
+  return !modelId.includes("gemini-3-flash-preview");
 }
 
 export function getModelsForModule(

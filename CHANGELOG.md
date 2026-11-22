@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-22
 
+- chore(eslint): reject model ids outside registries
+
 - chore(eslint): route AI SDK imports through usage wrappers
 
 ## 2026-11-18

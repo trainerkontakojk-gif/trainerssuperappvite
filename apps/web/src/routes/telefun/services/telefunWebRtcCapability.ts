@@ -1,4 +1,6 @@
-export const OPENAI_WEBRTC_MODEL_ID = "gpt-realtime-2.1" as const;
+import { DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID } from "@trainers/types";
+
+export const OPENAI_WEBRTC_MODEL_ID = DEFAULT_TELEFUN_OPENAI_WEBRTC_MODEL_ID;
 export const OPENAI_WEBRTC_TRANSPORT = "openai-webrtc" as const;
 
 export interface TelefunWebRtcCapability {
