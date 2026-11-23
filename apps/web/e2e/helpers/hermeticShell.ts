@@ -73,7 +73,12 @@ export type HermeticShellOptions = {
    * tanpa dihitung sebagai egress tak terduga. Tetap di-abort.
    */
   expectedThirdPartyHosts?: readonly string[];
-  /** Pola URL yang ditunggu setelah navigasi. Default: string `options.path`. */
+  /**
+   * URL yang ditunggu setelah navigasi. String dicocokkan pada pathname saja
+   * (default: pathname `options.path`), karena rute dengan `validateSearch`
+   * menormalkan query string saat app mount, mis. `/tna` menjadi
+   * `/tna?service=call&...`. Pakai RegExp untuk mencocokkan query.
+   */
   waitForUrl?: string | RegExp;
   /**
    * Dipanggil setelah guard terpasang dan sebelum halaman dibuka. Route yang
@@ -295,7 +300,12 @@ export async function openHermeticShell(
   await options.beforeNavigate?.(page);
   await page.goto(options.path);
   const waitFor = options.waitForUrl ?? options.path;
-  await page.waitForURL(typeof waitFor === "string" ? `**${waitFor}` : waitFor);
+  if (typeof waitFor === "string") {
+    const pathname = new URL(waitFor, "http://localhost").pathname;
+    await page.waitForURL((url) => url.pathname === pathname);
+  } else {
+    await page.waitForURL(waitFor);
+  }
   return audit;
 }
 
