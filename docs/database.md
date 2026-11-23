@@ -356,6 +356,36 @@ anon denial, dan Gemini/non-WebRTC aggregate boundary terverifikasi.
 - **`qa_service_rule_versions`**: Versi rule per service+periode dengan status `draft`, `published`, atau `superseded`.
 - **`qa_service_rule_indicators`**: Snapshot indikator per rule version. `legacy_indicator_id` (tanpa FK) memetakan snapshot ke master `qa_indicators`; snapshot lama yang masih `NULL` tidak bisa dicatat sebagai temuan dan ditandai "Belum terhubung" di Input Temuan sampai dipetakan (lihat `plans/markdown/sidak-unmapped-indicator-findings.md`). Query read-only produksi 2026-11-07 (TNA Fase 5 T4): 0 snapshot `NULL` dan 0 mapping menggantung dari 102 snapshot di 10 versi, jadi tidak ada backfill (`plans/markdown/tna-phase-5-t4-report.md`).
 
+#### Cache baris temuan per tahun
+
+Migration `20261123130000_qa_temuan_year_versions.sql` menambah tabel internal
+`app_internal.qa_temuan_year_versions(tahun integer PRIMARY KEY, version bigint
+NOT NULL, changed_at timestamptz NOT NULL DEFAULT now())`. Tabel tidak mendapat
+grant langsung ke role API atau client. Tidak ada backfill: tahun yang belum
+mempunyai row berarti versi `0`.
+
+Statement trigger AFTER INSERT/UPDATE/DELETE menaikkan versi sekali per tahun
+berbeda yang disentuh statement; UPDATE yang memindahkan temuan menaikkan versi
+tahun lama dan baru. Nilai `tahun IS NULL` diabaikan karena kolom tetap nullable
+dan trigger `fill_tahun_from_period()` hanya dapat mengisi tahun bila period
+yang dirujuk ditemukan. BEFORE TRUNCATE menaikkan semua versi yang ada dan
+memasukkan versi awal untuk setiap tahun berisi baris sebelum data dihapus.
+Keempat trigger `ENABLE ALWAYS`, sehingga tetap mencatat perubahan saat
+`session_replication_role = replica`.
+
+Trigger memakai fungsi `SECURITY DEFINER` dengan `search_path` kosong dan nama
+schema-qualified. Penulis `qa_temuan` tidak memerlukan grant baru. RPC
+`public.get_qa_temuan_year_version(integer)` juga `SECURITY DEFINER`, memanggil
+`app_internal.assert_service_role()` pada awal fungsi, menolak `anon` dan
+`authenticated`, dan hanya memberi EXECUTE kepada `service_role`; tahun yang
+belum mempunyai row mengembalikan `0`.
+
+API membaca RPC sebelum memindai row tahun dan memeriksa ulang setelah
+`SIDAK_TEMUAN_VERSION_CHECK_MS` (default 10.000 ms). Kegagalan RPC menjalankan
+satu full scan untuk request itu tanpa menyimpan hasil ke cache; kegagalan scan
+tetap diteruskan. Rollback hanya menghapus RPC, trigger, tabel versi turunan,
+dan fungsi trigger; data temuan tidak berubah.
+
 #### Apply produksi 2026-11-09
 
 - Disetujui Fajar. Preflight read-only: versi terakhir `20261109120000`, migration `20261109210000` belum tercatat, kolom dan fungsi belum ada; total 8.519 baris.

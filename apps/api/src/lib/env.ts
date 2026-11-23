@@ -15,6 +15,11 @@ try {
 
 const envSchema = z.object({
   PORT: z.string().default("3001").transform(Number),
+  SIDAK_TEMUAN_VERSION_CHECK_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(10_000),
   VITE_SUPABASE_URL: z.string().url(),
   VITE_SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),

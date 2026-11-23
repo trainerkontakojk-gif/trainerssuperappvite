@@ -249,7 +249,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - **KETIK review durable**: `routes/ketik-reviews.ts` hanya enqueue manual (202 untuk queued/processing), tidak memanggil AI. RPC backend-only mengunci history lalu job untuk enqueue/claim/publish, memakai token lease per claim, tiga attempt maksimum, dan publikasi review/typos/skor/job atomik. Rerun mempertahankan hasil lama sampai pengganti berhasil; status polling read-only dan tidak memalsukan timeout. `workers/ketik-review-worker-runtime.ts` adalah worker opt-in serial dengan satu status union host (`idle/running/stopping/stopped/faulted`) dan transisi fase kerja terpusat, termasuk `release_timed_out`. Outcome shutdown disimpan di state dan hanya timeout claim yang aktif saat stop yang menandai deferred recovery. Transisi ilegal men-terminalkan host sebagai `faulted`, menghentikan admission dan menurunkan health; rejection loop ditangani agar proses API embedded tetap hidup, sedangkan shutdown melaporkan deferred recovery dengan lease expiry sebagai pemulihan. Deadline/shutdown memakai satu bounded release (maksimum `min(shutdownMs, 20000)` ms); deadline release timeout menurunkan health sampai poll sukses berikutnya dan tidak menghalangi claim job berikutnya. Saat deadline habis atau shutdown melepas claim, worker membatalkan request provider, melepas claim, lalu menunggu penyelesaian pemrosesan dengan batas waktu; hasil attempt yang dibatalkan tidak dipublikasikan maupun dihitung sebagai gagal. Pembatalan provider hanya di sisi client: request yang sudah berjalan tetap dapat ditagihkan, tetapi fallback dan retry setelah pembatalan tidak dimulai. RPC/provider terlambat tetap dipagari token/expiry. Worker ini berjalan **di dalam proses API** lewat `api-runtime.ts` bila `KETIK_REVIEW_WORKER_ENABLED=true`, seperti worker scoring Telefun, dengan backoff saat idle dan wake enqueue hanya dalam proses yang sama; `workers/ketik-review-worker-entrypoint.ts` tetap tersedia sebagai host standalone cadangan dengan health loopback. Daftar/summary history tetap self; detail sesi, review dan status memakai owner/admin atau trainer yang mengelola assignment penerima. RPC baca memotret hasil/score/job dalam satu statement. Token lease tidak diberi SELECT ke JWT pengguna. Aktivasi/rollback di `docs/deployment.md`, tanpa aktivasi remote otomatis.
 - **SIDAK Simulation History**: Agent detail reads canonical KETIK/PDKT/Telefun history through `apps/api/src/routes/sidak/simulations.ts`. The service filters exact participant attribution, resolves leader service scope before reading history, and loads transcript/review only for the detail request. Monitoring detail panels are reused as renderers through preloaded review data.
 - **SIDAK reference data cache**: API processes cache global periods, active indicators, published rule versions, rule-indicator snapshots, and service weights for 60 seconds. API writes invalidate the affected local cache; write guards and temuan validation read fresh. Railway and Coolify have separate caches, so writes on one instance can remain unseen on the other for up to the TTL. The same limit applies to out-of-process writes including migrations, seeds, `scripts/database-parity/*`, the dashboard SQL editor, and direct calls to `publish_sidak_rule_version` outside the API. User-JWT TNA and EFEK reference queries remain uncached.
-- **SIDAK temuan row cache** (`services/sidak/temuan-row-cache.ts`): one year of `qa_temuan` rows (every service, peserta, and phantom row; no long text) is cached per instance for 60 seconds and shared by the dashboard (`getDashboardData`, so also ranking and forecast), the dashboard trend (`fetchPaginatedTrendData` with a year), and the agent directory, together with the dashboard's `profiler_peserta` columns. Each caller applies its own scope, service, period, folder, phantom, and exclusion filters in memory with the same semantics as the former PostgREST filters; access scope is never part of the key or the value. Reads without a year, and single-agent dashboard reads (`peserta_id`, e.g. quickview), keep the uncached query. A year above 150,000 rows is not cached. On top of it, `getAgentDirectorySummary` (used by `GET /sidak/agents` and the Home "agents below target" item) caches the unscoped, scored directory per year and service set for 60 seconds; scope and folder/jabatan exclusion are applied per request. API writes to `qa_temuan` (batch, perfect-score session, update, delete) and `profiler_peserta` (create, update, delete, bulk/copy, move, folder rename/delete/duplicate) call `invalidateSidakTemuanCaches()`, which clears both caches locally. Reference-table changes are covered by their own caches; SQL-only and other-instance (Railway ↔ Coolify) writes appear after at most the TTL. Real-backend E2E fixtures that write through SQL call `resetSidakReferenceCache()` or `invalidateSidakTemuanCaches()`.
+- **SIDAK temuan row cache** (`services/sidak/temuan-row-cache.ts`): one year of `qa_temuan` rows (every service, peserta, and phantom row; no long text) is cached per instance and shared by the dashboard (`getDashboardData`, so also ranking and forecast), the dashboard trend (`fetchPaginatedTrendData` with a year), and the agent directory. Each cached year stores the version read before its row scan; `SIDAK_TEMUAN_VERSION_CHECK_MS` defaults to 10 seconds and bounds how long an unchanged version is trusted. Out-of-process and other-instance writes (Railway ↔ Coolify) become visible to dashboard/trend reads on the first version check after the write, rather than waiting for the former 60-second row TTL. A year above 150,000 rows is not cached. Each caller applies its own scope, service, period, folder, phantom, and exclusion filters in memory; access scope is never part of the key or value. Reads without a year and single-agent dashboard reads (`peserta_id`, e.g. quickview) remain uncached. The dashboard's `profiler_peserta` columns and the unscoped scored directory in `getAgentDirectorySummary` (used by `GET /sidak/agents` and Home "agents below target") retain their separate 60-second caches; scope and folder/jabatan exclusion are applied per request. API writes to `qa_temuan` (batch, perfect-score session, update, delete) and `profiler_peserta` (create, update, delete, bulk/copy, move, folder rename/delete/duplicate) still invalidate the affected local caches immediately. Version-check failure triggers one full scan for that request and does not cache the result. See `app_internal.qa_temuan_year_versions` and `get_qa_temuan_year_version()` in `docs/database.md`.
 - **SIDAK Dashboard Performance**: Endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi. Materialized view (`mv_qa_period_summary`) dan tabel cache/summary (`qa_dashboard_period_summary`) dipelihara terpisah untuk kompatibilitas database, workflows backfill, dan offline analytics, namun tidak digunakan pada read-path dashboard utama.
 - **SIDAK Dashboard Forecast**: Prediksi dashboard menggunakan batch forecast persistence dengan SHA-256 fingerprinting. 3-state lifecycle (`missing`/`fresh`/`stale`) dengan visual attention effects. Angka menggunakan regresi linear deterministik, narasi menggunakan Gemini 3.8 Flash (`SIDAK_FORECAST_MODEL`). Snapshot disimpan di tabel `sidak_dashboard_forecast_snapshots` dengan akses terbatas ke `service_role` saja. `cacheOnly` lookup di mount page — Gemini hanya dipanggil saat user klik "Perbarui Prediksi".
 - **Beranda "Perlu perhatian"** (`GET /api/v1/home/attention`, `routes/home.ts` → `services/home/attention.ts`): agregat ringan untuk Beranda staff. Tiap sumber hanya dijalankan bila capability peran mengizinkan dan memakai ulang fungsi halaman asalnya — permintaan akses leader dari sumber `/admin/leader-requests/pending` (`admin.leaderAccess`), agen di bawah target 95 dari `getAgentDirectorySummary` dengan scope yang sama seperti direktori agen (`sidak.read`, leader terbatas pada timnya), periode QA bulan berjalan WIB yang belum dibuat (`sidak.config.manage`), dan satu peserta dengan ulang tahun terdekat dari `getUpcomingBirthdays(1)` yang sama dengan `/profiler/peserta/upcoming-birthdays` (`participants.readAll`, jadi hanya admin/trainer; item `upcoming_birthday` dengan `birthday { pesertaId, nama, tglLahir, batchName, daysUntil, age }`, "hari ini" dalam WIB, selalu dikirim selama ada peserta bertanggal lahir). Sumber dijalankan dengan `Promise.allSettled`; item berhitungan 0 tidak dikirim, dan sumber yang gagal hanya menghilangkan itemnya dengan `partial: true`. Kontrak di `packages/types/src/home.ts`; item `agents_below_target` menyertakan `worstAgents` opsional (maksimal tiga `{ agentId, nama, score }`, urut skor naik lalu nama) dari direktori yang **sudah** dibatasi scope pemanggil. Tidak ada query di luar fungsi sumber asalnya dan tidak ada panggilan AI.
@@ -452,16 +452,16 @@ Tanpa baris kebijakan, backend memakai default kode berikut. Nilai `null` yang d
 secara eksplisit berarti **Bawaan model** dan mengirim request tanpa `thinkingConfig`.
 Reset menghapus override dan kembali ke default kode.
 
-| Use case | Default kode |
-| --- | --- |
-| `ketik_reply` | `LOW` |
-| `ketik_review` | Bawaan model |
-| `pdkt_reply` | `LOW` |
-| `pdkt_evaluation` | Bawaan model |
-| `telefun_transcription` | `LOW` |
-| `telefun_assessment` | Bawaan model |
-| `telefun_coaching` | `MEDIUM` |
-| `sidak_forecast` | `LOW` |
+| Use case                | Default kode |
+| ----------------------- | ------------ |
+| `ketik_reply`           | `LOW`        |
+| `ketik_review`          | Bawaan model |
+| `pdkt_reply`            | `LOW`        |
+| `pdkt_evaluation`       | Bawaan model |
+| `telefun_transcription` | `LOW`        |
+| `telefun_assessment`    | Bawaan model |
+| `telefun_coaching`      | `MEDIUM`     |
+| `sidak_forecast`        | `LOW`        |
 
 `resolveAiThinkingLevel(scope, effectiveModelId)` memeriksa level yang telah diverifikasi
 untuk model efektif pada setiap panggilan. Provider non-Gemini, model yang tidak dikenal,
@@ -470,15 +470,15 @@ tanpa `thinkingConfig`; level tidak pernah dipetakan ke nilai lain. Daftar verif
 mengikuti [panduan thinking Gemini](https://aistudio.google.com/docs/thinking), dengan
 batas proyek berikut:
 
-| Model | Level yang dikirim |
-| --- | --- |
-| `gemini-4-hydrogen` | `LOW`, `MEDIUM`, `HIGH` (panduan juga mencantumkan `xhigh`, belum didukung enum proyek) |
-| `gemini-3.8-flash` | `LOW`, `MEDIUM`, `HIGH` |
-| `gemini-3.5-flash-lite` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
-| `gemini-3-flash-preview` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
-| `gemini-3.1-pro-preview` | `LOW`, `MEDIUM`, `HIGH` |
-| `gemini-3.5-flash` | Belum terverifikasi dalam panduan saat ini |
-| `gemini-3.1-flash-lite` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
+| Model                    | Level yang dikirim                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `gemini-4-hydrogen`      | `LOW`, `MEDIUM`, `HIGH` (panduan juga mencantumkan `xhigh`, belum didukung enum proyek) |
+| `gemini-3.8-flash`       | `LOW`, `MEDIUM`, `HIGH`                                                                 |
+| `gemini-3.5-flash-lite`  | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH`                                                      |
+| `gemini-3-flash-preview` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH`                                                      |
+| `gemini-3.1-pro-preview` | `LOW`, `MEDIUM`, `HIGH`                                                                 |
+| `gemini-3.5-flash`       | Belum terverifikasi dalam panduan saat ini                                              |
+| `gemini-3.1-flash-lite`  | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH`                                                      |
 
 Level diterapkan pada KETIK reply/review, PDKT reply/evaluation, Telefun transcription,
 assessment/coaching dan annotations, serta SIDAK forecast. Gemini image generation dan
