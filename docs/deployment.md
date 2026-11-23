@@ -694,6 +694,11 @@ PRODUCTION. API dan Telefun tetap service Railway; Vercel tidak menggantikan
 kedua backend tersebut. Railway Web staging tetap didukung sebagai target
 staging normal; hanya Railway Web PRODUCTION yang noncanonical/auxiliary.
 
+Status sejak 2026-11-23: route pertama `vercel.json` mengalihkan setiap request
+ke host `trainers-superapp.vercel.app` dengan `307` ke
+`https://trainerssuperapp.my.id/<path>` (web di Coolify). URL preview Vercel
+tidak terkena. Hapus route itu bila Vercel kembali menjadi web produksi.
+
 ### Deployment Policy
 
 | Environment            | Purpose                | Auth / API / Telefun |

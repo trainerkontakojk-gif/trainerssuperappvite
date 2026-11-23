@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- feat(web): redirect trainers-superapp.vercel.app to trainerssuperapp.my.id
+
 - docs(deploy): note that the old Coolify Nixpacks resources were deleted
 
 - docs(deploy): record that Coolify production now runs the GHCR image resources
