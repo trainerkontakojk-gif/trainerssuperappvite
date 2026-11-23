@@ -9,6 +9,7 @@ import { labelJabatan } from "@trainers/types";
 import { profilerApi } from "../../../../lib/profilerService";
 import { supabase } from "../../../../lib/supabase";
 import { notify } from "../../../../lib/toast";
+import { isImeComposing } from "../../../../lib/keyboard";
 import { ProfilerFolderSelect } from "../ProfilerFolderSelect";
 import { Button } from "../../../../components/ui/button";
 import {
@@ -405,7 +406,8 @@ export default function ProfilerAddForm({
                       value={newTimName}
                       onChange={(event) => setNewTimName(event.target.value)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter") void handleAddTim();
+                        if (event.key === "Enter" && !isImeComposing(event))
+                          void handleAddTim();
                         if (event.key === "Escape") setShowAddTim(false);
                       }}
                       placeholder="Nama tim baru"

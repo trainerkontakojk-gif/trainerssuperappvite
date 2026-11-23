@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import type { ProfilerTim } from "@trainers/types";
 import { profilerApi } from "../../../lib/profilerService";
+import { isImeComposing } from "../../../lib/keyboard";
 import { Button } from "../../../components/ui/button";
 import {
   Dialog,
@@ -122,7 +123,8 @@ export default function ProfilerTeamsDialog({
                 value={newName}
                 onChange={(event) => setNewName(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") void handleAddTeam();
+                  if (event.key === "Enter" && !isImeComposing(event))
+                    void handleAddTeam();
                 }}
                 placeholder="Contoh: Tim Social Media"
                 className="min-h-11 flex-1"

@@ -9,6 +9,7 @@ import {
 } from "../../../components/ui/avatar";
 import { Button } from "../../../components/ui/button";
 import { Textarea } from "../../../components/ui/textarea";
+import { isImeComposing } from "../../../lib/keyboard";
 import type { KetikQuickTemplate, KetikServerSession } from "@trainers/types";
 import { KETIK_PROMPT_LIMITS } from "@trainers/types";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
@@ -184,7 +185,7 @@ export function ChatInterface({
           (prev) =>
             (prev - 1 + filteredTemplates.length) % filteredTemplates.length,
         );
-      } else if (e.key === "Enter" || e.key === "Tab") {
+      } else if ((e.key === "Enter" && !isImeComposing(e)) || e.key === "Tab") {
         if (filteredTemplates.length > 0) {
           e.preventDefault();
           insertTemplate(filteredTemplates[selectedTemplateIndex]);
@@ -195,6 +196,7 @@ export function ChatInterface({
       }
     } else if (e.key === "Enter" && !e.shiftKey && !isOverLimit) {
       e.preventDefault();
+      if (isImeComposing(e)) return;
       handleSend();
     }
   };

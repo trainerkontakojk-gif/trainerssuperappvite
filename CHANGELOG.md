@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- fix(web): ignore Enter that confirms IME composition in chat and profiler inputs
+
 - fix(web): follow the system color scheme and apply the theme before React loads
 
 - docs(db): record the production apply of the qa_temuan year versions
