@@ -141,6 +141,7 @@ export async function generateScenarioEmailTemplate(
       responseMimeType: "application/json",
       usageContext,
       userId,
+      thinkingScope: "pdkt_reply",
     });
 
     if (!response.success) throw new Error(response.error || "Gagal generate template.");
@@ -322,6 +323,7 @@ export async function initializeEmailSession(
       responseMimeType: "application/json",
       usageContext: { module: "pdkt", action: "init_email" },
       userId,
+      thinkingScope: "pdkt_reply",
     });
 
     if (!response.success) {

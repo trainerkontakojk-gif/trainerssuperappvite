@@ -9,6 +9,7 @@ import {
   DEFAULT_KETIK_SCENARIOS,
 } from "@trainers/types";
 import { generateGeminiContent } from "../../lib/gemini";
+import { resolveAiThinkingLevel } from "../../lib/ai-thinking-policy";
 import { generateCompatibleContent } from "../../lib/ai-text";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { UsageContext } from "../../lib/ai-usage";
@@ -479,9 +480,10 @@ ATURAN BALASAN:
 
   try {
     // Temperature is for OpenAI-style providers; Gemini uses its default.
+    const thinkingLevel = await resolveAiThinkingLevel("ketik_reply", modelId);
     const response =
       provider === "gemini"
-        ? await generateGeminiContent(callPayload)
+        ? await generateGeminiContent({ ...callPayload, thinkingLevel })
         : await generateCompatibleContent(provider, {
             ...callPayload,
             temperature: 0.55,

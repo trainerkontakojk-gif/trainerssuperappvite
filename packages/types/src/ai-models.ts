@@ -1,4 +1,5 @@
 import { isGeminiLiveVoiceName } from "./telefun-voices";
+import type { AiThinkingLevel } from "./ai-thinking-policy";
 
 export interface AiModelCapabilities {
   supportsText: boolean;
@@ -38,6 +39,8 @@ export interface AiModelInfo {
   realtime?: AiModelRealtimeMetadata;
   /** False when the vendor API rejects or does not honor temperature. */
   supportsTemperature?: boolean;
+  /** Explicit Gemini GenerateContent levels verified for this model. */
+  supportedThinkingLevels?: readonly AiThinkingLevel[];
 }
 
 export type AIProvider = "gemini" | "openai" | "sumopod";
@@ -395,6 +398,9 @@ export const TEXT_MODELS: AiModelInfo[] = [
       supportsImage: true,
       supportsAudioInput: true,
     },
+    // https://aistudio.google.com/docs/thinking lists low/medium/high/xhigh;
+    // XHIGH is not in AI_THINKING_LEVELS yet.
+    supportedThinkingLevels: ["LOW", "MEDIUM", "HIGH"],
     supportsTemperature: false,
   },
   {
@@ -408,6 +414,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
       supportsImage: true,
       supportsAudioInput: true,
     },
+    supportedThinkingLevels: ["LOW", "MEDIUM", "HIGH"],
   },
   {
     id: "gemini-3.5-flash-lite",
@@ -416,6 +423,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
     provider: "gemini",
     timeoutMs: 120_000,
     capabilities: { supportsText: true, supportsImage: true },
+    supportedThinkingLevels: ["MINIMAL", "LOW", "MEDIUM", "HIGH"],
   },
   {
     id: "gpt-5.6-luna",
@@ -445,6 +453,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
       supportsText: true,
       supportsImage: true,
     },
+    // Not listed in https://aistudio.google.com/docs/thinking; send no level.
   },
   {
     id: "gemini-3.1-flash-lite",
@@ -456,6 +465,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
       supportsText: true,
       supportsImage: true,
     },
+    supportedThinkingLevels: ["MINIMAL", "LOW", "MEDIUM", "HIGH"],
   },
   {
     id: "gemini-3-flash-preview",
@@ -468,6 +478,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
       supportsText: true,
       supportsImage: true,
     },
+    supportedThinkingLevels: ["MINIMAL", "LOW", "MEDIUM", "HIGH"],
   },
   {
     id: "gemini-3.1-pro-preview",
@@ -479,6 +490,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
       supportsText: true,
       supportsImage: true,
     },
+    supportedThinkingLevels: ["LOW", "MEDIUM", "HIGH"],
   },
   GEMINI_31_FLASH_LIVE_MODEL,
   // SumoPod: OpenAI-compatible gateway (ai.sumopod.com). Text only; never a

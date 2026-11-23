@@ -1,4 +1,4 @@
-import { can, normalizeRole } from "@trainers/types";
+import { AI_THINKING_LEVELS, can, normalizeRole } from "@trainers/types";
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -41,6 +41,13 @@ import {
   listTaskModelPolicyAudit,
   setTaskModelPolicy,
 } from "../lib/ai-model-policy";
+import {
+  AiThinkingPolicyError,
+  deleteAiThinkingPolicy,
+  listAiThinkingPolicies,
+  listAiThinkingPolicyAudit,
+  setAiThinkingPolicy,
+} from "../lib/ai-thinking-policy";
 
 type Variables = { user: User; profile: any };
 
@@ -696,6 +703,95 @@ ai.delete(
       return c.json({ success: true, data: null });
     } catch (error) {
       return modelPolicyErrorResponse(c, "monitoring/models DELETE", error);
+    }
+  },
+);
+
+// ── Gemini Thinking Policy per Use Case ─────────────────
+function thinkingPolicyErrorResponse(
+  c: Context,
+  scope: string,
+  error: unknown,
+) {
+  if (error instanceof AiThinkingPolicyError) {
+    return c.json(
+      {
+        success: false as const,
+        error: { code: error.code, message: error.message },
+      },
+      error.status,
+    );
+  }
+  return dbErrorResponse(c, scope, error);
+}
+
+ai.get(
+  "/monitoring/thinking",
+  requireCapability("monitoring.models.read"),
+  async (c) => {
+    try {
+      const data = await listAiThinkingPolicies(createAdminClient());
+      return c.json({ success: true, data });
+    } catch (error) {
+      return thinkingPolicyErrorResponse(c, "monitoring/thinking GET", error);
+    }
+  },
+);
+
+ai.get(
+  "/monitoring/thinking/audit",
+  requireCapability("monitoring.models.read"),
+  async (c) => {
+    try {
+      const items = await listAiThinkingPolicyAudit(createAdminClient());
+      return c.json({ success: true, data: { items } });
+    } catch (error) {
+      return thinkingPolicyErrorResponse(
+        c,
+        "monitoring/thinking/audit GET",
+        error,
+      );
+    }
+  },
+);
+
+const thinkingPolicyPutSchema = z.object({
+  thinkingLevel: z.enum(AI_THINKING_LEVELS).nullable(),
+});
+
+ai.put(
+  "/monitoring/thinking/:scope",
+  requireCapability("monitoring.models.write"),
+  zValidator("json", thinkingPolicyPutSchema),
+  async (c) => {
+    const scope = c.req.param("scope");
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    try {
+      await setAiThinkingPolicy(
+        createAdminClient(),
+        scope,
+        body.thinkingLevel,
+        user.id,
+      );
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return thinkingPolicyErrorResponse(c, "monitoring/thinking PUT", error);
+    }
+  },
+);
+
+ai.delete(
+  "/monitoring/thinking/:scope",
+  requireCapability("monitoring.models.write"),
+  async (c) => {
+    const scope = c.req.param("scope");
+    const user = c.get("user");
+    try {
+      await deleteAiThinkingPolicy(createAdminClient(), scope, user.id);
+      return c.json({ success: true, data: null });
+    } catch (error) {
+      return thinkingPolicyErrorResponse(c, "monitoring/thinking DELETE", error);
     }
   },
 );

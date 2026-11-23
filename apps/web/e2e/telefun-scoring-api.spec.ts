@@ -21,6 +21,7 @@ import { fetchOwnedTelefunQueueJobs } from "./helpers/telefunScoringQueueHarness
 const env = readLoopbackEnv();
 const ns = `telefun-score-${randomUUID().slice(0, 8)}`;
 let agent: Awaited<ReturnType<typeof createUserWithJwt>>;
+let adminUser: Awaited<ReturnType<typeof createUserWithJwt>>;
 let app: Hono;
 let guardedFetch: typeof fetch;
 const providerCalls: { kind: string; prompt: string; payload: any }[] = [];
@@ -93,6 +94,89 @@ async function score(id: string) {
     method: "POST",
     headers: { Authorization: `Bearer ${agent.token}` },
   });
+}
+
+async function setThinkingPolicy(scope: string, thinkingLevel: string | null) {
+  return tnaApiRequest(
+    app,
+    `http://localhost/api/v1/ai/monitoring/thinking/${scope}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${adminUser.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ thinkingLevel }),
+    },
+  );
+}
+
+async function setTelefunAssessmentModel(modelId: string) {
+  return tnaApiRequest(
+    app,
+    "http://localhost/api/v1/ai/monitoring/models/telefun_assessment",
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${adminUser.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ modelId }),
+    },
+  );
+}
+
+async function resetTelefunAssessmentModel() {
+  if (
+    runSql(
+      env,
+      "SELECT to_regclass('public.ai_model_policy') IS NOT NULL",
+    ) !== "t"
+  ) {
+    return;
+  }
+  await tnaApiRequest(
+    app,
+    "http://localhost/api/v1/ai/monitoring/models/telefun_assessment",
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${adminUser.token}` },
+    },
+  );
+  (await import("../../api/src/lib/ai-model-policy"))
+    .invalidateAiModelPolicyCache();
+}
+
+async function clearThinkingPoliciesIfAvailable() {
+  if (
+    runSql(
+      env,
+      "SELECT to_regclass('public.ai_thinking_policy') IS NOT NULL",
+    ) !== "t"
+  ) {
+    return;
+  }
+  for (const scope of [
+    "ketik_reply",
+    "ketik_review",
+    "pdkt_reply",
+    "pdkt_evaluation",
+    "telefun_transcription",
+    "telefun_assessment",
+    "telefun_coaching",
+    "sidak_forecast",
+  ]) {
+    const response = await tnaApiRequest(
+      app,
+      `http://localhost/api/v1/ai/monitoring/thinking/${scope}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${adminUser.token}` },
+      },
+    );
+    expect(response.status, `reset ${scope}`).toBe(200);
+  }
+  runSql(env, "DELETE FROM ai_thinking_policy_audit;");
 }
 
 async function readSession(id: string) {
@@ -235,6 +319,7 @@ test.beforeAll(async () => {
     }
     return guardedFetch(request);
   };
+  adminUser = await createUserWithJwt(env, "admin", `${ns}-admin`);
   agent = await createUserWithJwt(env, "trainer", ns);
   app = (await import("../../api/src/app")).default as unknown as Hono;
   const { env: apiEnv } = await import("../../api/src/lib/env");
@@ -243,6 +328,7 @@ test.beforeAll(async () => {
 
 test.beforeEach(async () => {
   providerCalls.length = 0;
+  requestedModelUrls.length = 0;
   claimTimeouts.length = 0;
   segments = structuredClone(TRANSCRIPT_SEGMENTS);
   transcriptionText = undefined;
@@ -251,6 +337,9 @@ test.beforeEach(async () => {
   providerScores = { rate: 9.9, fillers: 9.9 };
   abortAfterTranscription = undefined;
   releaseCoaching = undefined;
+  changePolicyAfterTranscription = false;
+  await resetTelefunAssessmentModel();
+  await clearThinkingPoliciesIfAvailable();
   const deleted = await createAdmin(env)
     .from("ai_usage_logs")
     .delete()
@@ -276,6 +365,14 @@ test.afterEach(async () => {
 
 test.afterAll(async () => {
   if (guardedFetch) globalThis.fetch = guardedFetch;
+  await resetTelefunAssessmentModel();
+  await clearThinkingPoliciesIfAvailable();
+  if (adminUser) {
+    const deletedAdmin = await createAdmin(env).auth.admin.deleteUser(
+      adminUser.userId,
+    );
+    expect(deletedAdmin.error, "delete run admin user").toBeNull();
+  }
   if (!agent) return;
   const admin = createAdmin(env);
   if (sessionIds.length > 0) {
@@ -434,6 +531,87 @@ test("new scoring transcribes first and persists computed speech facts and clamp
     category: "review",
     itemKey: "telefun_assessment",
   });
+});
+
+test("configured thinking levels are sent per Telefun scope; model default is omitted", async () => {
+  const transcriptionPolicy = await setThinkingPolicy(
+    "telefun_transcription",
+    "MEDIUM",
+  );
+  expect(transcriptionPolicy.status).toBe(200);
+  const assessmentPolicy = await setThinkingPolicy(
+    "telefun_assessment",
+    null,
+  );
+  expect(assessmentPolicy.status).toBe(200);
+  const coachingPolicy = await setThinkingPolicy("telefun_coaching", "HIGH");
+  expect(coachingPolicy.status).toBe(200);
+
+  const id = await createSession();
+  const response = await score(id);
+  expect(response.status).toBe(200);
+  await expect.poll(() => providerCalls.length).toBe(3);
+  expect(
+    providerCalls[0]!.payload.generationConfig.thinkingConfig.thinkingLevel,
+  ).toBe("MEDIUM");
+  expect(providerCalls[1]!.payload.generationConfig).not.toHaveProperty(
+    "thinkingConfig",
+  );
+  expect(
+    providerCalls[2]!.payload.generationConfig.thinkingConfig.thinkingLevel,
+  ).toBe("HIGH");
+});
+
+test("unsupported level is omitted for the effective Gemini model", async () => {
+  const policy = await setThinkingPolicy("telefun_assessment", "MINIMAL");
+  expect(policy.status).toBe(200);
+
+  const id = await createSession();
+  const response = await score(id);
+  expect(response.status).toBe(200);
+  await expect.poll(() => providerCalls.length).toBe(3);
+  expect(requestedModelUrls[1]).toContain("gemini-3.8-flash");
+  expect(providerCalls[1]!.payload.generationConfig).not.toHaveProperty(
+    "thinkingConfig",
+  );
+});
+
+test("Hydrogen sends its supported levels and omits MINIMAL", async () => {
+  const modelPolicy = await setTelefunAssessmentModel("gemini-4-hydrogen");
+  expect(modelPolicy.status).toBe(200);
+  const transcriptionPolicy = await setThinkingPolicy(
+    "telefun_transcription",
+    "HIGH",
+  );
+  expect(transcriptionPolicy.status).toBe(200);
+  // Gemini 4 models do not support MINIMAL.
+  const assessmentPolicy = await setThinkingPolicy(
+    "telefun_assessment",
+    "MINIMAL",
+  );
+  expect(assessmentPolicy.status).toBe(200);
+
+  try {
+    const id = await createSession();
+    expect((await score(id)).status).toBe(200);
+    await expect.poll(() => providerCalls.length).toBe(3);
+    expect(requestedModelUrls).toHaveLength(3);
+    expect(
+      requestedModelUrls.every((url) => url.includes("gemini-4-hydrogen")),
+    ).toBe(true);
+    expect(
+      providerCalls[0]!.payload.generationConfig.thinkingConfig.thinkingLevel,
+    ).toBe("HIGH");
+    expect(providerCalls[1]!.payload.generationConfig).not.toHaveProperty(
+      "thinkingConfig",
+    );
+    // telefun_coaching keeps its MEDIUM code default.
+    expect(
+      providerCalls[2]!.payload.generationConfig.thinkingConfig.thinkingLevel,
+    ).toBe("MEDIUM");
+  } finally {
+    await resetTelefunAssessmentModel();
+  }
 });
 
 test("cached historical scoring remains unchanged without any provider request", async () => {

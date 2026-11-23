@@ -440,6 +440,52 @@ lookup as usage billing; a future schedule alone is insufficient. Reset and its 
 Telefun scoring carries one resolved model through transcription, assessment and follow-up coaching.
 KETIK review claims derive their lease from resolved primary/fallback timeouts.
 
+## Gemini Thinking Level Policy
+
+Thinking level untuk Gemini GenerateContent diatur per use case di **Monitoring → Model**.
+API memakai capability `monitoring.models.read` dan `monitoring.models.write`, sama dengan
+kebijakan model: Admin dan Trainer boleh membaca serta mengubahnya; role lain ditolak.
+Tabel `ai_thinking_policy` dan audit `ai_thinking_policy_audit` hanya dapat diakses backend
+melalui `service_role`. RPC set/reset menulis kebijakan dan audit secara atomik.
+
+Tanpa baris kebijakan, backend memakai default kode berikut. Nilai `null` yang disimpan
+secara eksplisit berarti **Bawaan model** dan mengirim request tanpa `thinkingConfig`.
+Reset menghapus override dan kembali ke default kode.
+
+| Use case | Default kode |
+| --- | --- |
+| `ketik_reply` | `LOW` |
+| `ketik_review` | Bawaan model |
+| `pdkt_reply` | `LOW` |
+| `pdkt_evaluation` | Bawaan model |
+| `telefun_transcription` | `LOW` |
+| `telefun_assessment` | Bawaan model |
+| `telefun_coaching` | `MEDIUM` |
+| `sidak_forecast` | `LOW` |
+
+`resolveAiThinkingLevel(scope, effectiveModelId)` memeriksa level yang telah diverifikasi
+untuk model efektif pada setiap panggilan. Provider non-Gemini, model yang tidak dikenal,
+model belum terverifikasi, atau pasangan model/level yang tidak didukung menerima request
+tanpa `thinkingConfig`; level tidak pernah dipetakan ke nilai lain. Daftar verified levels
+mengikuti [panduan thinking Gemini](https://aistudio.google.com/docs/thinking), dengan
+batas proyek berikut:
+
+| Model | Level yang dikirim |
+| --- | --- |
+| `gemini-4-hydrogen` | `LOW`, `MEDIUM`, `HIGH` (panduan juga mencantumkan `xhigh`, belum didukung enum proyek) |
+| `gemini-3.8-flash` | `LOW`, `MEDIUM`, `HIGH` |
+| `gemini-3.5-flash-lite` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
+| `gemini-3-flash-preview` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
+| `gemini-3.1-pro-preview` | `LOW`, `MEDIUM`, `HIGH` |
+| `gemini-3.5-flash` | Belum terverifikasi dalam panduan saat ini |
+| `gemini-3.1-flash-lite` | `MINIMAL`, `LOW`, `MEDIUM`, `HIGH` |
+
+Level diterapkan pada KETIK reply/review, PDKT reply/evaluation, Telefun transcription,
+assessment/coaching dan annotations, serta SIDAK forecast. Gemini image generation dan
+Telefun Live sengaja tidak memakai kebijakan ini. Rollback
+`rollback_20261123120000_ai_thinking_level_policy.sql` menghapus semua override dan audit;
+rollback kode API/web lebih dulu.
+
 Gemini 4 Hydrogen (`gemini-4-hydrogen`) is an additional text/image choice; Gemini 3.8 Flash remains the primary code default; KETIK review fallback defaults to Gemini 3.5 Flash Lite. Hydrogen has `supportsAudioInput` after the subsequent bounded audio/replay annotation verification in commits `b355a999` and `b6b4ba0c`; the initial smoke had failed annotations before the schema correction; see `plans/markdown/telefun-hydrogen-audio.md` for evidence and limits. Standard pricing is USD 1.50 input / 7.50 output (including thinking) / 0.075 implicit cached input per million tokens, seeded by `20261114130615_add_gemini_4_hydrogen_pricing.sql`; that migration was applied to production on 2026-11-14 after explicit approval. Missing Hydrogen pricing logs tokens at zero cost and prevents policy selection (`MODEL_NO_PRICING`). GenerateContent cachedContentTokenCount is a subset of promptTokenCount; the cached subset is priced through the existing cached-input bucket while remaining prompt tokens stay unspecified, so input is counted once. Existing legacy fallback rates for other models are unchanged. The Monitoring model picker bounds its height to the viewport and scrolls the options while retaining visible header/footer actions.
 
 ## Performance Guardrails (FCP/LCP)

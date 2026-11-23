@@ -12,6 +12,7 @@ import { createAdminClient } from "../../lib/supabase";
 import { generateGeminiContent } from "../../lib/gemini";
 import { TELEFUN_ASSESSMENT_MODEL } from "../../lib/ai-models";
 import { resolveTaskModel } from "../../lib/ai-model-policy";
+import { resolveAiThinkingLevel } from "../../lib/ai-thinking-policy";
 
 type Variables = { user: User; profile: any };
 
@@ -463,6 +464,10 @@ Gunakan timestamp_ms berupa bilangan bulat minimal 0 dan priority berupa bilanga
       const { modelId } = await resolveTaskModel("telefun_assessment");
       const result = await generateGeminiContent({
         model: modelId || TELEFUN_ASSESSMENT_MODEL,
+        thinkingLevel: await resolveAiThinkingLevel(
+          "telefun_assessment",
+          modelId || TELEFUN_ASSESSMENT_MODEL,
+        ),
         systemInstruction:
           "Anda adalah pelatih komunikasi profesional. Analisis rekaman telepon dan berikan catatan objektif dalam format JSON. Gunakan Bahasa Indonesia.",
         contents: [

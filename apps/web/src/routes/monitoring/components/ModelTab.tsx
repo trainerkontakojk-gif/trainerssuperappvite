@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../../dashboard/components/management/ConfirmDial
 import { ModelEditDialog } from "./ModelEditDialog";
 import { useAuthStore } from "../../../store/authStore";
 import { formatPricingDate, mapError } from "../utils/formatting";
+import { ThinkingPolicySection } from "./ThinkingPolicySection";
 
 interface ModelTabProps {
   onNavigateToPricing: () => void;
@@ -190,6 +191,8 @@ export function ModelTab({ onNavigateToPricing }: ModelTabProps) {
           </table>
         </div>
       </div>
+
+      <ThinkingPolicySection canWrite={canWrite} />
 
       {/* Audit Log Table */}
       <div className="rounded-lg border border-border bg-card shadow-xs">

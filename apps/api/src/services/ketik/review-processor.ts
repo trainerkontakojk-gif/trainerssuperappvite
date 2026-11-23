@@ -6,6 +6,7 @@ import {
   type KetikReviewModels,
 } from "../../lib/ai-model-policy";
 import { generateGeminiContent } from "../../lib/gemini";
+import { resolveAiThinkingLevel } from "../../lib/ai-thinking-policy";
 import { generateCompatibleContent } from "../../lib/ai-text";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { UsageContext } from "../../lib/ai-usage";
@@ -66,6 +67,10 @@ async function generateKetikReviewAiResponse(options: {
     if (primaryModel.provider === "gemini") {
       primaryResp = await generateGeminiContent({
         model: primaryModel.modelId,
+        thinkingLevel: await resolveAiThinkingLevel(
+          "ketik_review",
+          primaryModel.modelId,
+        ),
         systemInstruction: options.systemInstruction,
         contents: options.contents as any,
         responseMimeType: "application/json",
@@ -112,6 +117,10 @@ async function generateKetikReviewAiResponse(options: {
     if (fallbackModel.provider === "gemini") {
       fallbackResp = await generateGeminiContent({
         model: fallbackModel.modelId,
+        thinkingLevel: await resolveAiThinkingLevel(
+          "ketik_review",
+          fallbackModel.modelId,
+        ),
         systemInstruction: options.systemInstruction,
         contents: options.contents as any,
         responseMimeType: "application/json",

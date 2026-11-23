@@ -2,8 +2,8 @@ import {
   Content,
   GoogleGenAI,
   Modality,
-  type ThinkingLevel,
 } from "@google/genai";
+import type { AiThinkingLevel } from "@trainers/types";
 import { randomUUID } from "crypto";
 import { getGeminiProxyFetch } from "./gemini-proxy";
 import {
@@ -68,7 +68,9 @@ export async function generateGeminiContent(options: {
   responseMimeType?: string;
   responseSchema?: any;
   responseModalities?: Modality[];
-  thinkingLevel?: ThinkingLevel;
+  // Keep the API's uppercase wire enum; @google/genai's ThinkingConfig type
+  // currently declares lowercase strings despite its uppercase enum values.
+  thinkingLevel?: AiThinkingLevel;
   usageContext?: UsageContext;
   userId?: string;
   sanitizeOutput?: boolean;

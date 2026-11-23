@@ -5,6 +5,9 @@ import type {
   AccessGroupItemRow,
   AiModelPolicyAuditEntry,
   AiModelPolicyItem,
+  AiThinkingLevel,
+  AiThinkingPolicyAuditListResponse,
+  AiThinkingPolicyListResponse,
   BulkUserResponse,
   PesertaSuggestion,
   AccessGroupRow,
@@ -363,6 +366,19 @@ type AiClient = {
   };
   "monitoring/models/audit": {
     $get(): Promise<RpcResponse<{ items: AiModelPolicyAuditEntry[] }>>;
+  };
+  "monitoring/thinking": {
+    $get(): Promise<RpcResponse<AiThinkingPolicyListResponse>>;
+  };
+  "monitoring/thinking/audit": {
+    $get(): Promise<RpcResponse<AiThinkingPolicyAuditListResponse>>;
+  };
+  "monitoring/thinking/:scope": {
+    $put(args: {
+      param: { scope: string };
+      json: { thinkingLevel: AiThinkingLevel | null };
+    }): Promise<RpcResponse<null>>;
+    $delete(args: { param: { scope: string } }): Promise<RpcResponse<null>>;
   };
   "monitoring/billing": {
     $get(): Promise<RpcResponse<{ usd_to_idr_rate: number }>>;

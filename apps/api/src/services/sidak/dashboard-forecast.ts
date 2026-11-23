@@ -10,6 +10,7 @@ import type {
 import { SIDAK_FORECAST_MODEL } from "../../lib/ai-models";
 import { resolveTaskModel } from "../../lib/ai-model-policy";
 import { generateGeminiContent } from "../../lib/gemini";
+import { resolveAiThinkingLevel } from "../../lib/ai-thinking-policy";
 import { roundTo } from "../../lib/math-utils";
 import { getDashboardData } from "./dashboard-data";
 import {
@@ -315,6 +316,10 @@ async function generateBatchInsight(
   const { modelId } = await resolveTaskModel("sidak_forecast");
   const response = await generateGeminiContent({
     model: modelId || SIDAK_FORECAST_MODEL,
+    thinkingLevel: await resolveAiThinkingLevel(
+      "sidak_forecast",
+      modelId || SIDAK_FORECAST_MODEL,
+    ),
     userId,
     usageContext: {
       module: "qa-analyzer",

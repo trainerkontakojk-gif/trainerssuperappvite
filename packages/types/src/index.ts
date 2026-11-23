@@ -18,6 +18,7 @@ export * from "./profiler";
 export * from "./admin";
 export * from "./ai-models";
 export * from "./ai-model-policy";
+export * from "./ai-thinking-policy";
 export * from "./telefun-communication-profile";
 export * from "./monitoring";
 export * from "./simulation-subject";

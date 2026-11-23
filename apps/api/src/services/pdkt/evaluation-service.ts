@@ -665,6 +665,7 @@ export async function evaluateAgentResponse(
           action: "evaluate_response",
         },
         userId,
+        thinkingScope: "pdkt_evaluation",
       });
 
       if (!response.success)

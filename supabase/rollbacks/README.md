@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #      | Rollback Script                                                                    | Dependency                                                                                                                                                                                                              |
 | ------ | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New    | `rollback_20261123120000_ai_thinking_level_policy.sql`                              | DATA LOSS: drops thinking-level policies and audit history; revert API/web first.                                                                                                                                      |
 | New    | `rollback_20261118120000_ketik_deferred_consumer_replies.sql`                      | Stop chat writes and restore the prior API first. Drops unpublished payloads and retires held/queued requests. Preserves published transcripts and history.                                                             |
 | New    | `rollback_20261116180000_ketik_consumer_close_transition.sql`                      | No data loss: stop chat writes while restoring the three session RPCs from `20261116160000`; preserves sessions, messages and ledgers.                                                                                  |
 | New    | `rollback_20261116170000_ketik_review_job_transitions.sql`                         | No data loss: pause review mutations; restores the three prior review RPCs and drops the helper. Current API remains compatible; published scores, reviews and jobs are preserved.                                      |
@@ -215,3 +216,6 @@ done
   Data loss: every EFEK session ↔ TNA plan link is removed; sessions and plans
   themselves are kept. Roll back the API/web first, since they select
   `tna_plans(...)` through that column.
+- `rollback_20261123120000_ai_thinking_level_policy.sql` drops all configured
+  thinking levels and their audit history. Revert API/web code first; policy
+  and audit rows are intentionally lost.

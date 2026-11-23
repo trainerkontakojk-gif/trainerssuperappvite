@@ -289,10 +289,15 @@ secara durable sebelum claim.
   410 setelah pensiun durable. Cache historis valid tetap dibaca tanpa perubahan;
   riwayat terminal scoring `completed` dengan cache malformed atau kosong memberi
   410 langsung tanpa RPC retirement atau mutasi.
-- `analyzeVoiceQuality()` membaca audio agen lalu memanggil `gemini-3.8-flash`
+- `analyzeVoiceQuality()` membaca audio agen lalu memanggil model Telefun efektif
   dua kali berurutan: transkripsi verbatim bersegmen (`startSec`, `endSec`, `text`),
   lalu penilaian lima indikator dengan audio plus transkrip/metrik terhitung.
-  Transkripsi memakai `thinkingLevel: LOW`, tanpa parameter temperature/sampling;
+  `telefun_transcription` memakai default kode `LOW`; `telefun_assessment` memakai
+  Bawaan model kecuali diatur di Monitoring → Model. Follow-up coaching memakai
+  scope `telefun_coaching` dengan default kode `MEDIUM`, sedangkan annotations
+  memakai `telefun_assessment`. Backend hanya mengirim level yang terverifikasi
+  untuk model efektif; level tidak didukung atau model yang belum diverifikasi
+  tidak mengirim `thinkingConfig`. Semua panggilan tetap tanpa parameter temperature/sampling;
   kata pengisi, ejaan informal, pengulangan, dan ucapan terpotong dipertahankan.
   Durasi segmen berasal dari model, bukan forced alignment; tes hermetic tidak
   membuktikan akurasi timestamp maupun teks pada rekaman nyata.

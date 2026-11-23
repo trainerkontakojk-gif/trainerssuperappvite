@@ -1,7 +1,11 @@
-import { coerceKetikPdktModelId } from "@trainers/types";
+import {
+  coerceKetikPdktModelId,
+  type AiThinkingScope,
+} from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
+import { resolveAiThinkingLevel } from "../../lib/ai-thinking-policy";
 import { generateCompatibleContent } from "../../lib/ai-text";
 
 /**
@@ -16,6 +20,7 @@ export async function callAI(options: {
   responseMimeType?: string;
   usageContext?: UsageContext;
   userId?: string;
+  thinkingScope: Extract<AiThinkingScope, "pdkt_reply" | "pdkt_evaluation">;
 }) {
   const { modelId, provider } = resolveModelProvider(
     coerceKetikPdktModelId(options.model),
@@ -33,7 +38,13 @@ export async function callAI(options: {
   // Temperature is for OpenAI-style providers; Gemini deprecated sampling
   // parameters.
   return provider === "gemini"
-    ? await generateGeminiContent(payload)
+    ? await generateGeminiContent({
+        ...payload,
+        thinkingLevel: await resolveAiThinkingLevel(
+          options.thinkingScope,
+          modelId,
+        ),
+      })
     : await generateCompatibleContent(provider, {
         ...payload,
         temperature: options.temperature ?? 0.7,
