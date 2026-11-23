@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- docs(deploy): record that Coolify production now runs the GHCR image resources
+
 - feat(deploy): build API/Telefun and Web images on GitHub Actions and push to GHCR for Coolify
 
 - chore(gitignore): keep local Cloudflare security-audit notes out of the public repo
