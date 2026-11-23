@@ -386,6 +386,13 @@ satu full scan untuk request itu tanpa menyimpan hasil ke cache; kegagalan scan
 tetap diteruskan. Rollback hanya menghapus RPC, trigger, tabel versi turunan,
 dan fungsi trigger; data temuan tidak berubah.
 
+#### Apply produksi 2026-11-23 (year versions)
+
+- Disetujui Fajar. Preflight read-only: versi terakhir `20261123120000`, migration `20261123130000` belum tercatat, tabel versi dan RPC belum ada; total 8.794 baris `qa_temuan`, 0 baris dengan `tahun IS NULL`.
+- `supabase db query --linked -f supabase/migrations/20261123130000_qa_temuan_year_versions.sql`, lalu `supabase migration repair --linked --status applied 20261123130000`; keduanya exit 0 (timestamp UTC persis tidak dicatat).
+- Readback read-only: migration tercatat; tabel `app_internal.qa_temuan_year_versions` ada dengan 0 row; trigger `qa_temuan_year_version_{insert,update,delete,truncate}` semuanya `ENABLE ALWAYS` (`A`); `anon` dan `authenticated` tidak memiliki `EXECUTE` pada `get_qa_temuan_year_version`, `service_role` memiliki; total tetap 8.794 baris.
+- Migration diterapkan sebelum kode API di-push, karena push ke `main` langsung men-deploy API produksi Railway.
+
 #### Apply produksi 2026-11-09
 
 - Disetujui Fajar. Preflight read-only: versi terakhir `20261109120000`, migration `20261109210000` belum tercatat, kolom dan fungsi belum ada; total 8.519 baris.
