@@ -12,3 +12,14 @@ mockups
 plans
 plan
 docs
+# Local-only tool output; absent from a clean clone but large in a working copy.
+**/.turbo
+**/coverage
+artifacts
+graphify-out
+reference-repo
+scratch
+.pi
+.hermes
+.handoff
+.superpowers

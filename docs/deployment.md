@@ -36,11 +36,51 @@ Web; Vercel adalah Web PRODUCTION kanonik.
 ## Prerequisites
 
 - Node.js `^22.23.4 || ^24.22.1 || ^26.12.1` (patched supported release lines).
-  CI uses `.node-version` = `22.23.4`; the Render image pins the same Node patch.
+  CI uses `.node-version` = `22.23.4`; the Render and GHCR images pin the same Node patch.
   A repository pin does not update an already-running production process: verify
   the deployed runtime separately before claiming the Node security fixes are live.
 - pnpm `12.9.1`, matching the root `packageManager` field.
 - Supabase project (with all migrations applied)
+
+## Coolify (VPS) via GHCR images
+
+Workflow **Actions → Coolify images → Run workflow** builds and pushes two
+`linux/amd64` images from the selected commit:
+
+- `ghcr.io/trainerkontakojk-gif/trainers-backend:<full-git-sha>` and `:latest`
+- `ghcr.io/trainerkontakojk-gif/trainers-web:<full-git-sha>` and `:latest`
+
+Sebelum menjalankan workflow, isi kelima **GitHub Actions Variables** berikut
+di **Settings → Secrets and variables → Actions → Variables**. Semuanya wajib
+karena nilainya ditanam ke bundle browser saat build:
+
+- `VITE_API_URL`
+- `VITE_APP_URL`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_TELEFUN_WS_URL`
+
+Paket GHCR harus berstatus **Public** agar Coolify dapat menarik image tanpa
+kredensial. Jika paket dibuat private, konfigurasi registry di Coolify dengan
+`docker login ghcr.io` memakai PAT yang memiliki izin `read:packages`.
+
+Buat resource Coolify bertipe **Docker Image**. Untuk backend, gunakan image
+`trainers-backend` dan set environment `SERVICE=api` atau `SERVICE=telefun`
+sesuai service yang dibuat. API memakai `PORT` (default `3001`) dan health check
+`/api/health`; Telefun memakai `PORT` (default `3002`) dan health check `/health`.
+Keduanya menerima override `PORT` dari Coolify. Web memakai image
+`trainers-web`, port `3005`, dan health check `/`. Resource Coolify saat ini
+memakai `PORT=3000` di ketiga service; samakan "Ports Exposes" dengan nilai
+`PORT` itu. Health check Coolify dijalankan di dalam container memakai `curl`,
+sehingga kedua image sengaja memasang `curl`.
+
+Coolify 4.7.6 tidak bisa mengubah resource Git (Nixpacks) menjadi Docker Image,
+jadi migrasi berarti membuat resource baru, menyalin semua env (termasuk
+`GEMINI_PROXY_URL`), lalu memindahkan domain dari resource lama.
+
+Alur deploy: **Run workflow → Coolify Redeploy** untuk resource image terkait.
+Gunakan tag full SHA untuk memilih rilis tertentu; `latest` menunjuk build
+terakhir yang berhasil dipush.
 
 ## Railway Service Settings (per service)
 
