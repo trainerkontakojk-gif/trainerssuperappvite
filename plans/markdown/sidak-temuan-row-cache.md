@@ -2,7 +2,7 @@
 
 > **Status: selesai (ditutup 2026-11-23).** Semua tugas sudah di-deploy dan diukur. Keputusan RPC WP4 dipindah ke plan induk egress. Penyempurnaan berikutnya: `2be1a5ac` (versi perubahan per tahun).
 
-Lanjutan WP4 di plan induk `supabase-egress-reduction.md` (hanya lokal, sengaja tidak di-commit). Plan ini adalah "opsi murah sebelum RPC" yang tercatat di checklist WP4. Lane C: tanpa migration, mesin skor tidak disentuh.
+Lanjutan WP4 di plan induk [`supabase-egress-reduction.md`](supabase-egress-reduction.md). Plan ini adalah "opsi murah sebelum RPC" yang tercatat di checklist WP4. Lane C: tanpa migration, mesin skor tidak disentuh.
 
 ## Konteks
 
@@ -112,5 +112,5 @@ Invarian yang harus dicek sebelum memetakan periode → tahun: `qa_temuan.tahun`
     - "Lainnya" 213 hit (sebelumnya 227), halaman lanjutan hanya 23. Terbesar: `select=id` (47, ber-scope peserta), teks detail agent (39), heatmap dengan `profiler_peserta!inner` (24, 16 lanjutan), home agent-summary (8, 4 lanjutan).
     - 39 POST `qa_temuan` (pukul 02 dan 10 UTC) tidak diikuti scan ulang dalam jam yang sama.
     - Catatan: traffic Senin tidak dinormalisasi terhadap Kamis 12 Nov (log baseline sudah lewat retensi).
-  - [x] Putuskan apakah RPC WP4 masih perlu: dipindah ke WP4/WP5 plan induk egress (2026-11-23). Rekomendasi: tunda. Sisa `qa_temuan` sudah kecil; cek grafik Usage egress 2–3 hari kerja dulu terhadap target <50 MB/hari.
+  - [x] Putuskan apakah RPC WP4 masih perlu: dipindah ke WP4/WP5 plan induk egress (2026-11-23), lalu RPC dibatalkan karena target tercapai. Rekomendasi saat itu: tunda. Sisa `qa_temuan` sudah kecil; cek grafik Usage egress 2–3 hari kerja dulu terhadap target <50 MB/hari.
   - Temuan sampingan (request, bukan byte): `claimKetikReview` (`review-lifecycle.ts`) memanggil `resolveKetikReviewModels()` sebelum setiap klaim, termasuk saat idle, sehingga TTL 60 detik menghasilkan ±1.380 GET `ai_model_policy`/hari (stabil 59/jam, 24 jam). Klaim `claim_ketik_review` ±2.760/hari (119/jam). Payload kecil; optimasi opsional.
