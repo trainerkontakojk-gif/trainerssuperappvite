@@ -118,6 +118,7 @@ test.beforeAll(async () => {
       req.method === "GET" &&
       [
         "/rest/v1/ai_model_policy",
+        "/rest/v1/ai_thinking_policy",
         "/rest/v1/ai_pricing_settings",
         "/rest/v1/ai_pricing_schedule",
         "/rest/v1/ai_billing_settings",

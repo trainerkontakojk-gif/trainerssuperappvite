@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- test(e2e): stub the ai_thinking_policy read in the no-backend API specs
+
 - fix(web): ignore Enter that confirms IME composition in chat and profiler inputs
 
 - fix(web): follow the system color scheme and apply the theme before React loads

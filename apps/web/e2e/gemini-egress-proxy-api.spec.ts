@@ -55,8 +55,12 @@ async function fixtures(service: LocalService) {
           is_deleted: false,
         }),
       );
-    } else if (req.method === "GET" && path === "/rest/v1/ai_model_policy") {
-      // No custom policy: the real resolver uses its code default.
+    } else if (
+      req.method === "GET" &&
+      (path === "/rest/v1/ai_model_policy" ||
+        path === "/rest/v1/ai_thinking_policy")
+    ) {
+      // No custom model or thinking policy: the real resolvers use their code defaults.
       res.end("[]");
     } else if (req.method === "GET" && path === "/rest/v1/telefun_history") {
       res.end(
