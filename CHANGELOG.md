@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- docs(claude): point to the hook scripts instead of listing each hook
+
 - docs(plans): close the SIDAK temuan row-cache plan and track it
 
 - test(e2e): wait for the hermetic shell route by pathname so normalized search params do not time out

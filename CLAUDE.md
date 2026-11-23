@@ -16,14 +16,4 @@ Workflow tools named in `docs/AGENT_WORKFLOW.md` map to these Claude Code capabi
 
 ## Claude Code hooks
 
-`.claude/settings.json` wires the scripts in `.claude/hooks/` to enforce `AGENTS.md` guardrails mechanically:
-
-- `protect-env.sh` blocks agent edits to `.env*` files except `.env.example`.
-- `guard-remote.sh` lets `git push` to this repo's own remote run unattended (logged to `~/.claude/logs/git-push-audit.log`), and asks before remote Supabase CLI commands, Vercel deploys, and remote-mutating Supabase/Vercel MCP calls. It blocks MCP calls aimed at the production project ref.
-- `one-test-run.sh` refuses a second concurrent Playwright run.
-- `block-superpowers.sh` refuses `superpowers:*` skills.
-- `block-no-verify.sh` refuses Git commands that skip hooks (`--no-verify`, `git commit -n`, or a `core.hooksPath` override).
-- `format-changed.sh` runs Prettier on a touched `.ts`/`.tsx`/`.md` file only when that file is new or was already Prettier-clean, so legacy files are not reformatted wholesale.
-- `.githooks/pre-commit` (a Git hook, not a Claude hook) rejects commits that add no `CHANGELOG.md` entry; CI runs `scripts/check-changelog.mjs`.
-- `.githooks/commit-msg` (a Git hook) checks the `Verified:` trailer; `git config trainers.verifyGate` selects `off`, `observe` (default, warns and logs), or `enforce` (blocks).
-- `migration-rollback.sh` warns when a migration has no `supabase/rollbacks/rollback_<name>.sql`; CI enforces the same rule for new migrations.
+`.claude/settings.json` wires `.claude/hooks/*.sh` (and `.githooks/` for Git) to enforce `AGENTS.md` guardrails mechanically; each hook explains itself when it blocks. `git config trainers.verifyGate` selects `off`, `observe` (default, warns and logs), or `enforce` (blocks) for the `Verified:` trailer check.
