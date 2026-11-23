@@ -748,6 +748,15 @@ Karena font sudah dari origin sendiri, CSP tidak perlu melonggarkan
 - `media-src` mengizinkan `https://*.supabase.co` supaya rekaman bisa diputar.
 - `script-src 'self'` — tidak ada script inline; jangan menambahkan inline
   script tanpa menyesuaikan policy ini.
+- `/theme-init.js` (dari `apps/web/public/`) adalah classic script same-origin
+  yang wajib ada di `<head>` `index.html`: ia menerapkan tema tersimpan (kelas
+  `.dark` dan `<meta name="color-scheme">`) sebelum bundle aplikasi berjalan,
+  supaya tidak ada kilatan tema salah. Jangan di-inline (CSP memblokirnya),
+  jangan diberi `defer`/`async`/`type="module"`, dan jangan dipindah ke
+  `/assets/*`. Namanya tidak ber-hash, jadi header-nya harus revalidate:
+  `serve.json` memberi `Cache-Control: public, max-age=0, must-revalidate`, dan
+  Vercel tidak memberi aturan cache khusus (default Vercel juga revalidate).
+  `apps/web/e2e/static-security.spec.ts` menjaga kedua hal ini.
 
 Cara memverifikasi CSP setelah mengubah UI:
 

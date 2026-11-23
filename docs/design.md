@@ -66,6 +66,8 @@ Aplikasi memiliki mode _Dark_ (sebagai _default_) dan _Light_. Gunakan variabel 
 
 > **Aturan Implementasi CSS:**
 > Pastikan selektor kelas `.dark` diaplikasikan dengan benar agar komponen anak mewarisi variabel _dark mode_ (contoh: `.dark .my-component { ... }`).
+>
+> Tema punya tiga preferensi: ikut sistem (default, tanpa nilai di `localStorage`), atau override `light`/`dark` yang disimpan di key `theme`. Kelas `.dark` dan `<meta name="color-scheme">` diterapkan lebih dulu oleh `apps/web/public/theme-init.js`, lalu dikelola `useThemeMode`. `index.css` memetakan isi meta itu ke properti CSS `color-scheme`, sehingga kontrol bawaan browser (scrollbar, input, autofill) ikut tema.
 
 ### Aturan Warna Tambahan
 

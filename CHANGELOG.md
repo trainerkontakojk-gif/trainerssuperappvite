@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- fix(web): follow the system color scheme and apply the theme before React loads
+
 - docs(db): record the production apply of the qa_temuan year versions
 
 - perf(sidak): validate year-row cache with per-year change versions

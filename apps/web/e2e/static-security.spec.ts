@@ -77,6 +77,70 @@ test("app deep links preserve the SPA shell and are marked noindex", async ({
   await expect(page.locator("#root")).toBeAttached();
 });
 
+test.describe("theme bootstrap", () => {
+  test.use({ colorScheme: "light" });
+
+  test("stored theme applies under the production CSP before the app bundle runs", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+    const violations: string[] = [];
+    page.on("console", (message) => {
+      if (message.text().includes("Content Security Policy"))
+        violations.push(message.text());
+    });
+    await page.route("**/assets/*.js", (route) => route.abort());
+
+    const response = await page.goto("/", { waitUntil: "load" });
+    expect(response?.headers()["content-security-policy"]).toContain(
+      "script-src 'self'",
+    );
+
+    const dom = await page.evaluate(() => ({
+      dark: document.documentElement.classList.contains("dark"),
+      meta:
+        document
+          .querySelector('meta[name="color-scheme"]')
+          ?.getAttribute("content") ?? null,
+    }));
+    expect(dom).toEqual({ dark: true, meta: "dark" });
+    expect(violations).toEqual([]);
+  });
+
+  test("without a stored theme the bootstrap follows the system before the app bundle runs", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.route("**/assets/*.js", (route) => route.abort());
+
+    await page.goto("/", { waitUntil: "load" });
+
+    const dom = await page.evaluate(() => ({
+      dark: document.documentElement.classList.contains("dark"),
+      meta:
+        document
+          .querySelector('meta[name="color-scheme"]')
+          ?.getAttribute("content") ?? null,
+      stored: localStorage.getItem("theme"),
+    }));
+    expect(dom).toEqual({ dark: true, meta: "light dark", stored: null });
+  });
+
+  test("the unhashed bootstrap script is revalidated instead of cached as immutable", async ({
+    request,
+  }) => {
+    const response = await request.get("/theme-init.js");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["cache-control"]).toBe(
+      "public, max-age=0, must-revalidate",
+    );
+    expect(response.headers()["content-security-policy"]).toContain(
+      "script-src 'self'",
+    );
+    expect(response.headers()["x-content-type-options"]).toBe("nosniff");
+  });
+});
+
 test("dotfiles and common scanner paths return 404, not the SPA shell", async ({
   page,
 }) => {
