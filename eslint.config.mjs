@@ -53,12 +53,13 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: [
+          patterns: [
             {
-              name: '../hooks/useApi',
+              regex: '(^|/)useApi(?:\\.[cm]?[jt]sx?)?$',
+              caseSensitive: true,
               importNames: ['getApi', 'postApi', 'putApi', 'patchApi', 'deleteApi'],
               message:
-                'Wrapper functions sudah dihapus. Gunakan Hono RPC client dari lib/api.ts sebagai gantinya.',
+                'Wrapper ini sudah dihapus. Gunakan klien Hono RPC dari @/lib/api/rpc-client.',
             },
           ],
         },
