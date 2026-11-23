@@ -79,3 +79,6 @@ supabase/.branches/
 .impeccable/
 # Session handoff notes from the context-handoff plugin (per machine, per session)
 .handoff/
+
+# Local security-audit notes: keep candidate details out of this public repo
+plans/markdown/cloudflare-security-audit-*.md

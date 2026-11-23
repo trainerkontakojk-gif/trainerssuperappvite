@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-23
 
+- chore(gitignore): keep local Cloudflare security-audit notes out of the public repo
+
 - docs(plans): close the Supabase egress reduction plan and track it
 
 - chore(eslint): block removed useApi wrapper imports through any path, including the @ alias
