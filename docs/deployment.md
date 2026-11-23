@@ -81,8 +81,7 @@ jadi migrasi berarti membuat resource baru, menyalin semua env (termasuk
 Status sejak 2026-11-23: domain produksi dilayani resource `api-image`,
 `telefun-image`, dan `web-image` (tag `latest`). Ketiganya memakai port mapping
 host `127.0.0.1:3101`/`3102`/`3103` seperti resource lama. Resource Nixpacks lama
-(`api`, `telefun`, `web`) sudah dihentikan dan tidak punya domain lagi; jangan
-redeploy resource itu.
+(`api`, `telefun`, `web`) dan image-nya sudah dihapus.
 
 Alur deploy: **Run workflow → Coolify Redeploy** untuk resource image terkait.
 Gunakan tag full SHA untuk memilih rilis tertentu; `latest` menunjuk build
