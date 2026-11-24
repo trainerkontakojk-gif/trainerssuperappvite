@@ -6,8 +6,8 @@ Dokumen ini menjelaskan logika bisnis SIDAK yang dipakai saat ini: sumber data, 
 
 - Scoring engine di `apps/api/src/lib/scoring.ts`.
 - Business logic SIDAK di `apps/api/src/services/sidak-service.ts`.
-- Shared types di `packages/types/src/index.ts`.
-- Migration di `supabase/migrations/001_sidak.sql`.
+- Shared types di `packages/types/src/sidak.ts` (di-re-export oleh `packages/types/src/index.ts`).
+- Skema dasar di `supabase/migrations/001_sidak_core.sql`; perubahan sesudahnya ada di migration `supabase/migrations/*` bertanggal (cari `qa_`/`sidak`).
 
 ## Istilah Dasar
 

@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-24
 
+- docs(sidak): point SIDAK logic source-of-truth at 001_sidak_core.sql and packages/types/src/sidak.ts
+
 - docs(sidak): plan management reports (Excel/PDF, monthly to yearly, team and leader rollups) for reports-data
 
 ## 2026-11-23
