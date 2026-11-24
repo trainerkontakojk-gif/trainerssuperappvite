@@ -10,6 +10,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 - docs(sidak): plan management reports (Excel/PDF, monthly to yearly, team and leader rollups) for reports-data
 
+- feat(sidak): add management report (POST /sidak/reports/management) with Excel export — monthly/quarter/semester/year/YTD/custom presets, Ringkasan, Rekap Tim, Rekap Agen, Pareto, Detail Temuan, dashboard-parity totals
+
 ## 2026-11-23
 
 - feat(web): redirect trainers-superapp.vercel.app to trainerssuperapp.my.id

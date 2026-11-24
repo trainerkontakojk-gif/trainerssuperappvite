@@ -255,6 +255,7 @@ const _allRoutes = new Hono().route("/", healthCheck).route("/v1", v1Api);
 app.route("/", healthCheck).use("/v1/*", authMiddleware).route("/v1", v1Api);
 
 export type AppType = typeof _allRoutes;
+export type SidakManagementReportRoute = import("./routes/sidak/reports").SidakManagementReportRoute;
 export type KetikRouteType = typeof ketik;
 export type HealthRouteType = typeof healthCheck;
 export default app;

@@ -1,6 +1,6 @@
 import { hc } from "hono/client";
 import type { ClientResponse } from "hono/client";
-import type { AppType, HealthRouteType } from "@trainers/api";
+import type { AppType, HealthRouteType, SidakManagementReportRoute } from "@trainers/api/types";
 import type {
   AccessGroupItemRow,
   AiModelPolicyAuditEntry,
@@ -548,6 +548,10 @@ export const pdktClient = (rpcClient as any).v1.pdkt;
 export const telefunClient = (rpcClient as any).v1.telefun;
 export const sidakClient = (rpcClient as any).v1.sidak as SidakClient &
   Record<string, any>;
+export const sidakManagementReportClient = hc<SidakManagementReportRoute>(
+  `${HC_BASE_URL}/v1/sidak`,
+  clientOptions,
+);
 export const aiClient = (rpcClient as any).v1.ai as unknown as AiClient;
 export const adminClient = (rpcClient as any).v1
   .admin as unknown as AdminClient;

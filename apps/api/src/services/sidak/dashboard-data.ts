@@ -30,6 +30,7 @@ import type {
   TopAgentData,
   ParetoData,
   DashboardInsightAgent,
+  QAIndicator,
 } from "@trainers/types";
 import { formatQAIndicatorName } from "@trainers/types";
 import {
@@ -55,9 +56,21 @@ import {
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
   type PeriodScoringContext,
+  type PeriodScoringRow,
 } from "./period-scoring-context";
 
 const PAGINATION_STEP = 1000;
+
+export function resolveDashboardIndicator(
+  row: PeriodScoringRow,
+  context: PeriodScoringContext,
+  indicators: QAIndicator[],
+): QAIndicator | undefined {
+  const [normalized] = normalizePeriodScoringRows([row], context);
+  return (normalized
+    ? context.indicators.find((indicator) => indicator.id === normalized.indicator_id)
+    : undefined) ?? indicators.find((indicator) => indicator.id === row.indicator_id);
+}
 
 type TemuanFilter = {
   service_type?: string;
@@ -320,13 +333,7 @@ export async function getDashboardData(params: {
   const findIndicatorForRow = (
     row: DashboardTemuanRow,
     context: PeriodScoringContext,
-  ) => {
-    const [normalized] = normalizePeriodScoringRows([row], context);
-    if (!normalized) return undefined;
-    return context.indicators.find(
-      (indicator) => indicator.id === normalized.indicator_id,
-    );
-  };
+  ) => resolveDashboardIndicator(row, context, indicators);
 
   const auditedAgents = groupTemuanByAgent(rows);
   const auditedAgentsWithMetrics: DashboardAgentWithMetrics[] = [];
@@ -388,17 +395,13 @@ export async function getDashboardData(params: {
         if (r.is_phantom_padding === true) return false;
         if (r.nilai === null || r.nilai === undefined || Number(r.nilai) !== 0)
           return false;
-        const ind =
-          findIndicatorForRow(r, context) ??
-          indicators.find((i) => i.id === r.indicator_id);
+        const ind = findIndicatorForRow(r, context);
         return ind?.category === "critical";
       });
       if (periodHasCritical) hasCritical = true;
 
       for (const row of findingRows) {
-        const ind =
-          findIndicatorForRow(row, context) ??
-          indicators.find((i) => i.id === row.indicator_id);
+        const ind = findIndicatorForRow(row, context);
         if (ind) {
           const key = formatQAIndicatorName(ind);
           paretoMap.set(key, {

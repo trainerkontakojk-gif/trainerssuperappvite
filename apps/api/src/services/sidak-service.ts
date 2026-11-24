@@ -7,6 +7,7 @@ export * from "./sidak/dashboard-data";
 export * from "./sidak/service-trends";
 export * from "./sidak/rule-versions";
 export * from "./sidak/report-data";
+export * from "./sidak/management-report";
 export * from "./sidak/dashboard-forecast";
 export * from "./sidak/forecast";
 export * from "./sidak/agent-quickview";

@@ -1,25 +1,29 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer } from "react";
 import { Search, Download, Loader2, RefreshCw } from "lucide-react";
 import { formatQAIndicatorName, type QAIndicator } from "@trainers/types";
 import { useApi, fetchApi } from "../../hooks/useApi";
-import { sidakClient, unwrapResponse } from "../../lib/api";
+import { sidakClient, sidakManagementReportClient, unwrapResponse } from "../../lib/api";
 import { writeFlatExcel } from "../../lib/excel-utils";
 import { Pagination } from "../../components/ui/Pagination";
 import { Button } from "@/components/ui/button";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
-import type { AgentDirectoryResponse } from "@trainers/types";
+import type {
+  AgentDirectoryResponse,
+  SidakManagementReportRequest,
+  SidakManagementReportResponse,
+} from "@trainers/types";
+import { getSidakCalendarMonth } from "@trainers/types";
+import { downloadManagementReportExcel } from "./management-report-excel";
 import {
-  getReportFindingText,
-  getReportRecommendationText,
-  getReportTicketText,
   isActionableReportRow,
   normalizeReportAgents,
+  toRowFacts,
   validateReportFilters,
 } from "./reports-data-utils";
 import { SidakPageHeader } from "../../components/sidak/SidakPageHeader";
 import { useSidakScope } from "../../hooks/useSidakScope";
-import { VALID_SERVICE_TYPES, type ServiceType } from "@trainers/types";
+import { VALID_SERVICE_TYPES } from "@trainers/types";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
 const SERVICE_LABELS: Record<string, string> = {
@@ -59,41 +63,46 @@ const SERVICE_ITEMS = [
 ];
 const MONTH_ITEMS = MONTH_NAMES.map((name, i) => ({ value: String(i + 1), label: name }));
 
-/** Kelas sel tabel: padat, rata atas, wrap aman untuk teks panjang. */
-const CELL = "px-3 py-2.5 align-top";
-/**
- * Satu bentuk fakta per baris, dipakai oleh KEDUA representasi hasil (tabel
- * desktop dan daftar ringkas mobile). Jadi isi kolom, urutan, dan nilai selalu
- * sama; yang berbeda hanya density tata letak per breakpoint.
- */
-type ReportRowFacts = {
-  service: string;
-  period: string;
-  agent: string;
-  batch: string;
-  ticket: string;
-  parameter: string;
-  finding: string;
-  recommendation: string;
-  score: string;
-};
+type ManagementReportState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ready"; data: SidakManagementReportResponse; exportError?: string }
+  | { status: "exportingExcel"; data: SidakManagementReportResponse }
+  | { status: "error"; message: string };
+type ManagementReportAction =
+  | { type: "clear" }
+  | { type: "loading" }
+  | { type: "ready"; data: SidakManagementReportResponse }
+  | { type: "exportingExcel" }
+  | { type: "exported" }
+  | { type: "error"; message: string }
+  | { type: "exportError"; message: string };
 
-function toRowFacts(row: any): ReportRowFacts {
-  return {
-    service: SERVICE_LABELS[row.service_type] || row.service_type || "-",
-    period: `${String(row.qa_periods?.month || "").padStart(2, "0")}/${row.qa_periods?.year || ""}`,
-    agent: row.profiler_peserta?.nama || "-",
-    batch: row.profiler_peserta?.batch_name || "",
-    ticket: getReportTicketText(row),
-    parameter: row.qa_indicators?.name || "-",
-    finding: getReportFindingText(row),
-    recommendation: getReportRecommendationText(row),
-    // Skor ditampilkan apa adanya sebagai angka tabular — tanpa badge/lingkaran
-    // dan tanpa warna sebagai satu-satunya penanda Status.
-    score: row.nilai === null || row.nilai === undefined ? "-" : String(row.nilai),
-  };
+function managementReportReducer(
+  state: ManagementReportState,
+  action: ManagementReportAction,
+): ManagementReportState {
+  switch (action.type) {
+    case "clear": return { status: "idle" };
+    case "loading": return { status: "loading" };
+    case "ready": return { status: "ready", data: action.data };
+    case "exportingExcel":
+      return state.status === "ready" || state.status === "exportingExcel"
+        ? { status: "exportingExcel", data: state.data }
+        : state;
+    case "exported":
+      return state.status === "exportingExcel"
+        ? { status: "ready", data: state.data }
+        : state;
+    case "error": return { status: "error", message: action.message };
+    case "exportError": return state.status === "exportingExcel"
+      ? { status: "ready", data: state.data, exportError: action.message }
+      : state;
+  }
 }
 
+/** Kelas sel tabel: padat, rata atas, wrap aman untuk teks panjang. */
+const CELL = "px-3 py-2.5 align-top";
 /** Opsi filter Parameter: nilai = UUID indikator, label = nama terbaca. */
 type ParameterOption = { id: string; label: string };
 
@@ -149,6 +158,7 @@ function buildParameterOptions(indicators: QAIndicator[] | null): ParameterOptio
 }
 
 export default function SidakReportsData() {
+  const { year: currentYear, month: currentMonth } = getSidakCalendarMonth();
   const { data: periods } = useApi<any[]>("/sidak/periods");
 
   const [mode, setMode] = useState<"layanan" | "individu">("layanan");
@@ -159,37 +169,60 @@ export default function SidakReportsData() {
   const [serviceType, setServiceTypeState] = useState<string>(
     explicitScope.layanan ?? "",
   );
-  const [year, setYearState] = useState(
-    explicitScope.tahun ?? new Date().getFullYear(),
-  );
+  const initialYear = explicitScope.tahun && explicitScope.tahun <= currentYear ? explicitScope.tahun : currentYear;
+  const [year, setYearState] = useState(initialYear);
+  const initialMaxMonth = initialYear === currentYear ? currentMonth : 12;
   const { data: agentDirectory, loading: agentsLoading } =
     useApi<AgentDirectoryResponse>(`/sidak/agents?year=${year}`);
   const agents = normalizeReportAgents(agentDirectory);
-  const [startMonth, setStartMonthState] = useState(explicitScope.dari ?? 1);
-  const [endMonth, setEndMonthState] = useState(explicitScope.sampai ?? 12);
+  const [startMonth, setStartMonthState] = useState(Math.min(explicitScope.dari ?? 1, initialMaxMonth));
+  const [endMonth, setEndMonthState] = useState(Math.min(explicitScope.sampai ?? currentMonth, initialMaxMonth));
+  const [presetMonth, setPresetMonth] = useState(currentMonth);
+  const [periodPreset, setPeriodPreset] = useState<"bulanan" | "kuartal" | "semester" | "tahunan" | "ytd" | "kustom">("kustom");
   // Bulan lokal ikut ditulis supaya cakupan tidak jatuh ke bawaan Jan–bulan ini.
   const localMonths = () =>
     startMonth <= endMonth ? { dari: startMonth, sampai: endMonth } : {};
   const setServiceType = (next: string) => {
     setServiceTypeState(next);
     const layanan = VALID_SERVICE_TYPES.find((s) => s === next);
-    if (layanan) setScope({ layanan: layanan as ServiceType, ...localMonths() });
+    setScope({ layanan, ...localMonths() });
   };
   const setYear = (next: number) => {
+    const maxMonth = next === currentYear ? currentMonth : 12;
+    const nextStart = Math.min(startMonth, maxMonth);
+    const nextEnd = Math.min(endMonth, maxMonth);
     setYearState(next);
-    setScope({ tahun: next, ...localMonths() });
+    setStartMonthState(nextStart);
+    setEndMonthState(nextEnd);
+    setPeriodPreset("kustom");
+    setScope({ tahun: next, ...(nextStart <= nextEnd ? { dari: nextStart, sampai: nextEnd } : {}) });
   };
   const setMonthRange = (dari: number, sampai: number) => {
-    setStartMonthState(dari);
-    setEndMonthState(sampai);
-    if (dari <= sampai) setScope({ dari, sampai });
+    const maxMonth = year === currentYear ? currentMonth : 12;
+    const clampedStart = Math.min(dari, maxMonth);
+    const clampedEnd = Math.min(sampai, maxMonth);
+    setStartMonthState(clampedStart);
+    setEndMonthState(clampedEnd);
+    if (clampedStart <= clampedEnd) setScope({ dari: clampedStart, sampai: clampedEnd });
   };
-  const setStartMonth = (next: number) => setMonthRange(next, endMonth);
-  const setEndMonth = (next: number) => setMonthRange(startMonth, next);
+  const setStartMonth = (next: number) => {
+    setPresetMonth(next);
+    setPeriodPreset("kustom");
+    setMonthRange(next, endMonth);
+  };
+  const setEndMonth = (next: number) => {
+    setPeriodPreset("kustom");
+    setMonthRange(startMonth, next);
+  };
   const [pesertaId, setPesertaId] = useState("");
   const [indicatorId, setIndicatorId] = useState("");
   const [results, setResults] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [managementReport, dispatchManagementReport] = useReducer(
+    managementReportReducer,
+    { status: "idle" },
+  );
+  const managementRequestRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -272,6 +305,11 @@ export default function SidakReportsData() {
     settledCatalog?.status === "ready" ? settledCatalog.options : NO_PARAMETER_OPTIONS;
   const selectedParameterIsValid = parameterOptions.some((option) => option.id === indicatorId);
   const activeIndicatorId = selectedParameterIsValid ? indicatorId : "";
+  const reportFilterKey = JSON.stringify([serviceType, year, startMonth, endMonth, pesertaId, mode, indicatorId]);
+  const reportFilterKeyRef = useRef(reportFilterKey);
+  useLayoutEffect(() => {
+    reportFilterKeyRef.current = reportFilterKey;
+  }, [reportFilterKey]);
   useEffect(() => {
     if (!parameterValidated) return;
     // Bentuk `updater`, bukan `indicatorId` yang ditutup di dalam effect: nilai
@@ -292,15 +330,90 @@ export default function SidakReportsData() {
   // filter yang sekarang sudah valid, persis seperti `results` yang basi.
   const latestRequestRef = useRef(0);
   useEffect(() => {
-    latestRequestRef.current += 1;
+    managementRequestRef.current += 1;
+    dispatchManagementReport({ type: "clear" });
+    setLoading(false);
     setPage(1);
     setResults(null);
     setError(null);
   }, [serviceType, year, startMonth, endMonth, pesertaId, mode, activeIndicatorId]);
 
   const availableYears = periods
-    ? [...new Set(periods.map((p: any) => p.year))].sort((a, b) => b - a)
-    : [new Date().getFullYear()];
+    ? [...new Set([currentYear, ...periods.map((p: any) => p.year).filter((value: number) => value <= currentYear)])].sort((a, b) => b - a)
+    : [currentYear];
+  const monthItemsForYear = MONTH_ITEMS.filter((item) => Number(item.value) <= (year === currentYear ? currentMonth : 12));
+
+  const applyPeriodPreset = (next: typeof periodPreset) => {
+    setPeriodPreset(next);
+    if (next === "kustom") return;
+    if (next === "bulanan") {
+      setMonthRange(presetMonth, presetMonth);
+      return;
+    }
+    if (next === "kuartal") {
+      const firstMonth = Math.floor((presetMonth - 1) / 3) * 3 + 1;
+      setMonthRange(firstMonth, firstMonth + 2);
+      return;
+    }
+    if (next === "semester") {
+      const firstMonth = presetMonth <= 6 ? 1 : 7;
+      setMonthRange(firstMonth, firstMonth + 5);
+      return;
+    }
+    if (next === "tahunan") {
+      setMonthRange(1, 12);
+      return;
+    }
+    setMonthRange(1, year === currentYear ? currentMonth : 12);
+  };
+
+  const fetchManagementReport = async () => {
+    const validationError = validateReportFilters({ mode, pesertaId, startMonth, endMonth });
+    if (validationError) {
+      dispatchManagementReport({ type: "error", message: validationError });
+      return;
+    }
+    const requestId = ++managementRequestRef.current;
+    dispatchManagementReport({ type: "loading" });
+    try {
+      const body: SidakManagementReportRequest = {
+        serviceType: mode === "layanan" ? VALID_SERVICE_TYPES.find((item) => item === serviceType) : undefined,
+        year,
+        startMonth,
+        endMonth,
+        pesertaId: mode === "individu" && pesertaId ? pesertaId : undefined,
+        indicatorId: activeIndicatorId || undefined,
+      };
+      const data = await unwrapResponse(
+        await sidakManagementReportClient.reports.management.$post({ json: body }),
+      );
+      if (requestId === managementRequestRef.current) {
+        dispatchManagementReport({ type: "ready", data });
+      }
+    } catch (e) {
+      if (requestId === managementRequestRef.current) {
+        dispatchManagementReport({
+          type: "error",
+          message: e instanceof Error ? e.message : "Laporan manajemen belum bisa dibuat. Coba lagi.",
+        });
+      }
+    }
+  };
+
+  const exportManagementExcel = async () => {
+    if (managementReport.status !== "ready") return;
+    const data = managementReport.data;
+    dispatchManagementReport({ type: "exportingExcel" });
+    try {
+      await downloadManagementReportExcel(data);
+      dispatchManagementReport({ type: "exported" });
+    } catch {
+      dispatchManagementReport({
+        type: "exportError",
+        message: "File Excel belum bisa dibuat. Coba unduh lagi.",
+      });
+    }
+  };
 
   const fetchReport = async () => {
     const validationError = validateReportFilters({
@@ -317,6 +430,7 @@ export default function SidakReportsData() {
     setLoading(true);
     setError(null);
     const requestToken = ++latestRequestRef.current;
+    const submittedFilterKey = reportFilterKeyRef.current;
     try {
       // `activeIndicatorId` (bukan `indicatorId`) yang dikirim: kalau katalog
       // sudah menyingkirkan pilihan itu, request ini tidak boleh lagi memakai
@@ -333,19 +447,21 @@ export default function SidakReportsData() {
       }}));
       // Seleksi sekali pada respons: count, tabel, pagination, dan Excel
       // memakai satu array hasil terseleksi yang sama.
-      const selected = (Array.isArray(data) ? (data as any[]) : []).filter(isActionableReportRow);
+      const selected = Array.isArray(data) ? data.filter(isActionableReportRow) : [];
       // Respons basi: filter sudah berubah atau ada pencarian yang lebih baru,
       // jadi baris ini bukan hasil filter yang sedang terlihat. Jangan dipasang
       // ke state — count, tabel, dan export akan ikut memalsukan filter baru.
-      if (requestToken === latestRequestRef.current) setResults(selected);
+      if (requestToken === latestRequestRef.current && submittedFilterKey === reportFilterKeyRef.current) setResults(selected);
     } catch (e: any) {
-      if (requestToken === latestRequestRef.current) setError(e.message);
+      if (requestToken === latestRequestRef.current && submittedFilterKey === reportFilterKeyRef.current) setError(e.message);
     }
     // `loading` dan `page` tetap dilepas untuk setiap request yang selesai —
     // termasuk yang basi — supaya tombol "Cari Data" tidak pernah terkunci
     // disabled hanya karena responsnya sudah tidak berlaku.
-    setLoading(false);
-    setPage(1);
+    if (requestToken === latestRequestRef.current && submittedFilterKey === reportFilterKeyRef.current) {
+      setLoading(false);
+      setPage(1);
+    }
   };
 
   const exportExcel = async () => {
@@ -361,7 +477,7 @@ export default function SidakReportsData() {
     // field mentah: dari situ spasi tepi ikut masuk dan tiket kosong menjadi sel
     // kosong. Kolom lain apa adanya di bawah ini.
     const rows = results.map((r: any) => {
-      const facts = toRowFacts(r);
+      const facts = toRowFacts(r, SERVICE_LABELS);
       return {
         Layanan: SERVICE_LABELS[r.service_type] || r.service_type,
         Periode: `${String(r.qa_periods?.month || "").padStart(2, "0")}/${r.qa_periods?.year || ""}`,
@@ -428,6 +544,37 @@ export default function SidakReportsData() {
                 </div>
               </fieldset>
 
+              <fieldset className="space-y-2" aria-labelledby="reports-data-preset-label">
+                <legend id="reports-data-preset-label" className="text-[12px] font-medium text-fg2">
+                  Preset periode
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ["bulanan", "Bulanan"], ["kuartal", "Kuartal"],
+                    ["semester", "Semester"], ["tahunan", "Tahunan"],
+                    ["ytd", "YTD"], ["kustom", "Rentang kustom"],
+                  ] as const).map(([id, label]) => (
+                    <Button
+                      key={id}
+                      type="button"
+                      size="sm"
+                      variant={periodPreset === id ? "default" : "outline"}
+                      aria-pressed={periodPreset === id}
+                      disabled={id === "ytd" && year !== currentYear}
+                      onClick={() => applyPeriodPreset(id)}
+                      className="min-h-[44px]"
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                {year === currentYear && startMonth <= currentMonth && endMonth >= currentMonth ? (
+                  <p role="status" className="text-[12px] leading-relaxed text-fg2">
+                    {MONTH_NAMES[currentMonth - 1]} {year} · berjalan — data sementara
+                  </p>
+                ) : null}
+              </fieldset>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {mode === "layanan" ? (
                   <FilterSelect
@@ -468,7 +615,7 @@ export default function SidakReportsData() {
                   className="space-y-1"
                   value={String(startMonth)}
                   onValueChange={(v) => setStartMonth(Number(v))}
-                  items={MONTH_ITEMS}
+                  items={monthItemsForYear}
                 />
                 <FilterSelect
                   id="reports-data-to"
@@ -476,7 +623,7 @@ export default function SidakReportsData() {
                   className="space-y-1"
                   value={String(endMonth)}
                   onValueChange={(v) => setEndMonth(Number(v))}
-                  items={MONTH_ITEMS}
+                  items={monthItemsForYear}
                 />
                 {/* Filter parameter: satu kontrol untuk KEDUA mode, jadi
                     nama label dan urutan Tab sama di Per Layanan dan Per
@@ -544,6 +691,36 @@ export default function SidakReportsData() {
                   )}
                   {loading ? "Memuat..." : "Cari Data"}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={fetchManagementReport}
+                  disabled={managementReport.status === "loading" || managementReport.status === "exportingExcel"}
+                  className="min-h-[44px]"
+                >
+                  {managementReport.status === "loading" ? (
+                    <Loader2 data-icon="inline-start" className="motion-reduce:animate-none" aria-hidden="true" />
+                  ) : (
+                    <Search data-icon="inline-start" aria-hidden="true" />
+                  )}
+                  {managementReport.status === "loading" ? "Membuat laporan..." : "Buat laporan manajemen"}
+                </Button>
+                {managementReport.status === "ready" || managementReport.status === "exportingExcel" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={exportManagementExcel}
+                    disabled={managementReport.status === "exportingExcel"}
+                    className="min-h-[44px]"
+                  >
+                    {managementReport.status === "exportingExcel" ? (
+                      <Loader2 data-icon="inline-start" className="motion-reduce:animate-none" aria-hidden="true" />
+                    ) : (
+                      <Download data-icon="inline-start" aria-hidden="true" />
+                    )}
+                    {managementReport.status === "exportingExcel" ? "Membuat file..." : "Export Excel Manajemen"}
+                  </Button>
+                ) : null}
                 {results && results.length > 0 && (
                   <Button type="button" variant="outline" size="lg" onClick={exportExcel} className="min-h-[44px]">
                     <Download data-icon="inline-start" aria-hidden="true" />
@@ -553,6 +730,19 @@ export default function SidakReportsData() {
               </div>
             </div>
           </section>
+
+          {managementReport.status === "error" ? (
+            <QaStatePanel type="error" title={managementReport.message} />
+          ) : managementReport.status === "loading" ? (
+            <p role="status" className="text-sm leading-relaxed text-fg2">Menyusun laporan manajemen sesuai periode dan cakupan yang dipilih.</p>
+          ) : managementReport.status === "ready" ? (
+            <div role="status" className="text-sm leading-relaxed text-fg2">
+              {managementReport.exportError ? <p role="alert" className="text-destructive">{managementReport.exportError}</p> : null}
+              Laporan manajemen siap diunduh · {managementReport.data.agents.length} agen · {managementReport.data.pareto.length} parameter.
+            </div>
+          ) : managementReport.status === "exportingExcel" ? (
+            <p role="status" className="text-sm leading-relaxed text-fg2">Menyiapkan workbook Excel lima sheet.</p>
+          ) : null}
 
           {/* Status: error → loading → belum pernah mencari. */}
           {error ? (
@@ -613,7 +803,7 @@ export default function SidakReportsData() {
                         </thead>
                         <tbody className="divide-y divide-border">
                           {pageRows.map((row: any, i: number) => {
-                            const facts = toRowFacts(row);
+                            const facts = toRowFacts(row, SERVICE_LABELS);
                             return (
                               <tr
                                 key={row.id || i}
@@ -651,7 +841,7 @@ export default function SidakReportsData() {
                   {/* Mobile: fakta per baris, dipisah divider — bukan mini-card. */}
                   <ul data-testid="results-list" aria-label="Daftar temuan QA" className="divide-y divide-border lg:hidden">
                     {pageRows.map((row: any, i: number) => {
-                      const facts = toRowFacts(row);
+                      const facts = toRowFacts(row, SERVICE_LABELS);
                       return (
                         <li key={row.id || i} className="px-4 py-4">
                           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

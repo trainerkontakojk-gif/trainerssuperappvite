@@ -42,7 +42,9 @@ export type MockAuthOptions = {
   fullName?: string;
 };
 
-export function buildMockAuth(opts: MockAuthOptions = {}) {
+const MOCK_SESSION_LIFETIME_SECONDS = 100 * 365 * 24 * 60 * 60;
+
+export function buildMockAuth(opts: MockAuthOptions = {}, now = Date.now()) {
   const email = opts.email ?? "trainer.visual@trainers.local";
   const role = opts.role ?? "trainer";
   const fullName = opts.fullName ?? "Trainer Visual";
@@ -61,8 +63,8 @@ export function buildMockAuth(opts: MockAuthOptions = {}) {
     access_token: "live-test-token",
     refresh_token: "refresh-test-token",
     token_type: "bearer",
-    expires_in: 3600,
-    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    expires_in: MOCK_SESSION_LIFETIME_SECONDS,
+    expires_at: Math.floor(now / 1000) + MOCK_SESSION_LIFETIME_SECONDS,
     user: authUser,
   };
 
@@ -99,7 +101,8 @@ export async function installMockAuthSession(
   page: Page,
   opts: MockAuthOptions = {},
 ) {
-  const payload = buildMockAuth(opts);
+  const now = await page.evaluate(() => Date.now()).catch(() => Date.now());
+  const payload = buildMockAuth(opts, now);
   const { authSession, authProfile, storageKey } = payload;
 
   await page.addInitScript(
@@ -146,7 +149,7 @@ export async function mockSupabaseAuth(page: Page, opts: MockAuthOptions = {}) {
       toJson({
         ...authSession,
         user: authUser,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        expires_at: authSession.expires_at,
       }),
     );
   });

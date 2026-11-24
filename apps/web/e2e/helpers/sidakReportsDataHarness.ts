@@ -1053,7 +1053,11 @@ export async function openReportsData(
   indicatorMock?: IndicatorMock,
   agentDirectoryMock?: AgentDirectoryMock,
   path = "/sidak/reports-data",
+  clockTime = new Date("2026-12-15T12:00:00.000Z"),
 ) {
+  // Existing workspace filter tests cover full-year table behavior, not date
+  // eligibility. Freeze in December by default; date-boundary specs override it.
+  await page.clock.install({ time: clockTime });
   await mockSupabaseAuth(page);
   await tapSupabaseMocks(page, audit);
   await mockSidakApi(
@@ -1456,12 +1460,19 @@ export function inScopeControls(page: Page) {
   return [
     page.getByRole("button", { name: "Per Layanan" }),
     page.getByRole("button", { name: "Per Individu" }),
+    page.getByRole("button", { name: "Bulanan" }),
+    page.getByRole("button", { name: "Kuartal" }),
+    page.getByRole("button", { name: "Semester" }),
+    page.getByRole("button", { name: "Tahunan" }),
+    page.getByRole("button", { name: "YTD" }),
+    page.getByRole("button", { name: "Rentang kustom" }),
     page.getByRole("combobox", { name: "Layanan" }),
     page.getByRole("combobox", { name: "Tahun" }),
     page.getByRole("combobox", { name: "Dari bulan" }),
     page.getByRole("combobox", { name: "Ke bulan" }),
     page.getByRole("combobox", { name: "Parameter" }),
     page.getByRole("button", { name: "Cari Data" }),
+    page.getByRole("button", { name: "Buat laporan manajemen" }),
     page.getByRole("button", { name: "Export Excel" }),
   ];
 }

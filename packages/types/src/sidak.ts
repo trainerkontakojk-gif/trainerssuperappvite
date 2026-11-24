@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { EfekTrainingEntry } from "./efek";
+import { getSidakCalendarMonth } from "./sidak-calendar";
 
 export const serviceTypeSchema = z.enum([
   "call",
@@ -12,6 +13,153 @@ export const serviceTypeSchema = z.enum([
 ]);
 export type ServiceType = z.infer<typeof serviceTypeSchema>;
 export const VALID_SERVICE_TYPES: ServiceType[] = serviceTypeSchema.options;
+
+export function isSidakActionableReportRow(row: {
+  is_phantom_padding?: unknown;
+  ketidaksesuaian?: unknown;
+  sebaiknya?: unknown;
+}): boolean {
+  return row.is_phantom_padding !== true &&
+    typeof row.ketidaksesuaian === "string" && row.ketidaksesuaian.trim().length > 0 &&
+    typeof row.sebaiknya === "string" && row.sebaiknya.trim().length > 0;
+}
+
+export const sidakManagementReportRequestSchema = z
+  .object({
+    serviceType: serviceTypeSchema.optional(),
+    year: z.number().int().min(2000).max(2100),
+    startMonth: z.number().int().min(1).max(12),
+    endMonth: z.number().int().min(1).max(12),
+    pesertaId: z.string().uuid().optional(),
+    indicatorId: z.string().uuid().optional(),
+    showArchived: z.boolean().optional(),
+  })
+  .refine((value) => value.startMonth <= value.endMonth, {
+    path: ["startMonth"],
+    message: "Bulan awal tidak boleh setelah bulan akhir.",
+  })
+  .refine((value) => {
+    const now = getSidakCalendarMonth();
+    return value.year < now.year ||
+      (value.year === now.year && value.endMonth <= now.month);
+  }, {
+    path: ["endMonth"],
+    message: "Bulan yang akan datang belum bisa dipilih.",
+  });
+export type SidakManagementReportRequest = z.infer<
+  typeof sidakManagementReportRequestSchema
+>;
+
+export type SidakManagementReportMetricRow = {
+  rowType: "month" | "quarter" | "total";
+  serviceType: ServiceType;
+  month: number | null;
+  label: string;
+  quarter?: "Q1" | "Q2" | "Q3" | "Q4";
+  agentsAudited: number | null;
+  sessionsAudited: number | null;
+  findingsCount: number | null;
+  ticketsWithFindings: number | null;
+  avgAgentScore: number | null;
+  complianceRate: number | null;
+  zeroErrorRate: number | null;
+  delta: {
+    findings: number | null;
+    tickets: number | null;
+    avgAgentScore: number | null;
+    complianceRate: number | null;
+    zeroErrorRate: number | null;
+  } | null;
+};
+
+export type SidakManagementReportTeamRow = SidakManagementReportMetricRow & {
+  team: string;
+  batchName: string;
+};
+
+export type SidakManagementReportAgentRow = {
+  agentId: string;
+  name: string;
+  team: string;
+  batchName: string;
+  serviceType: ServiceType;
+  sessionsAudited: number;
+  findingsCount: number;
+  monthlyScores: Record<number, number | null>;
+  quarterScores: Record<"Q1" | "Q2" | "Q3" | "Q4", number | null>;
+  periodScore: number | null;
+  monthsAtTarget: string;
+  rank: number;
+  trend: "Naik" | "Turun" | "Stabil" | "Belum cukup data";
+};
+
+export type SidakManagementReportParetoRow = {
+  serviceType: ServiceType;
+  parameter: string;
+  category: "critical" | "non_critical";
+  monthlyCounts: Array<{ month: number; count: number }>;
+  total: number;
+  contribution: number;
+  cumulativeContribution: number;
+  agentsAffected: number;
+};
+
+export type SidakManagementReportDetailRow = {
+  id?: string;
+  peserta_id?: string;
+  period_id?: string;
+  indicator_id?: string;
+  rule_indicator_id?: string | null;
+  service_type?: string;
+  created_at?: string;
+  is_countable?: boolean;
+  no_tiket?: string | null;
+  nilai?: number | null;
+  ketidaksesuaian?: string | null;
+  sebaiknya?: string | null;
+  is_phantom_padding?: boolean | null;
+  profiler_peserta: {
+    id?: string;
+    nama?: string | null;
+    tim?: string | null;
+    batch_name?: string | null;
+    jabatan?: string | null;
+  };
+  qa_indicators: { id?: string; name?: string | null; category?: string | null };
+  qa_periods: { id?: string; month?: number; year?: number };
+};
+
+export interface SidakManagementReportResponse {
+  metadata: {
+    mode: "layanan" | "individu";
+    agentId: string | null;
+    agentName: string | null;
+    indicatorId: string | null;
+    indicatorName: string | null;
+    indicatorScope: "detail-only";
+    allowedServiceTypes: ServiceType[] | null;
+    showArchived: boolean;
+    year: number;
+    generatedAtJakarta: string;
+    startMonth: number;
+    endMonth: number;
+    serviceType: ServiceType | null;
+    generatedAt: string;
+    temporaryMonths: number[];
+    ruleVersions: Array<{
+      serviceType: ServiceType;
+      month: number;
+      versionId: string | null;
+    }>;
+    mixedRuleVersions: boolean;
+  };
+  monthly: SidakManagementReportMetricRow[];
+  teams: SidakManagementReportTeamRow[];
+  agents: SidakManagementReportAgentRow[];
+  pareto: SidakManagementReportParetoRow[];
+  details: SidakManagementReportDetailRow[];
+
+}
 
 export const categorySchema = z.enum(["critical", "non_critical", "none"]);
 export type Category = z.infer<typeof categorySchema>;

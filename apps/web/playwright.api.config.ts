@@ -191,6 +191,10 @@ export default defineConfig({
       testMatch: "sidak-dashboard-kpi-api.spec.ts",
     },
     {
+      name: "sidak-management-reports-real-backend",
+      testMatch: "sidak-management-reports-api.spec.ts",
+    },
+    {
       name: "access-groups-view-guard-real-backend",
       testMatch: "access-groups-view-guard-api.spec.ts",
     },

@@ -5,6 +5,7 @@ export {
   pdktClient,
   telefunClient,
   sidakClient,
+  sidakManagementReportClient,
   aiClient,
   adminClient,
   profilerClient,

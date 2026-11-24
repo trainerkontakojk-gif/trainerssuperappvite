@@ -303,6 +303,8 @@ test.describe("SIDAK reports data workspace", () => {
     // hasil parameter baru: request Email ditahan, filter diganti ke
     // Kepatuhan prosedur, baru responsnya dilepas.
     await pickSelect(page, "Layanan", "Semua Layanan");
+    await expect(selectValue(page.getByRole("combobox", { name: "Layanan" }))).toHaveText("Semua Layanan");
+    await expect(parameter).toBeEnabled();
     await pickFromTrigger(parameter, "Email · Kelengkapan dokumen");
     const deferred = createDeferredReportResponse();
     await searchButton.click();

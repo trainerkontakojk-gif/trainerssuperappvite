@@ -134,7 +134,7 @@ test.describe("SIDAK reports data workspace", () => {
 
     await expect(page.getByTestId(RESULTS_COUNT)).toBeVisible();
     expect(dataRequests).toHaveLength(2);
-    // Default tetap 1..12 walaupun labelnya sudah nama bulan.
+    // Fixture default berada di Desember; akhir default bulan berjalan, jadi nilainya 12.
     expect(dataRequests[0].body).toEqual({
       year: expect.any(Number),
       startMonth: 1,
@@ -160,6 +160,21 @@ test.describe("SIDAK reports data workspace", () => {
       await selectedLabel(page.getByRole("combobox", { name: "Ke bulan" })),
     ).toBe(MIDDLE_TO_MONTH.label);
 
+    expectNoApplicationTraffic(audit);
+  });
+
+  test("default bulan berjalan mengikuti kalender Jakarta dan bulan mendatang tidak tersedia", async ({ page }) => {
+    const audit = startAudit();
+    const dataRequests: DataRequest[] = [];
+    await openReportsData(page, audit, dataRequests, ALL_ROWS, undefined, undefined, undefined, new Date("2026-03-15T00:00:00.000Z"));
+    await expect(page.getByRole("combobox", { name: "Tahun" })).toContainText("2026");
+    await expect(page.getByRole("combobox", { name: "Dari bulan" })).toContainText("Januari");
+    await expect(page.getByRole("combobox", { name: "Ke bulan" })).toContainText("Maret");
+    const endMonth = selectTrigger(page, "Ke bulan");
+    await openSelect(endMonth);
+    await expect(page.getByRole("option", { name: "April" })).toHaveCount(0);
+    await closeSelect(endMonth);
+    expect(dataRequests).toHaveLength(0);
     expectNoApplicationTraffic(audit);
   });
 

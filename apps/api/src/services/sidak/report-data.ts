@@ -1,5 +1,6 @@
 import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 import { supabaseAdmin } from "../../lib/supabase";
+import type { ServiceType, SidakManagementReportDetailRow } from "@trainers/types";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
 import { getPeriods } from "./period-indicator";
@@ -18,7 +19,8 @@ export async function getDataReportRows(params: {
   indicatorId?: string;
   agent_ids?: string[];
   showArchived?: boolean;
-}): Promise<any[]> {
+  allowedServiceTypes?: ServiceType[];
+}): Promise<SidakManagementReportDetailRow[]> {
   if (params.agent_ids && params.agent_ids.length === 0) {
     return [];
   }
@@ -63,6 +65,10 @@ export async function getDataReportRows(params: {
         .range(from, to);
 
       if (params.serviceType) q = q.eq("service_type", params.serviceType);
+      else if (params.allowedServiceTypes?.length)
+        q = q.in("service_type", params.allowedServiceTypes);
+      else if (params.allowedServiceTypes)
+        q = q.in("service_type", []);
       if (params.year) q = q.eq("tahun", params.year);
       if (params.pesertaId) q = q.eq("peserta_id", params.pesertaId);
       if (params.indicatorId) q = q.eq("indicator_id", params.indicatorId);
