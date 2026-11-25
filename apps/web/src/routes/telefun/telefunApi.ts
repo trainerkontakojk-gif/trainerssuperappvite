@@ -5,7 +5,7 @@ import { validateAssessment } from "../../lib/voiceAssessmentUtils";
 import type { SessionMetrics, TelefunScoringStatus } from "@trainers/types";
 import {
   mapSimulationSubjectRowToSnapshot,
-  parseTelefunTranscript,
+  resolveTelefunReviewTranscript,
   simulationSubjectSnapshotSchema,
   type SimulationSubjectSelection,
   type SimulationSubjectSnapshot,
@@ -148,7 +148,10 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
       ? row.voice_dashboard_metrics.score
       : undefined;
 
-  const transcript = parseTelefunTranscript(row.messages);
+  const transcript = resolveTelefunReviewTranscript(
+    row.messages,
+    row.voice_assessment,
+  );
   const parsedSubject = simulationSubjectSnapshotSchema.safeParse(
     row.simulationSubject,
   );

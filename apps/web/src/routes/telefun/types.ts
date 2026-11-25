@@ -51,6 +51,17 @@ export interface TelefunScoringStatusLabel {
 }
 
 /**
+ * Transcript to keep beside a fresh score: its content review quotes the
+ * stored Telaah transcript (agent turns from the recording), not Live.
+ */
+export function scoredTelefunTranscript(
+  record: Pick<CallRecord, "transcript">,
+  assessment: VoiceQualityAssessment | undefined,
+): TelefunTranscriptEntry[] | undefined {
+  return assessment?.reviewTranscript ?? record.transcript;
+}
+
+/**
  * A record only renders a concrete score when scoring actually finished:
  * `completed`, or a legacy row without a scoring state. Pending/processing/
  * failed rows must never show a fabricated `0/10` or a stale score.

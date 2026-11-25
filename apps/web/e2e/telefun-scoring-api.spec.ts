@@ -33,6 +33,7 @@ let releaseCoaching: (() => void) | undefined;
 let holdCoaching = false;
 let coachingWrites = 0;
 let providerScores = { rate: 9.9, fillers: 9.9 };
+let assessmentExtra: Record<string, unknown> = {};
 let changePolicyAfterTranscription = false;
 const requestedModelUrls: string[] = [];
 let abortAfterTranscription: AbortController | undefined;
@@ -289,6 +290,7 @@ test.beforeAll(async () => {
             examples: ["salah"],
           },
           transcript: "Transkrip model penilaian yang salah.",
+          ...assessmentExtra,
         }),
       );
     }
@@ -335,6 +337,7 @@ test.beforeEach(async () => {
   holdCoaching = false;
   coachingWrites = 0;
   providerScores = { rate: 9.9, fillers: 9.9 };
+  assessmentExtra = {};
   abortAfterTranscription = undefined;
   releaseCoaching = undefined;
   changePolicyAfterTranscription = false;
@@ -941,6 +944,134 @@ test("filler examples retain actual spellings but are capped at ten unique match
     count: 14,
     examples: examples.slice(0, 10),
     score: 3,
+  });
+});
+
+/** Live mishears key terms; the agent recording hears them correctly. */
+const MISHEARD_LIVE_MESSAGES = [
+  {
+    speaker: "consumer",
+    text: "Halo, saya mau lapor pinjol yang menagih kasar.",
+    startMs: 2000,
+  },
+  {
+    speaker: "agent",
+    text: "Selamat siang, dengan Kontak Gojek 157, ada yang bisa dibantu?",
+    startMs: 5000,
+  },
+  {
+    speaker: "consumer",
+    text: "Iya, debt collectornya kasar sekali.",
+    startMs: 12000,
+  },
+  {
+    speaker: "agent",
+    text: "Silakan lapor ke YSC melalui iasj ojk go id ya Pak.",
+    startMs: 18000,
+  },
+];
+const RECORDING_SEGMENTS = [
+  {
+    startSec: 0,
+    endSec: 4,
+    text: "Selamat siang, dengan Kontak OJK 157, ada yang bisa dibantu?",
+  },
+  {
+    startSec: 12,
+    endSec: 17,
+    text: "Ee silakan lapor ke IASC melalui iasc.ojk.go.id ya Pak.",
+  },
+];
+
+test("content review reads agent turns from the recording and stores the merged transcript", async () => {
+  segments = structuredClone(RECORDING_SEGMENTS);
+  assessmentExtra = {
+    caseCore: "Konsumen melaporkan penagihan pinjol yang kasar.",
+    consumerPoints: [],
+    agentNotes: [
+      {
+        line: 4,
+        quote: "lapor ke IASC melalui iasc.ojk.go.id",
+        category: "accuracy",
+        verdict: "good",
+        note: "Kanal pengaduan disebut lengkap.",
+        example: null,
+        relatedLine: null,
+        relatedQuote: null,
+      },
+    ],
+  };
+  const id = await createSession({ messages: MISHEARD_LIVE_MESSAGES });
+  const response = await score(id);
+  expect(response.status, JSON.stringify(await response.clone().json())).toBe(
+    200,
+  );
+  await expect.poll(() => providerCalls.length).toBe(3);
+  const prompt = providerCalls[1]!.prompt;
+  expect(prompt).toContain(
+    "[1] Konsumen: Halo, saya mau lapor pinjol yang menagih kasar.",
+  );
+  expect(prompt).toContain(
+    "[2] Agen: Selamat siang, dengan Kontak OJK 157, ada yang bisa dibantu?",
+  );
+  expect(prompt).toContain("[3] Konsumen: Iya, debt collectornya kasar sekali.");
+  expect(prompt).toContain(
+    "[4] Agen: Ee silakan lapor ke IASC melalui iasc.ojk.go.id ya Pak.",
+  );
+  expect(prompt).not.toContain("Gojek");
+  expect(prompt).not.toContain("YSC");
+
+  const stored = (await readSession(id)).voice_assessment;
+  expect(stored.reviewTranscript).toEqual([
+    MISHEARD_LIVE_MESSAGES[0],
+    { ...MISHEARD_LIVE_MESSAGES[1], text: RECORDING_SEGMENTS[0]!.text },
+    MISHEARD_LIVE_MESSAGES[2],
+    { ...MISHEARD_LIVE_MESSAGES[3], text: RECORDING_SEGMENTS[1]!.text },
+  ]);
+  // Quotes are checked against the merged lines, so this one survives.
+  expect(stored.contentReview.agentNotes).toEqual([
+    expect.objectContaining({
+      startMs: 18000,
+      quote: "lapor ke IASC melalui iasc.ojk.go.id",
+    }),
+  ]);
+  // The coaching prompt gets assessment facts, not a second transcript copy.
+  expect(providerCalls[2]!.prompt).not.toContain("reviewTranscript");
+});
+
+test("a recording that does not match Live keeps the Live transcript for review", async () => {
+  const messages = [
+    { speaker: "consumer", text: "Saya mau tanya soal asuransi.", startMs: 1000 },
+    {
+      speaker: "agent",
+      text: "Terima kasih sudah menunggu, data Bapak sudah dicatat.",
+      startMs: 4000,
+    },
+  ];
+  const id = await createSession({ messages });
+  const response = await score(id);
+  expect(response.status).toBe(200);
+  await expect.poll(() => providerCalls.length).toBe(3);
+  expect(providerCalls[1]!.prompt).toContain(
+    "[2] Agen: Terima kasih sudah menunggu, data Bapak sudah dicatat.",
+  );
+  expect((await readSession(id)).voice_assessment.reviewTranscript).toBeNull();
+});
+
+test("a standalone ee counts as a filler word", async () => {
+  segments = [
+    {
+      startSec: 0,
+      endSec: 10,
+      text: "Ee, baik Pak, ee saya cek dulu ya, kemudian saya jelaskan.",
+    },
+  ];
+  const response = await score(await createSession());
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.data.assessment.fillerWords).toMatchObject({
+    count: 2,
+    examples: ["Ee", "ee"],
   });
 });
 

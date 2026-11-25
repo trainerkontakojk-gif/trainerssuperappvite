@@ -28,7 +28,7 @@ import { parseTelefunScoreResult } from "../../../lib/voiceAssessmentUtils";
 import { useRecordingAnalysis } from "../hooks/useRecordingAnalysis";
 import { useTelefunRecordingUrl } from "../hooks/useTelefunRecordingUrl";
 import type { CallRecord } from "../types";
-import { isTelefunRecordScored } from "../types";
+import { isTelefunRecordScored, scoredTelefunTranscript } from "../types";
 import {
   annotationItemId,
   buildTelefunQuoteMarks,
@@ -341,6 +341,7 @@ export function TelefunReviewStage({
         score: result.score,
         feedback: result.feedback,
         voiceAssessment: result.assessment,
+        transcript: scoredTelefunTranscript(record, result.assessment),
         scoringStatus: "completed",
       };
       onRecordChange(scored);
@@ -387,6 +388,7 @@ export function TelefunReviewStage({
           score: result.score,
           feedback: result.feedback,
           voiceAssessment: result.assessment,
+          transcript: scoredTelefunTranscript(record, result.assessment),
           scoringStatus: "completed",
         });
       }

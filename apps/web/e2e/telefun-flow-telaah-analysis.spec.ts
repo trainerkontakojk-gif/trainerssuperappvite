@@ -101,6 +101,67 @@ test.describe("Telefun Telaah (hermetic)", () => {
     expectHermetic(audit);
   });
 
+  test("analisis ulang langsung memakai transkrip Telaah dari hasil baru", async ({
+    page,
+  }) => {
+    const row: TelefunRow = {
+      ...FAILED_ROW,
+      messages: [
+        {
+          speaker: "agent",
+          text: "Selamat pagi, dengan Kontak Gojek 157.",
+          startMs: 1000,
+        },
+      ],
+    };
+    const scored = {
+      ...voiceAssessment({ overall: 8.1 }),
+      reviewTranscript: [
+        {
+          speaker: "agent",
+          text: "Selamat pagi, dengan Kontak OJK 157.",
+          startMs: 1000,
+        },
+      ],
+    };
+    // Baris server belum dinilai, jadi hanya hasil skor yang memuat transkrip baru.
+    const audit = await openTelaah(
+      page,
+      row,
+      [
+        {
+          method: "GET",
+          path: `/api/v1/telefun/history/${row.id}`,
+          body: { success: true, data: row },
+        },
+        {
+          method: "POST",
+          path: `/api/v1/telefun/score/${row.id}`,
+          body: {
+            success: true,
+            data: { score: 8.1, feedback: "Baik", assessment: scored },
+          },
+        },
+      ],
+      FULL_HISTORY.map((item) => (item.id === row.id ? row : item)),
+    );
+    const result = page.getByRole("region", { name: "Hasil telaah" });
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    await expect(transcript.getByTestId("telefun-line-00.01")).toContainText(
+      "Kontak Gojek 157",
+      { timeout: 20000 },
+    );
+    await result.getByRole("button", { name: "Analisis ulang" }).click();
+    await expect(result.getByTestId("telefun-voice-score")).toHaveText("8,1");
+    await expect(transcript.getByTestId("telefun-line-00.01")).toContainText(
+      "Kontak OJK 157",
+    );
+    await waitForMockedApi(audit, [`POST /api/v1/telefun/score/${row.id}`]);
+    expectHermetic(audit);
+  });
+
   test("rekaman agen terlalu pendek: alasan tampil dan analisis ulang tidak ditawarkan", async ({
     page,
   }) => {
@@ -484,6 +545,41 @@ test.describe("Telefun Telaah (hermetic)", () => {
         .getByRole("region", { name: "Pertanyaan konsumen" })
         .getByText(/Belum tersedia untuk hasil ini/),
     ).toContainText("Telaah ulang");
+    expectHermetic(audit);
+  });
+
+  test("transkrip Telaah memakai teks agen dari rekaman bila tersedia", async ({
+    page,
+  }) => {
+    // Live salah dengar; penilaian menyimpan transkrip gabungan dari rekaman.
+    const messages = (REVIEWED_ROW.messages as { text: string }[]).map(
+      (entry) => ({
+        ...entry,
+        text: entry.text.replace("Kontak OJK 157", "Kontak Gojek 157"),
+      }),
+    );
+    const row: TelefunRow = {
+      ...ANNOTATED_ROW,
+      messages,
+      voice_assessment: {
+        ...annotatedAssessment(),
+        reviewTranscript: REVIEWED_ROW.messages,
+      },
+    };
+    const audit = await openTelaah(
+      page,
+      row,
+      [],
+      [row, ...FULL_HISTORY.filter((item) => item.id !== row.id)],
+    );
+    const transcript = page.getByRole("region", {
+      name: "Rekaman dan transkrip",
+    });
+    await expect(transcript.getByTestId("telefun-line-00.11")).toContainText(
+      "Kontak OJK 157",
+      { timeout: 20000 },
+    );
+    await expect(transcript).not.toContainText("Gojek");
     expectHermetic(audit);
   });
 

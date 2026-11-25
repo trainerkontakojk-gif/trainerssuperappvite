@@ -360,6 +360,37 @@ test("leader hanya melihat peserta di tim yang disetujui", async () => {
   expect(outOfScope.status).toBe(404);
 });
 
+test("review Telefun menampilkan transkrip Telaah tersimpan, bukan teks Live", async () => {
+  const live = [
+    { speaker: "consumer", text: "Saya mau lapor pinjol.", startMs: 1000 },
+    { speaker: "agent", text: "Silakan lapor ke YSC ya Pak.", startMs: 4000 },
+  ];
+  const reviewTranscript = [
+    live[0],
+    { ...live[1], text: "Silakan lapor ke IASC ya Pak." },
+  ];
+  const id = sqlOne(
+    env,
+    `INSERT INTO telefun_history (user_id, created_at, scenario_title, consumer_name,
+       duration_seconds, score, scoring_status, messages, voice_assessment)
+     VALUES (${quoted(trainer.userId)}, '2031-04-09T04:00:00Z', 'Transkrip Telaah',
+       'Pak Budi', 120, 7, 'completed', ${quoted(JSON.stringify(live))}::jsonb,
+       ${quoted(JSON.stringify({ overallScore: 7.5, reviewTranscript }))}::jsonb)
+     RETURNING id;`,
+  );
+  try {
+    const response = await get(
+      trainer.token,
+      `/ai/monitoring/history/telefun/${id}/review`,
+    );
+    const body = await response.json();
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body.data.transcript).toEqual(reviewTranscript);
+  } finally {
+    runSql(env, `DELETE FROM telefun_history WHERE id = ${quoted(id)};`);
+  }
+});
+
 test("leader tanpa akses disetujui tidak melihat sesi", async () => {
   const response = await history(unapprovedLeader.token, { q: ns });
   expect(response.status).toBe(200);

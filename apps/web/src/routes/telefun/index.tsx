@@ -57,7 +57,7 @@ import {
   parseTelefunSettings,
   resolveFinalIdentity,
 } from "./telefunSettings";
-import type { CallRecord } from "./types";
+import { scoredTelefunTranscript, type CallRecord } from "./types";
 import { summarizeTelefunLanding } from "./utils/landingSummary";
 
 const navButtonClass =
@@ -538,6 +538,10 @@ export default function TelefunLanding() {
               score: result.score ?? undefined,
               feedback: result.feedback,
               voiceAssessment: result.voiceAssessment,
+              transcript: scoredTelefunTranscript(
+                savedForScoring.record,
+                result.voiceAssessment,
+              ),
               scoringStatus: "completed",
             });
           } else {

@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { enrichAssessmentWithCommunicationProfile } from "./telefun-communication-profile";
+import {
+  parseTelefunTranscript,
+  telefunTranscriptSchema,
+  type TelefunTranscriptEntry,
+} from "./telefun-transcript";
 
 const finiteNumber = z.number().finite();
 const scoreSchema = finiteNumber.transform((value) =>
@@ -224,7 +229,32 @@ export const voiceQualityAssessmentInputSchema = z.object({
     .nullable()
     .optional()
     .catch(undefined),
+  // Telaah transcript: Live turns with agent text from the agent recording.
+  // `undefined`: older result, Telaah shows Live. `null`: the recording did
+  // not match Live, so Live was reviewed. Malformed counts as older.
+  reviewTranscript: telefunTranscriptSchema
+    .min(1)
+    .nullable()
+    .optional()
+    .catch(undefined),
 });
+
+/**
+ * Transcript shown in Telaah and monitoring. The content review's lines and
+ * quotes refer to this same transcript, so callers never mix the two sources.
+ */
+export function resolveTelefunReviewTranscript(
+  messages: unknown,
+  voiceAssessment: unknown,
+): TelefunTranscriptEntry[] {
+  const stored =
+    voiceAssessment && typeof voiceAssessment === "object"
+      ? voiceQualityAssessmentInputSchema.shape.reviewTranscript.parse(
+          (voiceAssessment as { reviewTranscript?: unknown }).reviewTranscript,
+        )
+      : undefined;
+  return stored ?? parseTelefunTranscript(messages);
+}
 
 export const telefunScoreEnvelopeSchema = z.object({
   score: scoreResponseSchema,

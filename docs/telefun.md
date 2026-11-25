@@ -334,7 +334,7 @@ secara durable sebelum claim.
   belum bertahan setelah muat ulang.
   Segmen kosong/rusak/bertumpang tindih atau tidak berurutan juga ditolak.
 - Kata pengisi dihitung kode dengan batas kata dan pemanjangan bunyi (`eh`, `hm`,
-  `em`, `anu`, `gitu`, `apa ya`, `eee`); contoh merupakan ejaan aktual unik,
+  `em`, `anu`, `gitu`, `apa ya`, `ee`/`eee`); contoh merupakan ejaan aktual unik,
   maksimal 10. **Batas diketahui:** semua `gitu` dihitung sebagai pengisi,
   termasuk pemakaian yang sebenarnya bukan pengisi. Tidak ada klasifikasi AI tambahan.
 - Kode menimpa transkrip, WPM, jumlah dan contoh pengisi dari model penilaian.
@@ -350,9 +350,9 @@ secara durable sebelum claim.
   sebelum LIMIT, agar status failed dengan retry date null tidak memicu retry
   tanpa henti. Retry manual tetap tersedia. Abort dan claim/capture diperiksa sebelum setiap
   panggilan; claim yang hilang saat transkripsi tidak boleh memulai penilaian.
-- Persistensi hasil tetap melalui RPC completion yang token-fenced. Bentuk JSON
-  `voice_assessment` tidak berubah; cache historis dibaca apa adanya, sedangkan
-  penilaian baru dan **Telaah ulang** memakai alur baru.
+- Persistensi hasil tetap melalui RPC completion yang token-fenced. Cache
+  historis dibaca apa adanya, sedangkan penilaian baru dan **Telaah ulang**
+  memakai alur baru (termasuk field opsional `reviewTranscript` di bawah).
 - `SIGTERM`/`SIGINT` menghentikan admission, menunggu claim yang sedang settle,
   dan mencoba melepaskan claim aktif secara token-fenced setelah abort atau
   deadline. Penantian claim dan RPC release masing-masing dibatasi satu lease;
@@ -360,8 +360,22 @@ secara durable sebelum claim.
   tercapai dan lease database menjadi recovery backstop tanpa retry kedua.
   Embedded mode tidak membuka health server kedua. Startup dan transisi error /
   recovery hanya mencatat field bounded (interval, batch, lease, kelas error).
-- Bila transkrip dua arah (`telefun_history.messages`) memuat konsumen dan
-  agen, panggilan scoring yang sama juga meminta anotasi isi. Backend
+- **Transkrip Telaah** (`lib/telefun-review-transcript.ts`): giliran agen di
+  transkrip Live (`telefun_history.messages`) diganti potongan transkripsi
+  rekaman agen yang cocok, karena Live sering salah dengar istilah kunci (OJK,
+  IASC, nama) dan membuang pengisi. Kedua transkrip tidak punya jam bersama,
+  jadi giliran dipetakan lewat penjajaran kata (LCS); giliran konsumen dan
+  `startMs` tetap dari Live. Hasilnya disimpan di
+  `voice_assessment.reviewTranscript` dalam write penilaian yang sama
+  (`undefined` = hasil lama, `null` = rekaman tidak cocok dengan Live, yaitu
+  kurang dari 60% kata agen Live ditemukan, atau terlalu panjang; log
+  `[Telefun ReviewTranscript]`). Telaah, unduhan, dan review monitoring
+  menampilkan `resolveTelefunReviewTranscript()` (`packages/types`):
+  `reviewTranscript` bila ada, selain itu Live. Prompt coaching tidak menerima
+  field ini.
+- Bila transkrip Telaah memuat konsumen dan agen, panggilan scoring yang sama
+  juga meminta anotasi isi dari transkrip itu, sehingga nomor baris dan
+  kutipannya cocok dengan yang ditampilkan. Backend
   (`lib/telefun-content-review.ts`) hanya menyimpan kutipan yang ada di baris
   pembicara yang tepat dan menaruhnya di `voice_assessment.contentReview`
   (`undefined` = hasil lama, `null` = tidak ada transkrip). Skor tidak

@@ -29,6 +29,7 @@ import {
   normalizeTelefunContentReview,
   telefunContentReviewResponseSchema,
 } from "./telefun-content-review";
+import { buildTelefunReviewTranscript } from "./telefun-review-transcript";
 
 export type { VoiceQualityAssessment };
 
@@ -258,9 +259,6 @@ export async function analyzeVoiceQuality(
   if (transcriptionAdmissionError)
     return { success: false, error: transcriptionAdmissionError };
 
-  const transcript = parseTelefunTranscript(row.messages);
-  const reviewContent = canReviewTelefunContent(transcript);
-
   // 4. Transcribe agent audio first. A failed transcript must fail the scoring
   // claim through the existing retry path, never fall back to guessed metrics.
   const transcription = await transcribeTelefunAgentAudio({
@@ -272,6 +270,21 @@ export async function analyzeVoiceQuality(
   });
   if (!transcription.success) return transcription;
   const speechMetrics = transcription.metrics;
+  // Telaah and the content review read agent turns from the recording, which
+  // hears key terms Live mishears. A recording that does not match Live keeps
+  // Live, stored as `reviewTranscript: null`.
+  const liveTranscript = parseTelefunTranscript(row.messages);
+  const merged = buildTelefunReviewTranscript(
+    liveTranscript,
+    transcription.segments,
+  );
+  if (merged.status !== "merged")
+    console.info(
+      `[Telefun ReviewTranscript] session=${sessionId} status=${merged.status}${merged.status === "unmatched" ? ` matchRatio=${merged.matchRatio.toFixed(2)}` : ""}`,
+    );
+  const reviewTranscript = merged.status === "merged" ? merged.transcript : null;
+  const transcript = reviewTranscript ?? liveTranscript;
+  const reviewContent = canReviewTelefunContent(transcript);
   // Capture failure or a superseded claim may win during transcription. Do not
   // spend a second provider call after that transition.
   const assessmentAdmissionError = await providerAdmissionError();
@@ -399,6 +412,7 @@ export async function analyzeVoiceQuality(
               normalizeTelefunContentReview(rawJson, transcript),
             )
           : null,
+        reviewTranscript,
         holdManagement: holdAssessment,
         overallScore: Math.round(adjustedOverallScore * 10) / 10,
       });
@@ -447,7 +461,12 @@ export async function generateCoachingSummary(
     Skenario: ${row.scenario_title}
 
     Data Voice Assessment (5 indikator + transcript, highlights, strengths):
-    ${JSON.stringify(row.voice_assessment || {}, null, 2)}
+    ${JSON.stringify(
+      row.voice_assessment || {},
+      // The Telaah transcript repeats the conversation; it is not a finding.
+      (key, value) => (key === "reviewTranscript" ? undefined : value),
+      2,
+    )}
 
     TUGAS: Berikan 3-5 rekomendasi coaching yang SPESIFIK, KONKRET, dan ACTIONABLE sesuai indikator yang nilainya paling rendah atau yang feedback-nya menyebut kekurangan. Jangan generik.
 

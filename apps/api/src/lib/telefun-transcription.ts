@@ -33,7 +33,7 @@ export const TELEFUN_FILLER_PATTERNS = [
   "e+m+",
   "anu",
   "gitu",
-  "e{3,}",
+  "e{2,}",
 ] as const;
 
 export function computeTelefunSpeechMetrics(segments: TelefunAgentSegment[]) {
@@ -78,7 +78,11 @@ export async function transcribeTelefunAgentAudio(params: {
   userId: string;
   signal?: AbortSignal;
 }): Promise<
-  | { success: true; metrics: TelefunSpeechMetrics }
+  | {
+      success: true;
+      metrics: TelefunSpeechMetrics;
+      segments: TelefunAgentSegment[];
+    }
   | { success: false; error: string }
 > {
   // Keep the admission check immediately before the provider boundary.
@@ -163,6 +167,7 @@ Judul skenario (data): ${JSON.stringify(params.scenarioTitle)}`,
     return {
       success: true,
       metrics: { ...metrics, wordsPerMinute: metrics.wordsPerMinute },
+      segments,
     };
   } catch {
     return { success: false, error: TRANSCRIPTION_ERROR };

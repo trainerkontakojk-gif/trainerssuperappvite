@@ -1,7 +1,7 @@
 import {
   ketikTranscriptDurationSeconds,
   mapSimulationSubjectRowToSnapshot,
-  parseTelefunTranscript,
+  resolveTelefunReviewTranscript,
 } from "@trainers/types";
 import type {
   KetikMonitoringReview,
@@ -407,7 +407,10 @@ export async function getMonitoringReviewDetail(params: {
       ? voiceAssessment.overallScore
       : telefunHistory.score;
 
-  const transcript = parseTelefunTranscript(telefunHistory.messages);
+  const transcript = resolveTelefunReviewTranscript(
+    telefunHistory.messages,
+    telefunHistory.voice_assessment,
+  );
   const { data: coachingSummary, error: coachingError } = await admin
     .from("telefun_coaching_summary")
     .select("recommendations, generated_at")
