@@ -6,8 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-25
 
+- chore(agent): let a single read-only SELECT/WITH execute_sql on production ask for approval instead of being denied by guard-remote
 - feat(telefun): add an offline script that scores Live and post-call agent transcripts against manual references (WER)
-
 - refactor(telefun): share the Gemini transcription config between server and web setup
 - fix(telefun): retire Gemini 3.0 Flash Live as a selectable model and keep it as readonly history
 - fix(telefun): keep Gemini Live transcripts whole, language-hinted, and free of leaked directions

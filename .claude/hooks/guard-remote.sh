@@ -8,12 +8,32 @@
 # the prod project ref, remote-mutating MCP calls) still ask.
 source "$(dirname "$0")/lib.sh"
 PROD_REF="ruosnjmtywcrghjgqugz"
+
+# A production execute_sql may reach Fajar's approval only when it is one
+# SELECT/WITH statement with no write, DDL, transaction, session, or known
+# side-effect function keyword anywhere (string literals and comments
+# included, so a match there errs toward deny). Leading "--" comment lines are
+# ignored; any other text before the statement is not.
+is_read_only_sql() {
+  local sql
+  sql=$(printf '%s\n' "$1" | awk 'started || !/^[[:space:]]*(--.*)?$/ { started = 1; print }' |
+    tr '[:upper:]' '[:lower:]')
+  sql=$(printf '%s' "$sql" | sed -E -e ':a' -e '$!{N;ba' -e '}' -e 's/[[:space:]]*;?[[:space:]]*$//')
+  [[ "$sql" =~ ^[[:space:]]*(select|with)([^a-z0-9_]|$) ]] || return 1
+  [[ "$sql" == *";"* ]] && return 1
+  local write='insert|update|delete|merge|upsert|truncate|drop|alter|create|grant|revoke|copy|call|do|vacuum|analyze|refresh|lock|set|reset|comment|reindex|cluster|listen|unlisten|notify|prepare|execute|deallocate|discard|import|security|begin|commit|rollback|savepoint|into|nextval|setval|set_config|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_advisory[a-z_]*|pg_read[a-z_]*|pg_ls[a-z_]*|pg_sleep|lo_[a-z_]+|dblink[a-z_]*'
+  ! printf '%s' "$sql" | grep -Eq "(^|[^a-z0-9_])($write)([^a-z0-9_]|$)"
+}
 input=$(cat)
 tool=$(jq -r '.tool_name' <<<"$input")
 
 if [[ "$tool" == mcp__* ]]; then
   if [[ "$input" == *"$PROD_REF"* ]]; then
-    deny "Targets the production Supabase project ($PROD_REF). Production changes are done by Fajar, not the agent."
+    if [[ "$tool" == *__execute_sql ]] &&
+      is_read_only_sql "$(jq -r '.tool_input.query // empty' <<<"$input")"; then
+      ask "Read-only query on the production Supabase project ($PROD_REF). Fajar approves each one: check that it only reads and calls no function with side effects."
+    fi
+    deny "Targets the production Supabase project ($PROD_REF). Production changes are done by Fajar, not the agent. Only a single SELECT/WITH execute_sql query may be proposed for approval."
   fi
   ask "Remote-mutating MCP call ($tool). Confirm the target is not production and that this change is authorized."
 fi
