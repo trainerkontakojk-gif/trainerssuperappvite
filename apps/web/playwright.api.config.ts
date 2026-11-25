@@ -95,6 +95,10 @@ export default defineConfig({
       name: "gemini-egress-proxy",
       testMatch: "gemini-egress-proxy-api.spec.ts",
     },
+    {
+      name: "telefun-live-transcript-fidelity-stub",
+      testMatch: "telefun-live-transcript-fidelity-api.spec.ts",
+    },
     { name: "subdomain-robots", testMatch: "subdomain-robots-api.spec.ts" },
     {
       name: "pdkt-consumer-email-stub",

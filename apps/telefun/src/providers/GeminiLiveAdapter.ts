@@ -561,6 +561,17 @@ export class GeminiLiveAdapter implements RealtimeProviderAdapter {
   }
 }
 
+/**
+ * Both lanes are Indonesian calls with English service terms. Without hints
+ * Gemini auto-detects per chunk and can render informal Indonesian as another
+ * language. Native audio models reject `speechConfig.languageCode`, so the hint
+ * lives on transcription only.
+ */
+const TELEFUN_TRANSCRIPTION_CONFIG = {
+  languageCodes: ["id-ID", "en-US"],
+  customVocabulary: ["OJK", "SLIK", "pinjol", "157", "BI checking", "debt collector"],
+};
+
 export function buildCanonicalGeminiSetup(
   configuration: ValidatedTelefunSessionConfigure,
   toolDispatcher = createProductionRealtimeToolDispatcher(),
@@ -592,8 +603,8 @@ export function buildCanonicalGeminiSetup(
         },
         turnCoverage: "TURN_INCLUDES_ONLY_ACTIVITY",
       },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
+      inputAudioTranscription: TELEFUN_TRANSCRIPTION_CONFIG,
+      outputAudioTranscription: TELEFUN_TRANSCRIPTION_CONFIG,
       sessionResumption: {},
       contextWindowCompression: {
         slidingWindow: {},

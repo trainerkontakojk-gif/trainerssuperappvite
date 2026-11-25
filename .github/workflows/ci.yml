@@ -73,6 +73,7 @@ jobs:
           --project dev-database-guard
           --project subdomain-robots
           --project gemini-egress-proxy
+          --project telefun-live-transcript-fidelity-stub
           --reporter=line
 
   changelog:

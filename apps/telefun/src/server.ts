@@ -199,13 +199,23 @@ function connectGemini(): WebSocket {
 
 wss.on("connection", async (ws, req) => {
   const callStartedAt = Date.now();
-  const transcriptCollector = new TranscriptCollector(callStartedAt);
+  const requestId = `telefun-live-${randomUUID()}`;
+  // Counts only: transcript text never reaches the log.
+  const transcriptCollector = new TranscriptCollector(
+    callStartedAt,
+    (speaker, removed) => {
+      console.warn("[Telefun] Transcript sanitized", {
+        requestId,
+        speaker,
+        ...removed,
+      });
+    },
+  );
   let providerAdapter: RealtimeProviderAdapter | null = null;
   let authed = false;
   let authTimeout: ReturnType<typeof setTimeout> | null = null;
   let userId = "";
   let sessionId = "";
-  const requestId = `telefun-live-${randomUUID()}`;
   const url = new URL(
     req.url || "/",
     `http://${req.headers.host || "localhost"}`,
@@ -318,7 +328,7 @@ wss.on("connection", async (ws, req) => {
         observeUsage: (metadata, observedAtMs) => {
           observeLiveUsageMetadata(usageAccumulator, metadata, observedAtMs);
         },
-        appendTranscript: (entry) => transcriptCollector.append(entry),
+        appendTranscript: (entry) => transcriptCollector.appendDelta(entry),
         startAiSpeaking: () => turnManager.startAiSpeaking(),
         completeTurn: () => {
           transcriptCollector.completeTurn("consumer");

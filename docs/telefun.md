@@ -163,6 +163,24 @@ perlu memperbarui aset.
 Historical raw model and transport fields remain visible in history. Settings
 normalization never rewrites historical history rows.
 
+## Transkrip dua arah (`telefun_history.messages`)
+
+- Server Telefun adalah satu-satunya penulis. Ia mengumpulkan
+  `inputTranscription` (agen) dan `outputTranscription` (konsumen) dari Gemini
+  Live, lalu menyimpannya saat sesi selesai.
+- Potongan Gemini bersifat inkremental dan disambung apa adanya
+  (`TranscriptCollector.appendDelta`), termasuk kata berulang. Penggabungan
+  kumulatif (`append`) hanya untuk pengamat OpenAI Realtime historis.
+- Setup mengirim `languageCodes: ["id-ID", "en-US"]` dan `customVocabulary`
+  istilah layanan pada kedua konfigurasi transkripsi.
+  `speechConfig.languageCode` tidak dipakai karena model audio native tidak
+  mendukungnya.
+- Saat giliran di-commit, `transcript-sanitizer.ts` membuang marker
+  `[TELEFUN_CONTROL:*]` (tertulis atau terucap) beserta kalimat arahannya, arahan
+  panggung (`*…*`, `(…)`, `[…]`), dan tag ASR seperti `<noise>`. Setiap
+  pembersihan dicatat sebagai `[Telefun] Transcript sanitized` berisi jumlah per
+  jenis, tanpa isi transkrip. Transkrip lama tidak ditulis ulang.
+
 ## Mikrofon panggilan
 
 - Dialog **Siapa yang berlatih?** mengecek mikrofon secara lokal. Setelah izin
