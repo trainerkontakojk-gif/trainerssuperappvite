@@ -40,18 +40,12 @@ describe("Telefun live model registry", () => {
         transport: "gemini-live",
         voiceProvider: "gemini",
       },
-      {
-        id: "gemini-3.0-flash-live-preview",
-        provider: "gemini",
-        transport: "gemini-live",
-        voiceProvider: "gemini",
-      },
     ]);
   });
 
-  it("keeps the previous Gemini Live models selectable", () => {
+  it("keeps Gemini 3.1 selectable and drops the retired Gemini 3.0", () => {
     expect(getTelefunLiveModel("gemini-3.1-flash-live-preview")).toBeDefined();
-    expect(getTelefunLiveModel("gemini-3.0-flash-live-preview")).toBeDefined();
+    expect(getTelefunLiveModel("gemini-3.0-flash-live-preview")).toBeUndefined();
     expect(getTelefunLiveModel("gemini-3.8-live")).toMatchObject({
       id: "gemini-3.8-live",
       provider: "gemini",

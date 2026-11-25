@@ -96,17 +96,24 @@ const GEMINI_31_FLASH_LIVE_MODEL = {
 export const TELEFUN_LIVE_MODELS = [
   GEMINI_38_LIVE_MODEL,
   GEMINI_31_FLASH_LIVE_MODEL,
+] as const satisfies readonly AiModelInfo[];
+
+/**
+ * Gemini Live models Google has shut down (setup closes with `1008 not
+ * found`). Readonly metadata for persisted pricing and usage rows; never
+ * selectable and never merged into TELEFUN_LIVE_MODELS.
+ */
+export const TELEFUN_RETIRED_GEMINI_LIVE_MODELS = [
   {
     id: "gemini-3.0-flash-live-preview",
     name: "Gemini 3.0 Flash Live",
-    description: "Stabil dan optimal untuk latensi rendah.",
+    description: "Sudah dihentikan Google; hanya untuk riwayat.",
     provider: "gemini",
     timeoutMs: 300_000,
     capabilities: {
       supportsText: true,
       supportsImage: false,
     },
-    availableModules: ["telefun"],
     realtime: {
       transport: TELEFUN_GEMINI_LIVE_TRANSPORT,
       inputSampleRateHz: 16_000,
@@ -222,6 +229,22 @@ export function getHistoricalTelefunRealtimeModel(
   );
 }
 
+/**
+ * Readonly metadata for any retired Telefun model (OpenAI Realtime or Gemini
+ * Live), for persisted rows that need a name, provider, or pricing mode.
+ */
+export function getRetiredTelefunModel(
+  modelId: string | null | undefined,
+):
+  | HistoricalTelefunOpenAiRealtimeModel
+  | (typeof TELEFUN_RETIRED_GEMINI_LIVE_MODELS)[number]
+  | undefined {
+  return (
+    getHistoricalTelefunRealtimeModel(modelId) ??
+    TELEFUN_RETIRED_GEMINI_LIVE_MODELS.find((model) => model.id === modelId)
+  );
+}
+
 /** True only for a known historical OpenAI Realtime model identifier. */
 export function isHistoricalTelefunOpenAiRealtimeModelId(
   modelId: unknown,
@@ -299,7 +322,7 @@ export function normalizeTelefunLiveModelSelection(
 
   let warningReason: TelefunLiveModelWarningReason | undefined;
   if (didFallback) {
-    warningReason = isHistoricalTelefunOpenAiRealtimeModelId(modelId)
+    warningReason = getRetiredTelefunModel(modelId)
       ? "legacy-model"
       : "unknown-model";
   } else if (

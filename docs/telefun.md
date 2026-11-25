@@ -1,8 +1,11 @@
 # Telefun
 
 > **Runtime status:** Telefun is Gemini Live only. The default selectable model
-> is `gemini-3.8-live`; `gemini-3.1-flash-live-preview` and
-> `gemini-3.0-flash-live-preview` remain available as explicit choices.
+> is `gemini-3.8-live`; `gemini-3.1-flash-live-preview` remains available as
+> an explicit choice. `gemini-3.0-flash-live-preview` was shut down by Google
+> (setup closes with `1008 not found`); it is readonly history in
+> `TELEFUN_RETIRED_GEMINI_LIVE_MODELS`, and a saved 3.0 choice falls back to
+> 3.8 with the "legacy model" warning.
 > GPT/OpenAI Realtime is permanently retired for Telefun and no configuration,
 > cohort, cached browser bundle, or request can start it.
 

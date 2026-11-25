@@ -238,7 +238,7 @@ test("selectable pricing matches catalogs and policies without retired or realti
   expect(active.map((row) => row.model_id).sort()).toEqual(
     [...expectedIds].sort(),
   );
-  expect(active).toHaveLength(11);
+  expect(active).toHaveLength(10);
   expect(
     active.every(
       (row) =>
@@ -329,6 +329,67 @@ test("retired pricing remains historical and cannot be edited or selected as fal
       modelId: "gemini-3.5-flash-lite",
       source: "code",
     });
+  } finally {
+    if (before.data)
+      expect(
+        (await createAdmin(env).from("ai_pricing_settings").upsert(before.data))
+          .error,
+      ).toBeNull();
+    else
+      expect(
+        (
+          await createAdmin(env)
+            .from("ai_pricing_settings")
+            .delete()
+            .eq("model_id", modelId)
+        ).error,
+      ).toBeNull();
+  }
+});
+
+test("retired Gemini 3.0 Flash Live pricing stays readable history and is no longer a Telefun choice", async () => {
+  const modelId = "gemini-3.0-flash-live-preview";
+  const before = await createAdmin(env)
+    .from("ai_pricing_settings")
+    .select("*")
+    .eq("model_id", modelId)
+    .maybeSingle();
+  expect(before.error).toBeNull();
+  const rates = {
+    model_id: modelId,
+    input_price_usd_per_million: 3,
+    output_price_usd_per_million: 12,
+  };
+  try {
+    expect(
+      (
+        await createAdmin(env)
+          .from("ai_pricing_settings")
+          .upsert(rates, { onConflict: "model_id" })
+      ).error,
+    ).toBeNull();
+    const response = await call("GET", "/monitoring/pricing");
+    expect(response.status).toBe(200);
+    expect(
+      (await response.json()).data.find(
+        (row: { model_id: string }) => row.model_id === modelId,
+      ),
+    ).toMatchObject({
+      ...rates,
+      model_name: "Gemini 3.0 Flash Live",
+      provider: "gemini",
+      pricing_mode: "realtime",
+      historical: true,
+      editable: false,
+    });
+    const edit = await call("PUT", "/monitoring/pricing", rates);
+    expect(edit.status).toBe(400);
+    expect((await edit.json()).error.code).toBe("UNKNOWN_MODEL");
+    const telefun = await call("GET", "/models?module=telefun");
+    expect(telefun.status).toBe(200);
+    expect(
+      (await telefun.json()).data.map((model: { id: string }) => model.id),
+    ).toEqual(["gemini-3.8-live", "gemini-3.1-flash-live-preview"]);
   } finally {
     if (before.data)
       expect(

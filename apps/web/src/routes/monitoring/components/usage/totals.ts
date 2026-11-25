@@ -2,6 +2,7 @@ import {
   AI_MODELS,
   TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS,
   TELEFUN_LIVE_MODELS,
+  TELEFUN_RETIRED_GEMINI_LIVE_MODELS,
 } from "@trainers/types";
 import type { UsageAggregation } from "../../../../lib/api";
 import { USAGE_MODULE_LABELS } from "../../biaya-search";
@@ -72,6 +73,7 @@ const MODEL_NAMES = new Map<string, string>(
     ...AI_MODELS,
     ...TELEFUN_LIVE_MODELS,
     ...TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS,
+    ...TELEFUN_RETIRED_GEMINI_LIVE_MODELS,
   ].map((model) => [model.id, model.name]),
 );
 

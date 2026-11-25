@@ -496,4 +496,39 @@ test.describe("Telefun Pengaturan (hermetic)", () => {
     expect(offenders, offenders.join("\n")).toEqual([]);
     expectHermetic(audit);
   });
+
+  test("Gemini 3.0 Flash Live yang sudah pensiun tidak ditawarkan, pilihan tersimpannya kembali ke 3.8", async ({
+    page,
+  }) => {
+    const audit = await open(
+      page,
+      "/telefun",
+      telefunMocks([], {
+        telefunModelId: "gemini-3.0-flash-live-preview",
+        telefunTransport: "gemini-live",
+      }),
+    );
+    await page
+      .getByRole("navigation", { name: "Menu Telefun" })
+      .getByRole("button", { name: /^Pengaturan/ })
+      .click({ timeout: 20000 });
+    const dialog = page.getByRole("dialog", { name: "Pengaturan Telefun" });
+    await dialog.getByRole("tab", { name: /^Sesi & AI/ }).click();
+
+    const models = dialog.getByRole("radiogroup", { name: "Model AI" });
+    await expect(models.getByRole("radio")).toHaveCount(2);
+    await expect(
+      models.getByRole("radio", { name: /^Gemini 3\.8 Live/ }),
+    ).toHaveAttribute("aria-checked", "true");
+    await expect(
+      models.getByRole("radio", { name: /^Gemini 3\.1 Flash Live/ }),
+    ).toHaveAttribute("aria-checked", "false");
+    await expect(dialog.getByText(/Gemini 3\.0/)).toHaveCount(0);
+    await expect(
+      dialog.getByRole("status").filter({
+        hasText: "Pilihan model lama telah dikembalikan ke Gemini.",
+      }),
+    ).toBeVisible();
+    expectHermetic(audit);
+  });
 });

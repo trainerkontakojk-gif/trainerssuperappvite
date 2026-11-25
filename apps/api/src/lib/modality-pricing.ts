@@ -4,7 +4,7 @@
  */
 
 import {
-  getHistoricalTelefunRealtimeModel,
+  getRetiredTelefunModel,
   getTelefunLiveModel,
   GEMINI_LIVE_PRICING,
 } from "@trainers/types";
@@ -47,7 +47,7 @@ export function resolveModalityPricing(
   pricing: PricingRates,
 ): Required<PricingRates> {
   const realtimeModel =
-    getTelefunLiveModel(modelId) ?? getHistoricalTelefunRealtimeModel(modelId);
+    getTelefunLiveModel(modelId) ?? getRetiredTelefunModel(modelId);
   const isGeminiLive = realtimeModel?.provider === "gemini";
 
   const liveDefaults = isGeminiLive ? GEMINI_LIVE_PRICING : null;

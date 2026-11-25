@@ -242,9 +242,9 @@ describe("parseTelefunSettings", () => {
 
   it("preserves valid model id", () => {
     const result = parseTelefunSettings({
-      selectedModel: "gemini-3.0-flash-live-preview",
+      selectedModel: "gemini-3.1-flash-live-preview",
     });
-    expect(result.selectedModel).toBe("gemini-3.0-flash-live-preview");
+    expect(result.selectedModel).toBe("gemini-3.1-flash-live-preview");
   });
 
   it("preserves Gemini 3.1 when Gemini 3.8 becomes the default", () => {
@@ -283,7 +283,7 @@ describe("parseTelefunSettings", () => {
 
   it("normalizes an OpenAI transport even when the model is otherwise valid", () => {
     const result = parseTelefunSettings({
-      telefunModelId: "gemini-3.0-flash-live-preview",
+      telefunModelId: "gemini-3.1-flash-live-preview",
       telefunTransport: "openai-audio",
     });
 

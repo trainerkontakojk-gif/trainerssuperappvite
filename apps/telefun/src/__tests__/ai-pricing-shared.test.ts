@@ -46,7 +46,7 @@ describe("shared AI pricing constants (plan 020)", () => {
   });
 
   it("stays consistent with the telefun live model registry", () => {
-    const live = getTelefunLiveModel("gemini-3.0-flash-live-preview");
+    const live = getTelefunLiveModel("gemini-3.1-flash-live-preview");
     expect(live?.provider).toBe("gemini");
     expect(live?.realtime.transport).toBe("gemini-live");
   });

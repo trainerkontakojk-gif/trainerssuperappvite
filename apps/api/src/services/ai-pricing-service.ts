@@ -1,5 +1,6 @@
 import {
   IMAGE_GENERATION_MODELS,
+  getRetiredTelefunModel,
   isMissingPricingScheduleTable,
   pickEffectivePricing,
 } from "@trainers/types";
@@ -166,7 +167,7 @@ export async function listPricing(admin: AdminClient, now = new Date()) {
 
   for (const row of settings) {
     if (PRICING_MODEL_IDS.has(row.model_id)) continue;
-    const historical = getHistoricalTelefunRealtimeModel(row.model_id);
+    const historical = getRetiredTelefunModel(row.model_id);
     result.push({
       model_id: row.model_id,
       model_name: historical?.name ?? row.model_id,

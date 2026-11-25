@@ -114,7 +114,6 @@ describe("Gemini-only Telefun public model and capability reads", () => {
     ).toEqual([
       "gemini-3.8-live",
       "gemini-3.1-flash-live-preview",
-      "gemini-3.0-flash-live-preview",
     ]);
   });
 
@@ -700,11 +699,11 @@ describe("preserved non-OpenAI Telefun contracts", () => {
     });
     expect(
       buildTelefunSessionUpdatePayload({
-        telefun_model_id: "gemini-3.0-flash-live-preview",
+        telefun_model_id: "gemini-3.1-flash-live-preview",
         telefun_transport: "gemini-live",
       }),
     ).toEqual({
-      telefun_model_id: "gemini-3.0-flash-live-preview",
+      telefun_model_id: "gemini-3.1-flash-live-preview",
       telefun_transport: "gemini-live",
     });
   });

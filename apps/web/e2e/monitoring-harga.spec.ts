@@ -66,8 +66,8 @@ const PRICING = [
     ...NULL_RATES,
   },
   {
-    model_id: "gemini-3.0-flash-live-preview",
-    model_name: "Gemini 3.0 Flash Live",
+    model_id: "gemini-3.1-flash-live-preview",
+    model_name: "Gemini 3.1 Flash Live",
     provider: "gemini",
     pricing_mode: "realtime",
     input_price_usd_per_million: 0,
@@ -235,14 +235,14 @@ test.describe("Monitoring Harga (hermetic)", () => {
       ]),
     });
     await waitForMockedApi(audit, ["/ai/monitoring/pricing"]);
-    const row = page.getByRole("row", { name: /Gemini 3\.0 Flash Live/ });
+    const row = page.getByRole("row", { name: /Gemini 3\.1 Flash Live/ });
     await expect(row).toContainText("6 harga terpisah (teks, audio, cache)", {
       timeout: 20000,
     });
     await row.getByRole("button", { name: "Ubah" }).click();
 
     const dialog = page.getByRole("dialog", {
-      name: "Ubah harga Gemini 3.0 Flash Live",
+      name: "Ubah harga Gemini 3.1 Flash Live",
     });
     await expect(dialog.getByLabel("Input audio", { exact: true })).toHaveValue(
       "3",
@@ -257,7 +257,7 @@ test.describe("Monitoring Harga (hermetic)", () => {
     await dialog.getByRole("button", { name: "Simpan" }).click();
     const body = (await request).postDataJSON();
     expect(body).toMatchObject({
-      model_id: "gemini-3.0-flash-live-preview",
+      model_id: "gemini-3.1-flash-live-preview",
       input_text_price_usd_per_million: 0.5,
       cached_input_text_price_usd_per_million: 0.05,
       input_audio_price_usd_per_million: 3,
