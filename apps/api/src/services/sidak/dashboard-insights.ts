@@ -154,19 +154,26 @@ export function buildDashboardInsights(input: Input): DashboardInsights | null {
     const score = `Skor rata-rata ${fmt(latest.avgAgentScore)}% di ${latest.label}`;
     if (gap !== null) {
       soWhat.headline = `Kurang ${fmt(gap)} poin dari target ${target}`;
-      soWhat.text = `${score}; ${fmt(below)} agen belum mencapai ${target}.`;
+      soWhat.text = `${score}, ${fmt(gap)} poin di bawah target ${target}; ${fmt(below)} agen masih di bawah ${target}.`;
       soWhat.tone = "bad";
     } else {
-      soWhat.headline = `Target ${target} tercapai`;
+      soWhat.headline =
+        below === 0
+          ? `Target ${target} tercapai`
+          : latest.avgAgentScore > target
+            ? `Rata-rata skor di atas target ${target}`
+            : `Rata-rata skor tepat pada target ${target}`;
+      const scoreVsTarget =
+        latest.avgAgentScore > target
+          ? `di atas target ${target}`
+          : `tepat pada target ${target}`;
       soWhat.text =
         below === 0
-          ? `${score}; semua agen yang diaudit sudah mencapai ${target}.`
-          : `${score}, tetapi ${fmt(below)} agen masih di bawah ${target}.`;
+          ? `${score}, ${scoreVsTarget}; semua agen yang diaudit sudah mencapai ${target}.`
+          : `${score}, ${scoreVsTarget}; tetapi ${fmt(below)} agen masih di bawah ${target}.`;
       soWhat.tone = below === 0 ? "good" : "neutral";
     }
   }
-  if (focusParameter)
-    soWhat.text += ` Kenaikan terbesar datang dari ${focusParameter.name} (+${fmt(focusParameter.change)} temuan${focusParameter.category === "critical" ? ", parameter kritikal" : ""}).`;
   const nowWhat: DashboardInsights["nowWhat"] = focusParameter?.agents.length
     ? {
         headline: `Coaching ${focusParameter.agents.length} agen untuk ${focusParameter.name}`,

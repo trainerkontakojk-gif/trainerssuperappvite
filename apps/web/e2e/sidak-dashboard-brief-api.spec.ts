@@ -428,9 +428,34 @@ test("latest focus +6, deterministic recommendation, sorted/capped agents and pe
     text: "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
     action: "coach_focus_agents",
   });
-  expect(insight.soWhat.text).toContain(
-    `Kenaikan terbesar datang dari ${parameter} (+6 temuan, parameter kritikal).`,
-  );
+  expect(insight.soWhat.text).not.toContain("Kenaikan terbesar datang dari");
+  expect(insight.soWhat.text).toMatch(/agen masih di bawah 95\./);
+});
+
+test("average target wording distinguishes agents still below target", async () => {
+  const ids = agents.map(q).join(",");
+  try {
+    runSql(
+      env,
+      `UPDATE qa_temuan SET nilai=3,ketidaksesuaian=NULL,sebaiknya=NULL WHERE peserta_id IN (${ids}); UPDATE qa_temuan SET nilai=0,ketidaksesuaian='informasi tidak akurat' WHERE peserta_id=${q(agents[0]!)};`,
+    );
+    const insight = (await dashboard()).insights;
+    expect(insight).toBeTruthy();
+    expect(insight.soWhat.scoreGapToTarget).toBeNull();
+    expect(insight.soWhat.belowTargetCount).toBeGreaterThan(0);
+    expect(insight.soWhat.headline).toBe("Rata-rata skor di atas target 95");
+    expect(insight.soWhat.text).toContain("di atas target 95; tetapi");
+    expect(insight.soWhat.text).toMatch(/agen masih di bawah 95\./);
+  } finally {
+    runSql(env, `DELETE FROM qa_temuan WHERE peserta_id IN (${ids});`);
+    for (let n = 0; n < agents.length; n++) {
+      const outside = n === 26;
+      if (n < 13 || outside) {
+        insertRows(agents[n]!, periods[0]!, 1);
+        insertRows(agents[n]!, periods[1]!, outside ? 30 : n === 0 ? 7 : 1);
+      }
+    }
+  }
 });
 
 test("focus root cause reads more than 100 findings in chunks", async () => {

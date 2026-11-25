@@ -27,7 +27,7 @@ const insights: DashboardInsights = {
   },
   soWhat: {
     headline: "Kurang 5 poin dari target 95",
-    text: "Skor rata-rata 90% di Okt 26; 2 agen belum mencapai 95. Kenaikan terbesar datang dari Akurasi informasi (+6 temuan, parameter kritikal).",
+    text: "Skor rata-rata 90% di Okt 26, 5 poin di bawah target 95; 2 agen masih di bawah 95.",
     tone: "bad",
     scoreGapToTarget: 5,
     belowTargetCount: 2,
@@ -129,7 +129,7 @@ function mocks(
 }
 test.beforeAll(assertLocalDevOnlyTarget);
 
-test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive light/dark", async ({
+test("Kesimpulan tampil sebagai strip ringkas dengan aksi coaching; responsif light/dark", async ({
   page,
 }, testInfo) => {
   test.setTimeout(90_000);
@@ -140,42 +140,36 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
   await waitForMockedApi(audit, ["/sidak/dashboard?", "/sidak/heatmap?"]);
   const brief = page.getByRole("region", { name: "Kesimpulan", exact: true });
   await expect(brief).toBeVisible();
-  for (const text of ["Apa yang terjadi", "Artinya", "Lakukan ini"])
-    await expect(
-      brief.getByRole("heading", { name: text, exact: true }),
-    ).toBeVisible();
-  await expect(brief).toContainText("Okt 26 dibanding Sep 26");
-  // Tone lives in a labelled cue on the headline, not in a fully coloured paragraph.
-  for (const [headline, tone] of [
-    ["Temuan naik 30% dari Sep 26", "Memburuk"],
-    ["Kurang 5 poin dari target 95", "Perlu perhatian"],
-  ])
-    await expect(
-      brief.getByText(headline, { exact: true }).locator(".."),
-    ).toContainText(tone);
   await expect(
-    brief.getByText(`Coaching 2 agen untuk ${FOCUS}`, { exact: true }),
-  ).toBeVisible();
-  // The coaching recommendation now sits in "Lakukan ini" itself.
-  await expect(brief.getByText(RECOMMENDATION, { exact: true })).toBeVisible();
+    brief.getByRole("heading", { name: "Kesimpulan" }),
+  ).toBeAttached();
+  await expect(brief.getByRole("heading")).toHaveCount(1);
+  await expect(brief).toContainText("Okt 26 memburuk");
+  await expect(brief).toContainText("Temuan naik 30% dari Sep 26");
+  await expect(brief).toContainText(
+    "Skor rata-rata 90% di Okt 26, 5 poin di bawah target 95; 2 agen masih di bawah 95.",
+  );
+  await expect(brief).toContainText(
+    `Parameter yang paling naik: ${FOCUS} (+6 temuan); 2 agen dengan temuan ${FOCUS}.`,
+  );
+  await expect(brief).not.toContainText("Target 95 tercapai");
   await expect(brief.getByRole("link", { name: "Buka TNA" })).toHaveAttribute(
     "href",
     "/tna",
   );
-  // Up to three priority agents are listed without an extra click.
-  await expect(brief.locator("summary")).toHaveCount(0);
+  await expect(brief.getByRole("list")).toHaveCount(0);
   await expect(
-    brief.getByRole("link", { name: /Ayu Larasati/ }),
-  ).toHaveAttribute("href", "/sidak/agents/agent-a");
-  await expect(brief.getByRole("link", { name: /Dimas/ })).toHaveAttribute(
-    "href",
-    "/sidak/agents/agent-b",
+    brief.getByRole("link", { name: /Ayu Larasati|Dimas/ }),
+  ).toHaveCount(0);
+  await expect(brief.getByRole("button", { name: /agen lainnya/ })).toHaveCount(
+    0,
   );
-  await expect(brief).toContainText("Tim Call");
-  await expect(brief).toContainText("8 temuan");
+  await expect(brief.locator("summary")).toHaveCount(0);
   const parameters = page.getByRole("region", { name: "Parameter teratas" });
   // The coaching suggestion lives in Kesimpulan only; the ranking stays a ranking.
-  await expect(parameters.getByText(RECOMMENDATION, { exact: true })).toHaveCount(0);
+  await expect(
+    parameters.getByText(RECOMMENDATION, { exact: true }),
+  ).toHaveCount(0);
   await expect(parameters).not.toContainText("Saran coaching");
   await expect(
     parameters.getByText("+6 vs Sep 26", { exact: true }),
@@ -183,9 +177,10 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
   await expect(
     parameters.getByText("−3 vs Sep 26", { exact: true }),
   ).toBeVisible();
-  // The agent list already lives in Kesimpulan; the ranking does not repeat it.
-  await expect(parameters.getByRole("link", { name: /Ayu Larasati/ })).toHaveCount(0);
-  await expect(parameters).not.toContainText("Lihat 2 agen");
+  // Agent names belong in TNA, not the summary or parameter ranking.
+  await expect(
+    parameters.getByRole("link", { name: /Ayu Larasati/ }),
+  ).toHaveCount(0);
   const trend = page.getByRole("region", { name: "Tren temuan", exact: true });
   await expect(
     trend.getByRole("button", { name: FOCUS, exact: true }),
@@ -212,17 +207,14 @@ test("Kesimpulan, focused parameter and keyboard coaching disclosure; responsive
   await expect(
     trend.getByRole("button", { name: "Total Temuan", exact: true }),
   ).toHaveAttribute("aria-pressed", "false");
-  // Wide layout: "Apa yang terjadi" and "Artinya" stack in one column beside
-  // "Lakukan ini", so the short parts do not leave tall empty columns.
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const box = async (name: string) =>
-    (await brief.getByRole("heading", { name, exact: true }).boundingBox())!;
-  const [what, soWhat, nowWhat] = await Promise.all(
-    ["Apa yang terjadi", "Artinya", "Lakukan ini"].map(box),
-  );
-  expect(Math.abs(what.x - soWhat.x)).toBeLessThan(2);
-  expect(soWhat.y).toBeGreaterThan(what.y);
-  expect(nowWhat.x).toBeGreaterThan(what.x + 200);
+  // Desktop keeps the action beside the content in one compact card.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const desktopCard = await brief.boundingBox();
+  const actionBox = await brief
+    .getByRole("link", { name: "Buka TNA" })
+    .boundingBox();
+  expect(desktopCard?.height).toBeLessThan(120);
+  expect(actionBox?.height).toBeGreaterThanOrEqual(44);
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     for (const theme of ["light", "dark"] as const) {
@@ -289,7 +281,7 @@ test("leader has no TNA action; ranking fallback carries the same context; null 
   }
 });
 
-test("more than three coaching agents fold the rest behind a toggle that collapses again", async ({
+test("agent count stays in the strip without exposing names or a disclosure", async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -312,27 +304,16 @@ test("more than three coaching agents fold the rest behind a toggle that collaps
   });
   await waitForMockedApi(audit, ["/sidak/dashboard?", "/sidak/heatmap?"]);
   const brief = page.getByRole("region", { name: "Kesimpulan", exact: true });
-  const list = brief.getByRole("list", { name: "Agen prioritas coaching" });
-  await expect(list.getByRole("link")).toHaveCount(3);
-  await expect(brief.getByRole("link", { name: /Dewi/ })).toBeHidden();
-  const toggle = brief.getByRole("button", { name: "Lihat 2 agen lainnya" });
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await toggle.focus();
-  await page.keyboard.press("Space");
-  await expect(brief.getByRole("link", { name: /Eko/ })).toHaveAttribute(
-    "href",
-    "/sidak/agents/agent-4",
+  await expect(brief).toContainText(
+    `Parameter yang paling naik: ${FOCUS} (+6 temuan); 5 agen dengan temuan ${FOCUS}.`,
   );
-  await expect(list.getByRole("link")).toHaveCount(5);
-  // Expanded: the "lainnya" wording is gone and the toggle offers to collapse.
-  await expect(brief).not.toContainText("agen lainnya");
-  const collapse = brief.getByRole("button", { name: "Tampilkan lebih sedikit" });
-  await expect(collapse).toHaveAttribute("aria-expanded", "true");
-  await collapse.click();
-  await expect(list.getByRole("link")).toHaveCount(3);
+  await expect(brief.getByRole("list")).toHaveCount(0);
   await expect(
-    brief.getByRole("button", { name: "Lihat 2 agen lainnya" }),
-  ).toBeFocused();
+    brief.getByRole("link", { name: /Ayu|Bima|Citra|Dewi|Eko/ }),
+  ).toHaveCount(0);
+  await expect(brief.getByRole("button", { name: /agen lainnya/ })).toHaveCount(
+    0,
+  );
   expectHermetic(audit);
 });
 
