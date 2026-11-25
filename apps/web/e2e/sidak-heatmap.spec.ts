@@ -274,7 +274,12 @@ test.describe("Halaman Heatmap", () => {
     await expect(chart).toHaveAttribute("aria-label", /Minggu: 0 temuan/);
     // Angka tiap bar tertulis, hari tersibuk disebut.
     await expect(bars).toContainText("16");
-    await expect(bars).toContainText("Selasa paling banyak");
+    await expect(bars).toContainText("Selasa paling banyak · 16 temuan (84,2%)");
+    // Persentase = porsi hari itu dari total temuan Senin–Minggu (19).
+    await expect(chart).toHaveAttribute("aria-label", /Senin: 3 temuan \(15,8%\)/);
+    await expect(chart).toHaveAttribute("aria-label", /Minggu: 0 temuan \(0%\)/);
+    await expect(chart.getByTitle("Selasa: 16 temuan (84,2%)")).toContainText("84,2%");
+    await expect(chart.getByTitle("Senin: 3 temuan (15,8%)")).toContainText("15,8%");
 
     // Tepat di bawah kalender.
     const calBox = await calendar.boundingBox();

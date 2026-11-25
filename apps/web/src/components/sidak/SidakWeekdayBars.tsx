@@ -3,12 +3,22 @@ import { WEEKDAY_FULL, buildHeatmapInsights } from "./heatmap-insights";
 import type { HeatmapDay } from "./SidakHeatmapCalendar";
 
 const INTEGER = new Intl.NumberFormat("id-ID");
+const PERCENT = new Intl.NumberFormat("id-ID", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
+
+/** Porsi satu hari dari total temuan Senin–Minggu, mis. "84,2%". */
+function formatShare(total: number, sum: number) {
+  return PERCENT.format(sum > 0 ? total / sum : 0);
+}
 const WEEKDAY_SHORT = WEEKDAY_FULL.map((label) => label.slice(0, 3));
 
 /**
  * Bar jumlah temuan per hari dalam minggu (Senin–Minggu). Dipakai Dashboard
  * dan di bawah kalender Heatmap supaya hari bisa dibandingkan sekilas. Angka
- * tiap bar tertulis; bar tertinggi diberi warna penuh.
+ * dan persentase (porsi dari total Senin–Minggu) tiap bar tertulis; bar
+ * tertinggi diberi warna penuh.
  */
 export function SidakWeekdayBars({
   totals,
@@ -18,22 +28,25 @@ export function SidakWeekdayBars({
   year: number;
 }) {
   const max = Math.max(...totals);
+  const sum = totals.reduce((acc, total) => acc + total, 0);
+  const describe = (total: number, index: number) =>
+    `${WEEKDAY_FULL[index]}: ${INTEGER.format(total)} temuan (${formatShare(total, sum)})`;
   return (
     <div
       role="img"
       aria-label={`Temuan per hari dalam minggu ${year}: ${totals
-        .map((total, index) => `${WEEKDAY_FULL[index]}: ${total} temuan`)
+        .map(describe)
         .join(", ")}`}
       className="flex min-h-0 flex-1 flex-col"
     >
       <div className="relative min-h-32 flex-1 border-b border-border">
-        <div className="absolute inset-0 flex items-end gap-2 pt-5">
+        <div className="absolute inset-0 flex items-end gap-2 pt-9">
           {totals.map((total, index) => {
             const isPeak = total > 0 && total === max;
             return (
               <div
                 key={WEEKDAY_FULL[index]}
-                title={`${WEEKDAY_FULL[index]}: ${INTEGER.format(total)} temuan`}
+                title={describe(total, index)}
                 className="flex h-full flex-1 items-end"
               >
                 <div
@@ -49,13 +62,20 @@ export function SidakWeekdayBars({
                 >
                   <span
                     aria-hidden="true"
-                    className={`absolute inset-x-0 bottom-full mb-1 text-center text-xs leading-4 tabular-nums ${
-                      isPeak
-                        ? "font-semibold text-foreground"
-                        : "text-muted-foreground"
-                    }`}
+                    className="absolute inset-x-0 bottom-full mb-1 flex flex-col items-center leading-4 tabular-nums"
                   >
-                    {INTEGER.format(total)}
+                    <span
+                      className={`text-xs ${
+                        isPeak
+                          ? "font-semibold text-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {INTEGER.format(total)}
+                    </span>
+                    <span className="text-xs whitespace-nowrap text-muted-foreground">
+                      {formatShare(total, sum)}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -87,6 +107,7 @@ export function SidakWeekdayPattern({
 }) {
   const insights = useMemo(() => buildHeatmapInsights(days), [days]);
   const busiest = insights.busiestWeekday;
+  const weekSum = insights.weekdayTotals.reduce((acc, total) => acc + total, 0);
   return (
     <section
       aria-labelledby="sidak-weekday-pattern-title"
@@ -101,7 +122,7 @@ export function SidakWeekdayPattern({
         </h3>
         <p className="text-sm text-fg2">
           {busiest && busiest.total > 0
-            ? `${busiest.label} paling banyak · ${INTEGER.format(busiest.total)} temuan`
+            ? `${busiest.label} paling banyak · ${INTEGER.format(busiest.total)} temuan (${formatShare(busiest.total, weekSum)})`
             : `Belum ada temuan di ${year}`}
         </p>
       </div>
@@ -110,7 +131,7 @@ export function SidakWeekdayPattern({
       </div>
       <p className="text-xs text-muted-foreground">
         Jumlah temuan {year} dijumlah per hari (Senin–Minggu) dari kalender di
-        atas.
+        atas; persentase = porsi hari itu dari total seminggu.
       </p>
     </section>
   );
