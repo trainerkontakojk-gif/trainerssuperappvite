@@ -127,6 +127,7 @@ menambah jumlah temuan.
 
 Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk clean session), Workspace Data (`/sidak/reports-data`) dirancang sebagai alat kerja perbaikan kualitas.
 
+- **Scope akses**: Leader hanya menerima row dari peserta yang disetujui dan layanan pada allowlist aksesnya; filter layanan otomatis diterapkan saat tidak memilih satu layanan. Permintaan peserta atau layanan di luar scope ditolak.
 - **Eksklusi Phantom**: Row `is_phantom_padding = true` tidak pernah ditampilkan di tabel maupun ekspor Excel.
 - **Findings-Only**: Hanya row yang memiliki data temuan riil DAN saran perbaikan yang ditampilkan.
 - **Tujuan**: Memungkinkan trainer/leader untuk melakukan audit detail dan coaching fokus pada area yang bermasalah saja.

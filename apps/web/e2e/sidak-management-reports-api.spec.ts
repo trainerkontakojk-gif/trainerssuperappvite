@@ -22,6 +22,7 @@ const quoted = (value: string) => `'${value.replace(/'/g, "''")}'`;
 type SidakApiApp = typeof import("../../api/src/app").default;
 let app: SidakApiApp;
 let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
+let admin: Awaited<ReturnType<typeof createUserWithJwt>>;
 let leader: Awaited<ReturnType<typeof createUserWithJwt>>;
 let unapprovedLeader: Awaited<ReturnType<typeof createUserWithJwt>>;
 let accessGroupId: string;
@@ -40,6 +41,21 @@ async function requestReport(body: Record<string, unknown>, token = trainer.toke
   return tnaApiRequest(
     app,
     "http://localhost/api/v1/sidak/reports/management",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+async function requestDataReport(body: Record<string, unknown>, token = trainer.token) {
+  return tnaApiRequest(
+    app,
+    "http://localhost/api/v1/sidak/reports/data",
     {
       method: "POST",
       headers: {
@@ -79,6 +95,7 @@ test.beforeAll(async () => {
   installLoopbackFetchGuard();
   year = Number(sqlOne(env, `SELECT candidate FROM generate_series(2000,2100) candidate WHERE NOT EXISTS (SELECT 1 FROM qa_periods WHERE year=candidate) ORDER BY abs(candidate - extract(year FROM clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::int) LIMIT 1;`));
   trainer = await createUserWithJwt(env, "trainer", `management-report-${namespace}`);
+  admin = await createUserWithJwt(env, "admin", `management-report-${namespace}`);
   leader = await createUserWithJwt(env, "leader", `management-report-${namespace}`);
   unapprovedLeader = await createUserWithJwt(env, "leader", `management-unapproved-${namespace}`);
 
@@ -118,6 +135,7 @@ test.beforeAll(async () => {
     env,
     "SELECT id FROM qa_indicators WHERE service_type='call' AND is_active ORDER BY sort_order, name LIMIT 2;",
   ).split("\n").map((value) => value.trim()).filter(Boolean);
+  const chatIndicatorId = sqlOne(env, "SELECT id FROM qa_indicators WHERE service_type='chat' AND is_active ORDER BY sort_order, name LIMIT 1;");
   if (indicators.length < 2) throw new Error("Fixture memerlukan dua indikator call aktif.");
   const ticket = quoted(`E2E-MANAGEMENT-${namespace}`);
   const phantomTicket = quoted(`__PHANTOM__MANAGEMENT-${namespace}`);
@@ -129,6 +147,7 @@ test.beforeAll(async () => {
     `(${quoted(secondParticipantId)},${quoted(periodIds.get(1)!)},${quoted(indicators[0]!)},'call',${quoted(`__PHANTOM__SECOND-${namespace}`)},true,3,NULL,NULL,${year})`,
     `(${quoted(excludedParticipantId)},${quoted(periodIds.get(1)!)},${quoted(indicators[0]!)},'call',${quoted(`EXCLUDED-${namespace}`)},false,0,${quoted(`Temuan staf dikecualikan ${namespace}`)},${quoted("Rekomendasi staf")},${year})`,
     `(${quoted(excludedParticipantId)},${quoted(periodIds.get(2)!)},${quoted(indicators[0]!)},'call',${quoted(`EXCLUDED-FEB-${namespace}`)},false,0,${quoted(`Temuan staf dikecualikan ${namespace}`)},${quoted("Rekomendasi staf")},${year})`,
+    `(${quoted(participantId)},${quoted(periodIds.get(1)!)},${quoted(chatIndicatorId)},'chat',${quoted(`E2E-MANAGEMENT-CHAT-${namespace}`)},false,1,${quoted("Temuan chat untuk uji scope layanan")},${quoted("Rekomendasi chat")},${year})`,
   ];
   runSql(
     env,
@@ -170,7 +189,7 @@ test.afterAll(async () => {
     const remainingFolders = runSql(env, `SELECT id FROM profiler_folders WHERE year_id=${quoted(profilerYearId)};`);
     if (!remainingFolders) runSql(env, `DELETE FROM profiler_years WHERE id=${quoted(profilerYearId)} AND year=${year};`);
   }
-  for (const user of [trainer, leader, unapprovedLeader]) {
+  for (const user of [trainer, admin, leader, unapprovedLeader]) {
     if (!user) continue;
     const { error } = await createAdmin(env).auth.admin.deleteUser(user.userId);
     expect(error).toBeNull();
@@ -272,6 +291,35 @@ test("leader report stays within approved participant and service scope", async 
   const outsideService = await requestReport({ serviceType: "email", year, startMonth: 1, endMonth: 2 }, leader.token);
   expect(outsideService.status).toBe(403);
   expect((await outsideService.json()).error.code).toBe("FORBIDDEN");
+});
+
+test("data report enforces leader scope and retains admin access", async () => {
+  const body = { year, startMonth: 1, endMonth: 1 };
+  const scoped = await requestDataReport(body, leader.token);
+  expect.soft(scoped.status, await scoped.clone().text()).toBe(200);
+  const scopedData = await scoped.json();
+  expect.soft(scopedData.success).toBe(true);
+  expect.soft(scopedData.data.length).toBeGreaterThan(0);
+  expect.soft(scopedData.data.every((row: { peserta_id: string; service_type: string }) => row.peserta_id === participantId && row.service_type === "call")).toBe(true);
+
+  const disallowedService = await requestDataReport({ ...body, serviceType: "email" }, leader.token);
+  expect.soft(disallowedService.status).toBe(403);
+  expect.soft((await disallowedService.json()).error).toEqual(expect.objectContaining({ code: "FORBIDDEN" }));
+
+  const outOfScope = await requestDataReport({ ...body, pesertaId: secondParticipantId }, leader.token);
+  expect.soft(outOfScope.status).toBe(403);
+  expect.soft((await outOfScope.json()).error).toEqual(expect.objectContaining({ code: "FORBIDDEN" }));
+
+  const unapproved = await requestDataReport(body, unapprovedLeader.token);
+  expect.soft(unapproved.status).toBe(403);
+  expect.soft((await unapproved.json()).error).toEqual(expect.objectContaining({ code: "FORBIDDEN" }));
+
+  const adminResponse = await requestDataReport(body, admin.token);
+  expect.soft(adminResponse.status, await adminResponse.clone().text()).toBe(200);
+  const adminData = await adminResponse.json();
+  const adminParticipantRows = adminData.data.filter((row: { peserta_id: string }) => row.peserta_id === participantId);
+  expect.soft(adminParticipantRows.map((row: { service_type: string }) => row.service_type)).toContain("call");
+  expect.soft(adminParticipantRows.map((row: { service_type: string }) => row.service_type)).toContain("chat");
 });
 
 test("management report errors remain errors and showArchived parity matches dashboard", async () => {

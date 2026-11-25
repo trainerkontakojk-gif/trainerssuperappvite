@@ -98,21 +98,74 @@ const dataReportRoute = new Hono<{ Variables: Variables }>().post(
         },
         400,
       );
-    const accessibleIds = await sidakService.getAccessibleAgentIds(
-      user.id,
-      profile?.role ?? "",
-    );
     try {
+      const filterScope = await sidakService.getAccessibleSidakFilters(
+        user.id,
+        profile?.role ?? "",
+      );
+      const agentIds = filterScope?.agentIds ?? null;
+      const allowedServices = filterScope?.allowedServices;
+      if (normalizeRole(profile?.role) === "leader" && agentIds?.length === 0) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "FORBIDDEN",
+              message: "Anda belum memiliki akses SIDAK yang disetujui.",
+            },
+          },
+          403,
+        );
+      }
+      if (
+        parsed.data.pesertaId &&
+        agentIds !== null &&
+        !agentIds.includes(parsed.data.pesertaId)
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "FORBIDDEN",
+              message: "Agen tersebut tidak termasuk dalam akses Anda.",
+            },
+          },
+          403,
+        );
+      }
+      if (
+        parsed.data.serviceType &&
+        allowedServices?.length &&
+        !allowedServices.some((service) => service === parsed.data.serviceType)
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "FORBIDDEN",
+              message: "Layanan ini tidak termasuk dalam akses Anda.",
+            },
+          },
+          403,
+        );
+      }
       const rows = await sidakService.getDataReportRows({
         ...parsed.data,
-        agent_ids: accessibleIds ?? undefined,
+        agent_ids: agentIds ?? undefined,
+        allowedServiceTypes: allowedServices,
       });
       return c.json({ success: true, data: rows });
-    } catch (e: any) {
-      if (e instanceof ScopeUnavailableError) throw e;
+    } catch (error) {
+      if (error instanceof ScopeUnavailableError) throw error;
       return c.json(
-        { success: false, error: { code: "REPORT_ERROR", message: e.message } },
-        400,
+        {
+          success: false,
+          error: {
+            code: "REPORT_ERROR",
+            message: "Data laporan belum bisa diambil. Coba lagi.",
+          },
+        },
+        500,
       );
     }
   },

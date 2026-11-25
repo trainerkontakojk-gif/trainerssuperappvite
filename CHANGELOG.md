@@ -7,6 +7,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 ## 2026-11-25
 
 - feat(sidak): ship compact SIDAK conclusion strip
+- fix(sidak): enforce leader service scope on data reports
 
 ## 2026-11-24
 
