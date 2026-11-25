@@ -9,12 +9,13 @@
 
 For the data report route, resolve `getAccessibleSidakFilters(user.id, role)` and pass both `agentIds` and `allowedServices` to the report query. Preserve nullable participant scope semantics for non-leaders and use the same friendly error policy as the management report. Apply service filtering in the database query.
 
-For the archive investigation, inspect migrations, local schema availability, participant/account lifecycle, Profiler UI behavior, and every caller of `getSoftDeletedPesertaIds`. Do not infer an archive marker from unrelated year/folder organization. No schema changes are authorized.
+For the archive investigation, the live local schema has no `deleted_at`, `is_active`, or status marker on `profiler_peserta`; its current account FK is `akun_id` to `profiles`, whose `is_deleted` and `status` fields match the existing canonical contract in `docs/database.md` and `docs/architecture.md`. Profiler's "arsip tahun" is only year/folder organization, and deleting a participant in the UI is a hard delete. Account soft-delete marks `profiles.is_deleted` and unlinks the participant, while inactive accounts can remain linked. This distinguishes year archive from the documented linked-account exclusion contract; no schema migration is needed. Query the current FK and exclude linked profiles where `is_deleted` or status `inactive`. The affected SIDAK callers are dashboard data, data report rows (including management report detail/aggregates), and `getAgents`.
 
 ## Tasklist
 
 - [x] Add a focused real-backend Playwright spec first; verify a local-only Supabase target and capture RED.
 - [x] Implement service/participant scope validation and database service allowlisting; capture GREEN.
 - [x] Run focused API and required reports-data browser E2Es serially, workspace typechecks, changed-file eslint, and self-review.
-- [ ] Investigate the live archive semantics after commit 1; only proceed with a second focused RED/GREEN implementation and its regression E2Es if semantics are unambiguous and need no migration.
-- [ ] Update `docs/SIDAK_LOGIC_AND_SCORING.md` if archive behavior changes; record evidence and stop otherwise.
+- [x] Investigate live schema, migration history, Profiler archive/delete behavior, and linked-account lifecycle; distinguish year folders from account status and record the no-migration decision.
+- [x] Implement the typed `akun_id` profile query; prove default exclusion and `showArchived` inclusion for Dashboard, data report, and management report with local real-backend E2E.
+- [x] Update `docs/SIDAK_LOGIC_AND_SCORING.md` and `docs/database.md` to describe the effective filter.

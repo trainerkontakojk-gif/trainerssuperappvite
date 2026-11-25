@@ -266,10 +266,75 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
   expect(JSON.stringify(data.details)).not.toContain("__PHANTOM__MANAGEMENT");
 });
 
+test("SIDAK archive filter excludes linked inactive accounts unless requested", async () => {
+  let archivedUser: Awaited<ReturnType<typeof createUserWithJwt>> | undefined;
+  let activeUser: Awaited<ReturnType<typeof createUserWithJwt>> | undefined;
+  let archivedPesertaId: string | undefined;
+  let activePesertaId: string | undefined;
+  try {
+    archivedUser = await createUserWithJwt(env, "agent", `sidak-archived-${namespace}`);
+    activeUser = await createUserWithJwt(env, "agent", `sidak-active-${namespace}`);
+    archivedPesertaId = sqlOne(env, `INSERT INTO profiler_peserta (batch_name,nama,tim,jabatan,nomor_urut,akun_id) VALUES (${quoted(folderName)},${quoted(`Akun Arsip ${namespace}`)},'Tim Uji Arsip','Agent',10,${quoted(archivedUser.userId)}) RETURNING id;`);
+    activePesertaId = sqlOne(env, `INSERT INTO profiler_peserta (batch_name,nama,tim,jabatan,nomor_urut,akun_id) VALUES (${quoted(folderName)},${quoted(`Akun Aktif ${namespace}`)},'Tim Uji Arsip','Agent',11,${quoted(activeUser.userId)}) RETURNING id;`);
+    runSql(env, `UPDATE profiles SET status='inactive' WHERE id=${quoted(archivedUser.userId)};`);
+    const indicatorId = sqlOne(env, "SELECT id FROM qa_indicators WHERE service_type='call' AND is_active ORDER BY sort_order, name LIMIT 1;");
+    runSql(env, `INSERT INTO qa_temuan (peserta_id,period_id,indicator_id,service_type,no_tiket,is_phantom_padding,nilai,ketidaksesuaian,sebaiknya,tahun) VALUES
+      (${quoted(archivedPesertaId)},${quoted(periodIds.get(1)!)},${quoted(indicatorId)},'call',${quoted(`ARCHIVED-${namespace}`)},false,1,${quoted(`Temuan arsip ${namespace}`)},${quoted("Rekomendasi arsip")},${year}),
+      (${quoted(activePesertaId)},${quoted(periodIds.get(1)!)},${quoted(indicatorId)},'call',${quoted(`ACTIVE-${namespace}`)},false,2,${quoted(`Temuan aktif ${namespace}`)},${quoted("Rekomendasi aktif")},${year});`);
+    await resetSidakReferenceCache();
+
+    const dashboardDefaultResponse = await requestDashboard(periodIds.get(1)!);
+    const dashboardArchivedResponse = await requestDashboard(periodIds.get(1)!, trainer.token, true);
+    expect.soft(dashboardDefaultResponse.status).toBe(200);
+    expect.soft(dashboardArchivedResponse.status).toBe(200);
+    const dashboardDefault = (await dashboardDefaultResponse.json()).data;
+    const dashboardArchived = (await dashboardArchivedResponse.json()).data;
+    expect.soft(dashboardArchived.summary.totalAgents).toBe(dashboardDefault.summary.totalAgents + 1);
+
+    const dataDefaultResponse = await requestDataReport({ year, startMonth: 1, endMonth: 1 });
+    const dataArchivedResponse = await requestDataReport({ year, startMonth: 1, endMonth: 1, showArchived: true });
+    expect.soft(dataDefaultResponse.status).toBe(200);
+    expect.soft(dataArchivedResponse.status).toBe(200);
+    const dataDefault = (await dataDefaultResponse.json()).data;
+    const dataArchived = (await dataArchivedResponse.json()).data;
+    expect.soft(dataDefault.map((row: { peserta_id: string }) => row.peserta_id)).toContain(activePesertaId);
+    expect.soft(dataDefault.map((row: { peserta_id: string }) => row.peserta_id)).not.toContain(archivedPesertaId);
+    expect.soft(dataArchived.map((row: { peserta_id: string }) => row.peserta_id)).toContain(archivedPesertaId);
+    expect.soft(dataArchived.map((row: { peserta_id: string }) => row.peserta_id)).toContain(activePesertaId);
+
+    const reportInput = { serviceType: "call", year, startMonth: 1, endMonth: 1 };
+    const reportDefaultResponse = await requestReport(reportInput);
+    const reportArchivedResponse = await requestReport({ ...reportInput, showArchived: true });
+    expect.soft(reportDefaultResponse.status).toBe(200);
+    expect.soft(reportArchivedResponse.status).toBe(200);
+    const reportDefault = (await reportDefaultResponse.json()).data;
+    const reportArchived = (await reportArchivedResponse.json()).data;
+    expect.soft(reportDefault.agents.map((agent: { agentId: string }) => agent.agentId)).toContain(activePesertaId);
+    expect.soft(reportDefault.agents.map((agent: { agentId: string }) => agent.agentId)).not.toContain(archivedPesertaId);
+    expect.soft(reportArchived.agents.map((agent: { agentId: string }) => agent.agentId)).toContain(archivedPesertaId);
+    expect.soft(reportArchived.agents.map((agent: { agentId: string }) => agent.agentId)).toContain(activePesertaId);
+  } finally {
+    if (archivedPesertaId || activePesertaId) {
+      const ids = [archivedPesertaId, activePesertaId]
+        .filter((id): id is string => id !== undefined)
+        .map(quoted)
+        .join(",");
+      runSql(env, `DELETE FROM qa_temuan WHERE peserta_id IN (${ids}); DELETE FROM profiler_peserta WHERE id IN (${ids});`);
+      await resetSidakReferenceCache();
+    }
+    for (const user of [archivedUser, activeUser]) {
+      if (!user) continue;
+      const { error } = await createAdmin(env).auth.admin.deleteUser(user.userId);
+      expect(error).toBeNull();
+    }
+  }
+});
+
 test("leader report stays within approved participant and service scope", async () => {
   outsideParticipantId = sqlOne(env, `INSERT INTO profiler_peserta (batch_name,nama,tim,jabatan,nomor_urut) VALUES (${quoted(folderName)},${quoted(`OUT-OF-SCOPE-${namespace}`)},'OUT-OF-SCOPE','Agent',2) RETURNING id;`);
   const indicatorId = sqlOne(env, "SELECT id FROM qa_indicators WHERE service_type='call' AND is_active ORDER BY sort_order, name LIMIT 1;");
   runSql(env, `INSERT INTO qa_temuan (peserta_id,period_id,indicator_id,service_type,no_tiket,is_phantom_padding,nilai,ketidaksesuaian,sebaiknya,tahun) VALUES (${quoted(outsideParticipantId)},${quoted(periodIds.get(1)!)},${quoted(indicatorId)},'call',${quoted(`OUT-OF-SCOPE-TICKET-${namespace}`)},false,2,${quoted(`OUT-OF-SCOPE-FINDING-${namespace}`)},${quoted("Outside scope recommendation")},${year});`);
+  await resetSidakReferenceCache();
   const own = await requestReport({ serviceType: "call", year, startMonth: 1, endMonth: 2 }, leader.token);
   expect(own.status).toBe(200);
   const ownBody = await own.json();
@@ -287,6 +352,7 @@ test("leader report stays within approved participant and service scope", async 
   expect(await forbiddenAgent.json()).toEqual(expect.objectContaining({ success: false, error: expect.objectContaining({ code: "FORBIDDEN", message: "Agen tersebut tidak termasuk dalam akses Anda." }) }));
   expect(ownBody.data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 1).findingsCount).toBe(2);
   runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(outsideParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(outsideParticipantId)};`);
+  await resetSidakReferenceCache();
 
   const outsideService = await requestReport({ serviceType: "email", year, startMonth: 1, endMonth: 2 }, leader.token);
   expect(outsideService.status).toBe(403);
