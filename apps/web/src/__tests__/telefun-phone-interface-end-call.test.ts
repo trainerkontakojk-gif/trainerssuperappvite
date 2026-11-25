@@ -140,8 +140,8 @@ describe("PhoneInterface end-call finalization", () => {
     expect(endButton).toBeDisabled();
     expect(screen.getByText("Mengakhiri…")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Menyimpan rekaman…");
-    expect(screen.getByRole("button", { name: "Tahan" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Bisukan" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Hold" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mute" })).toBeDisabled();
 
     await act(async () => {
       finalization.resolve();

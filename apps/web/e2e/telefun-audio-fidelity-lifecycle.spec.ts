@@ -942,7 +942,7 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
     const initialRecordingMic = await measureAudioTaps(page, "recording", 440);
     expect(initialRecordingMic.full_call).toBeGreaterThan(0.02);
     expect(initialRecordingMic.agent_only).toBeGreaterThan(0.02);
-    await call.getByRole("button", { name: "Bisukan" }).click();
+    await call.getByRole("button", { name: "Mute", exact: true }).click();
     await expect
       .poll(readMicTrack)
       .toMatchObject({ enabled: false, readyState: "live" });
@@ -961,18 +961,18 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
     expect(mutedRecordingMic.full_call).toBeLessThan(0.01);
     expect(mutedRecordingMic.agent_only).toBeLessThan(0.01);
 
-    await call.getByRole("button", { name: "Tahan" }).click();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
     await expect
       .poll(readMicTrack)
       .toMatchObject({ enabled: false, readyState: "live" });
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect
       .poll(readMicTrack)
       .toMatchObject({ enabled: false, readyState: "live" });
     const heldRecordingMic = await measureAudioTaps(page, "recording", 440);
     expect(heldRecordingMic.full_call).toBeLessThan(0.01);
     expect(heldRecordingMic.agent_only).toBeLessThan(0.01);
-    await call.getByRole("button", { name: "Bunyikan" }).click();
+    await call.getByRole("button", { name: "Unmute", exact: true }).click();
     await expect
       .poll(readMicTrack)
       .toMatchObject({ enabled: true, readyState: "live" });

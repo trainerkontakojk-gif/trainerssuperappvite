@@ -198,8 +198,8 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await page.screenshot({
       path: testInfo.outputPath("connected-desktop.png"),
     });
-    await call.getByRole("button", { name: "Bisukan", exact: true }).click();
-    await expect(call.getByText("Mikrofon dibisukan")).toBeVisible();
+    await call.getByRole("button", { name: "Mute", exact: true }).click();
+    await expect(call.getByText("Mikrofon di-mute")).toBeVisible();
     await expect
       .poll(() =>
         waveform
@@ -209,9 +209,9 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
           ),
       )
       .toBe(true);
-    await call.getByRole("button", { name: "Tahan", exact: true }).click();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
     await expect(waveform).toHaveCount(0);
-    await call.getByRole("button", { name: "Lanjutkan", exact: true }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect(waveform).toBeVisible();
     expectHermetic(audit);
   });
@@ -327,7 +327,7 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
         "Sambungan suara tidak berhasil dibuka. Periksa koneksi internet, lalu coba panggil lagi.",
       );
       await expect(alert).not.toContainText("Panggilan belum dapat dimulai.");
-      for (const name of ["Tahan", "Bisukan", "Akhiri"])
+      for (const name of ["Hold", "Mute", "Akhiri"])
         await expect(
           call.getByRole("button", { name, exact: true }),
         ).toHaveCount(0);
@@ -399,7 +399,7 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     expectHermetic(audit);
   });
 
-  test("cek mikrofon, layar softphone berlabel Indonesia, akhiri dengan konfirmasi, lalu tahap Telaah", async ({
+  test("cek mikrofon, layar softphone berlabel Hold/Mute/Akhiri, akhiri dengan konfirmasi, lalu tahap Telaah", async ({
     page,
   }) => {
     // Soket tiruan wajib dipasang sebelum halaman dimuat.
@@ -440,17 +440,17 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     expect(
       await phone.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
     ).toBeGreaterThanOrEqual(14);
-    for (const name of ["Tahan", "Bisukan", "Akhiri"]) {
-      await expect(call.getByRole("button", { name })).toBeVisible();
+    for (const name of ["Hold", "Mute", "Akhiri"]) {
+      await expect(call.getByRole("button", { name, exact: true })).toBeVisible();
     }
 
-    // Tahan memunculkan pita hold dengan batasnya.
-    await call.getByRole("button", { name: "Tahan" }).click();
-    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
-    await expect(call.getByText("Panggilan ditahan")).toHaveCount(0);
+    // Hold memunculkan pita hold dengan batasnya.
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toBeVisible();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toHaveCount(0);
 
-    // Bisukan dicatat sebagai interval di metrik sesi.
+    // Mute dicatat sebagai interval di metrik sesi.
     const patchBodies: unknown[] = [];
     page.on("request", (request) => {
       if (
@@ -459,10 +459,10 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
       )
         patchBodies.push(request.postDataJSON());
     });
-    await call.getByRole("button", { name: "Bisukan" }).click();
-    await expect(call.getByText("Mikrofon dibisukan")).toBeVisible();
+    await call.getByRole("button", { name: "Mute", exact: true }).click();
+    await expect(call.getByText("Mikrofon di-mute")).toBeVisible();
     await page.waitForTimeout(300);
-    await call.getByRole("button", { name: "Bunyikan" }).click();
+    await call.getByRole("button", { name: "Unmute", exact: true }).click();
 
     // Akhiri meminta konfirmasi aplikasi.
     await call.getByRole("button", { name: "Akhiri" }).click();
@@ -536,9 +536,9 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await expect(call.getByRole("status").first()).toHaveText("Giliran Anda", {
       timeout: 20000,
     });
-    await call.getByRole("button", { name: "Tahan" }).click();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
     const band = call.getByRole("status", { name: "Hold ke-1" });
-    await expect(band).toContainText("Panggilan ditahan");
+    await expect(band).toContainText("Panggilan di-hold");
     await expect(band).toContainText("dari batas 01.00");
 
     await page.clock.fastForward(52_000);
@@ -554,13 +554,13 @@ test.describe("Telefun panggilan (hermetic, mikrofon palsu)", () => {
     await expect(band).not.toHaveText(overtime!);
     await expect(band).toContainText(/\+00\.0[7-9]/);
     await expect(
-      call.getByRole("button", { name: "Lanjutkan", exact: true }),
+      call.getByRole("button", { name: "Unhold", exact: true }),
     ).toBeVisible();
     await expect(
-      call.getByRole("button", { name: "Lanjutkan", exact: true }),
+      call.getByRole("button", { name: "Unhold", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
 
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect(band).toHaveCount(0);
     expectHermetic(audit);
   });

@@ -45,7 +45,7 @@ export function HoldStatusDisplay({
       )}
     >
       <strong className="font-semibold">
-        {isOvertime ? "Hold melewati batas" : "Panggilan ditahan"}
+        {isOvertime ? "Hold melewati batas" : "Panggilan di-hold"}
       </strong>
       <span className="font-mono font-bold tabular-nums">
         {isOvertime

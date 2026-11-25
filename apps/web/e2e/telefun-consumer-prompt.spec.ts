@@ -233,10 +233,10 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       expect(text).not.toMatch(/[\d"'“”]|\b(?:menangis|sesenggukan)\b/i);
     }
 
-    await call.getByRole("button", { name: "Tahan" }).click();
-    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toBeVisible();
     await page.clock.fastForward(1_000);
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect.poll(() => holdEndCues(messages).length).toBe(1);
     await expect
       .poll(() => toneNoteEntries(messages).length)
@@ -564,15 +564,15 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
       if (profile.id === "terburu-buru")
         expect.soft(prompt).not.toContain("tunggu dengan sabar");
       expect(controlTexts("TIME_CUE")).toEqual([]);
-      await call.getByRole("button", { name: "Tahan" }).click();
-      await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+      await call.getByRole("button", { name: "Hold", exact: true }).click();
+      await expect(call.getByText("Panggilan di-hold")).toBeVisible();
       await page.clock.fastForward(62_000);
-      await call.getByRole("button", { name: "Lanjutkan" }).click();
+      await call.getByRole("button", { name: "Unhold", exact: true }).click();
       await expect.poll(() => holdEndCues(messages).length).toBe(1);
-      await call.getByRole("button", { name: "Tahan" }).click();
-      await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+      await call.getByRole("button", { name: "Hold", exact: true }).click();
+      await expect(call.getByText("Panggilan di-hold")).toBeVisible();
       await page.clock.fastForward(5_000);
-      await call.getByRole("button", { name: "Lanjutkan" }).click();
+      await call.getByRole("button", { name: "Unhold", exact: true }).click();
       await expect.poll(() => holdEndCues(messages).length).toBe(2);
       const [longHold, shortHold] = holdEndCues(messages);
       expect.soft(longHold).toContain("hold ke-1");
@@ -878,17 +878,17 @@ test.describe("Telefun konsumen AI (hermetic)", () => {
     expect(holdEndCues(messages)).toEqual([]);
 
     // Hold pertama melewati batas 1 menit.
-    await call.getByRole("button", { name: "Tahan" }).click();
-    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toBeVisible();
     await page.clock.fastForward(62_000);
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect.poll(() => holdEndCues(messages).length).toBe(1);
 
     // Hold kedua singkat.
-    await call.getByRole("button", { name: "Tahan" }).click();
-    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toBeVisible();
     await page.clock.fastForward(5_000);
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect.poll(() => holdEndCues(messages).length).toBe(2);
 
     const [first, second] = holdEndCues(messages);

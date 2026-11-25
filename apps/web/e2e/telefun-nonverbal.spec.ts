@@ -189,8 +189,8 @@ test.describe("Telefun klip nonverbal (hermetic)", () => {
     await responsePaused;
     await clipRequest;
     await expect(call.getByRole("status").first()).toHaveText("Giliran Anda");
-    await call.getByRole("button", { name: "Tahan", exact: true }).click();
-    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toBeVisible();
     releaseResponse();
     await page.waitForTimeout(100);
 

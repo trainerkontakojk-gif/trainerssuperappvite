@@ -324,8 +324,8 @@ test.describe("Telefun teguran saat agen diam (hermetic)", () => {
       timeout: 20000,
     });
     await waitForConsumerTurnDrained(page);
-    await call.getByRole("button", { name: "Tahan", exact: true }).click();
-    await expect(call.getByText("Panggilan ditahan")).toBeVisible();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
+    await expect(call.getByText("Panggilan di-hold")).toBeVisible();
     await page.clock.fastForward(6_000);
 
     expect(agentSilenceCues(messages)).toHaveLength(0);

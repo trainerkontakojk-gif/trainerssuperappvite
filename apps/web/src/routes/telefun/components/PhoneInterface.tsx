@@ -955,14 +955,14 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
 
       {!failed && (
         <div className="flex shrink-0 items-start justify-center gap-7 border-t border-border bg-surface-elevated px-6 pt-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
-          <CallControl label={isOnHold ? "Lanjutkan" : "Tahan"}>
+          <CallControl label={isOnHold ? "Unhold" : "Hold"}>
             <Button
               type="button"
               variant={isOnHold ? "default" : "outline"}
               size="icon-lg"
               onClick={toggleHold}
               disabled={isRinging || isDisconnecting}
-              aria-label={isOnHold ? "Lanjutkan" : "Tahan"}
+              aria-label={isOnHold ? "Unhold" : "Hold"}
               aria-pressed={isOnHold}
               className="size-14 rounded-full"
             >
@@ -973,7 +973,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               )}
             </Button>
           </CallControl>
-          <CallControl label={isMuted ? "Bunyikan" : "Bisukan"}>
+          <CallControl label={isMuted ? "Unmute" : "Mute"}>
             <Button
               type="button"
               variant={isMuted ? "default" : "outline"}
@@ -982,7 +982,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                 if (!isDisconnectingRef.current) setIsMuted((muted) => !muted);
               }}
               disabled={isOnHold || isRinging || isDisconnecting}
-              aria-label={isMuted ? "Bunyikan" : "Bisukan"}
+              aria-label={isMuted ? "Unmute" : "Mute"}
               aria-pressed={isMuted}
               className="size-14 rounded-full"
             >
@@ -1072,7 +1072,7 @@ function MicrophoneWaveform({
         ))}
       </div>
       <p className="text-xs text-fg2">
-        Suara Anda{muted && <span> · Mikrofon dibisukan</span>}
+        Suara Anda{muted && <span> · Mikrofon di-mute</span>}
       </p>
     </div>
   );

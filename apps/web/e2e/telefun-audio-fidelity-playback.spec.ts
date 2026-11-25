@@ -772,7 +772,7 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
         ).length,
     );
     expect(initialStarts).toBe(initialResponse.chunks.length);
-    await call.getByRole("button", { name: "Tahan" }).click();
+    await call.getByRole("button", { name: "Hold", exact: true }).click();
     await expect
       .poll(() =>
         page.evaluate(
@@ -796,7 +796,7 @@ test.describe("Telefun audio signal fidelity (synthetic, hermetic)", () => {
       })
       .toBeLessThan(0.01);
 
-    await call.getByRole("button", { name: "Lanjutkan" }).click();
+    await call.getByRole("button", { name: "Unhold", exact: true }).click();
     await expect
       .poll(() =>
         page.evaluate(
