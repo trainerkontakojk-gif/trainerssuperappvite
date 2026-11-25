@@ -1,5 +1,23 @@
 import { z } from "zod";
 
+/**
+ * Gemini Live transcription hints for both lanes. Calls are Indonesian with
+ * English service terms; without hints Gemini auto-detects per chunk and can
+ * render informal Indonesian as another language. Native audio models reject
+ * `speechConfig.languageCode`, so the hint lives on transcription only.
+ */
+export const TELEFUN_TRANSCRIPTION_CONFIG = {
+  languageCodes: ["id-ID", "en-US"],
+  customVocabulary: [
+    "OJK",
+    "SLIK",
+    "pinjol",
+    "157",
+    "BI checking",
+    "debt collector",
+  ],
+} as const;
+
 export const telefunTranscriptSpeakerSchema = z.enum([
   "agent",
   "consumer",

@@ -1,6 +1,6 @@
 # Telefun — pensiunkan Gemini 3.0 Flash Live + rapikan ketidakcocokan transkripsi
 
-Status: dikerjakan 2026-11-25. Lane **C** (registry model bersama di `packages/types`, dipakai API, server Telefun, dan web; tanpa skema, auth/RLS, atau migrasi).
+Status: selesai 2026-11-25 (commit 1 pensiun 3.0, commit 2 konfigurasi transkripsi bersama). Lane **C** (registry model bersama di `packages/types`, dipakai API, server Telefun, dan web; tanpa skema, auth/RLS, atau migrasi).
 
 ## Requirement
 
@@ -31,5 +31,5 @@ Di luar cakupan: menghapus baris `ai_pricing_settings` atau riwayat pemakaian 3.
 - [x] RED: test baru di `telefun-flow-landing.spec.ts` (pengaturan) dan `monitoring-models-api-policy.spec.ts` (harga pensiun); jalankan dan pastikan gagal.
 - [x] GREEN: registry pensiun, lookup, normalisasi, konsumen API/web.
 - [x] Fixture, unit test lama, dan dokumentasi yang menyebut 3.0 sebagai pilihan aktif (commit 1).
-- [ ] Konfigurasi transkripsi bersama, unit test `{}` usang, nama test `transcript.test.ts` (commit 2).
-- [ ] `thermo-nuclear`, gate (E2E terfokus, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git diff --check`), CHANGELOG, commit + push.
+- [x] Konfigurasi transkripsi bersama, unit test `{}` usang, nama test `transcript.test.ts` (commit 2).
+- [x] `thermo-nuclear`, gate (E2E terfokus, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `git diff --check`), CHANGELOG, commit + push.

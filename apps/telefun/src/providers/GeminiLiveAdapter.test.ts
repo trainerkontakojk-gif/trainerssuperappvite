@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { TELEFUN_TRANSCRIPTION_CONFIG } from "@trainers/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { parseTelefunSessionConfigure } from "../server-protocol.js";
@@ -133,8 +134,8 @@ describe("GeminiLiveAdapter", () => {
           },
         },
         systemInstruction: { parts: [{ text: "Roleplay test" }] },
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
+        inputAudioTranscription: TELEFUN_TRANSCRIPTION_CONFIG,
+        outputAudioTranscription: TELEFUN_TRANSCRIPTION_CONFIG,
         sessionResumption: {},
       },
     });

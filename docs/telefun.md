@@ -175,7 +175,9 @@ normalization never rewrites historical history rows.
   (`TranscriptCollector.appendDelta`), termasuk kata berulang. Penggabungan
   kumulatif (`append`) hanya untuk pengamat OpenAI Realtime historis.
 - Setup mengirim `languageCodes: ["id-ID", "en-US"]` dan `customVocabulary`
-  istilah layanan pada kedua konfigurasi transkripsi.
+  istilah layanan pada kedua konfigurasi transkripsi. Sumbernya satu:
+  `TELEFUN_TRANSCRIPTION_CONFIG` di `packages/types`, dipakai setup kanonis
+  server dan setup web (yang isinya diabaikan server).
   `speechConfig.languageCode` tidak dipakai karena model audio native tidak
   mendukungnya.
 - Saat giliran di-commit, `transcript-sanitizer.ts` membuang marker

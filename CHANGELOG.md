@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-25
 
+- refactor(telefun): share the Gemini transcription config between server and web setup
 - fix(telefun): retire Gemini 3.0 Flash Live as a selectable model and keep it as readonly history
 - fix(telefun): keep Gemini Live transcripts whole, language-hinted, and free of leaked directions
 - feat(sidak): add leader, critical, follow-up report sheets and executive PDF

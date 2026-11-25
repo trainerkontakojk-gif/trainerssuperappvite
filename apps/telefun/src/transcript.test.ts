@@ -63,7 +63,7 @@ describe("TranscriptCollector", () => {
     expect(s[0].text).toBe("Saya ingin");
   });
 
-  it("flushes on speaker switch", () => {
+  it("keeps both speakers in one turn and commits agent before consumer on flush", () => {
     const c = collector();
     c.append({ speaker: "agent", text: "Halo", observedAtMs: 3000 });
     c.append({ speaker: "consumer", text: "Halo juga", observedAtMs: 5000 });

@@ -17,7 +17,10 @@ import {
   getTelefunAudioConfiguration,
 } from "../routes/telefun/services/liveProtocol";
 import * as liveProtocol from "../routes/telefun/services/liveProtocol";
-import { TELEFUN_CONFIGURATION_CLOSE_CODE } from "@trainers/types";
+import {
+  TELEFUN_CONFIGURATION_CLOSE_CODE,
+  TELEFUN_TRANSCRIPTION_CONFIG,
+} from "@trainers/types";
 
 describe("telefun live protocol", () => {
   it("exports only the active Gemini runtime control message builder", () => {
@@ -157,8 +160,12 @@ describe("telefun live protocol", () => {
     expect(
       message.setup.realtimeInputConfig.automaticActivityDetection.disabled,
     ).toBe(false);
-    expect(message.setup.inputAudioTranscription).toEqual({});
-    expect(message.setup.outputAudioTranscription).toEqual({});
+    expect(message.setup.inputAudioTranscription).toEqual(
+      TELEFUN_TRANSCRIPTION_CONFIG,
+    );
+    expect(message.setup.outputAudioTranscription).toEqual(
+      TELEFUN_TRANSCRIPTION_CONFIG,
+    );
   });
 
   it("encodes captured PCM16 frames as Gemini audio payloads", () => {

@@ -1,3 +1,4 @@
+import { TELEFUN_TRANSCRIPTION_CONFIG } from "@trainers/types";
 import { arrayBufferToBase64, base64ToUint8Array } from "./common";
 
 export function buildTelefunLiveSetupMessage(params: {
@@ -29,8 +30,8 @@ export function buildTelefunLiveSetupMessage(params: {
         },
         turnCoverage: "TURN_INCLUDES_ONLY_ACTIVITY",
       },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
+      inputAudioTranscription: TELEFUN_TRANSCRIPTION_CONFIG,
+      outputAudioTranscription: TELEFUN_TRANSCRIPTION_CONFIG,
       sessionResumption: {},
       contextWindowCompression: {
         slidingWindow: {},
