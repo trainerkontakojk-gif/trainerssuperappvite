@@ -9,6 +9,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 - feat(sidak): ship compact SIDAK conclusion strip
 - fix(sidak): enforce leader service scope on data reports
 - fix(sidak): make showArchived actually filter archived/soft-deleted peserta
+- docs(sidak): document leader service scope and 403s for SIDAK report endpoints in auth-rbac
 
 ## 2026-11-24
 
