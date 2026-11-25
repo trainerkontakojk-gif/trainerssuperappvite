@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-25
 
+- fix(sidak): round weekday-bar percentages, hide them on days without findings, and give the count stronger weight than the percent
 - feat(sidak): show each weekday's share of the week's findings as a percentage next to its count in the weekday bars
 - feat(telefun): take Telaah agent turns from the post-call agent-recording transcript instead of Gemini Live, and count a standalone "ee" as a filler word
 - fix(telefun): label the call controls Hold/Unhold and Mute/Unmute instead of the awkward Tahan/Bisukan copy

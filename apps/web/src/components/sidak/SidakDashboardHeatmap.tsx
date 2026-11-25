@@ -189,8 +189,9 @@ export default function SidakDashboardHeatmap({
         </p>
       )}
       <p className="mt-auto pt-4 text-xs leading-5 text-muted-foreground">
-        Volume temuan, bukan rate · filter tim dan bulan serta cakupan akses
-        akun tetap berlaku.
+        Volume temuan, bukan rate · persentase bar = porsi hari itu dari total
+        Senin–Minggu · filter tim dan bulan serta cakupan akses akun tetap
+        berlaku.
       </p>
     </SidakDashboardPanel>
   );

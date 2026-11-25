@@ -5,10 +5,10 @@ import type { HeatmapDay } from "./SidakHeatmapCalendar";
 const INTEGER = new Intl.NumberFormat("id-ID");
 const PERCENT = new Intl.NumberFormat("id-ID", {
   style: "percent",
-  maximumFractionDigits: 1,
+  maximumFractionDigits: 0,
 });
 
-/** Porsi satu hari dari total temuan Senin–Minggu, mis. "84,2%". */
+/** Porsi satu hari dari total temuan Senin–Minggu, dibulatkan, mis. "84%". */
 function formatShare(total: number, sum: number) {
   return PERCENT.format(sum > 0 ? total / sum : 0);
 }
@@ -17,8 +17,8 @@ const WEEKDAY_SHORT = WEEKDAY_FULL.map((label) => label.slice(0, 3));
 /**
  * Bar jumlah temuan per hari dalam minggu (Senin–Minggu). Dipakai Dashboard
  * dan di bawah kalender Heatmap supaya hari bisa dibandingkan sekilas. Angka
- * dan persentase (porsi dari total Senin–Minggu) tiap bar tertulis; bar
- * tertinggi diberi warna penuh.
+ * tiap bar tertulis, dengan persentase (porsi dari total Senin–Minggu) di
+ * bawahnya bila hari itu ada temuan; bar tertinggi diberi warna penuh.
  */
 export function SidakWeekdayBars({
   totals,
@@ -40,7 +40,7 @@ export function SidakWeekdayBars({
       className="flex min-h-0 flex-1 flex-col"
     >
       <div className="relative min-h-32 flex-1 border-b border-border">
-        <div className="absolute inset-0 flex items-end gap-2 pt-9">
+        <div className="absolute inset-0 flex items-end gap-2 pt-10">
           {totals.map((total, index) => {
             const isPeak = total > 0 && total === max;
             return (
@@ -68,14 +68,16 @@ export function SidakWeekdayBars({
                       className={`text-xs ${
                         isPeak
                           ? "font-semibold text-foreground"
-                          : "text-muted-foreground"
+                          : "font-medium text-fg2"
                       }`}
                     >
                       {INTEGER.format(total)}
                     </span>
-                    <span className="text-xs whitespace-nowrap text-muted-foreground">
-                      {formatShare(total, sum)}
-                    </span>
+                    {total > 0 ? (
+                      <span className="text-xs whitespace-nowrap text-muted-foreground">
+                        {formatShare(total, sum)}
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               </div>
