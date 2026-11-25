@@ -59,6 +59,8 @@ const managementReportRoute = new Hono<{ Variables: Variables }>().post(
       const data = await sidakService.getSidakManagementReport(input, {
         agentIds,
         allowedServiceTypes: allowedServices,
+        userId: user.id,
+        role: normalizeRole(profile?.role) ?? undefined,
       });
       return c.json({ success: true, data });
     } catch (error) {

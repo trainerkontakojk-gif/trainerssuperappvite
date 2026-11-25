@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { installMockAuthSession } from "./helpers/mockAuth";
 import { assertLocalDevOnlyTargetAt } from "./helpers/sidakJadwalShiftingHarness";
 import { readDownloadedWorkbook } from "./helpers/sidakReportsDataHarness";
+import { readFileSync } from "node:fs";
+import { printedReadBack, readPdfPages } from "./helpers/pdfReadback";
 
 const ORIGIN = "http://localhost:3005";
 const requestBodies: Record<string, unknown>[] = [];
@@ -15,9 +17,16 @@ const managementData = {
     { rowType: "quarter", serviceType: "call", month: null, quarter: "Q4", label: "Subtotal Q4 · berjalan — data sementara", agentsAudited: 1, sessionsAudited: 1, findingsCount: 0, ticketsWithFindings: 0, avgAgentScore: 100, complianceRate: 100, zeroErrorRate: 100, delta: null },
     { rowType: "month", serviceType: "call", month: 12, label: "Desember 2026 · berjalan — data sementara", agentsAudited: 1, sessionsAudited: 1, findingsCount: 0, ticketsWithFindings: 0, avgAgentScore: 100, complianceRate: 100, zeroErrorRate: 100, delta: null },
   ],
-  teams: [{ rowType: "month", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", month: 1, label: "Januari 2026", agentsAudited: 1, sessionsAudited: 1, findingsCount: 2, ticketsWithFindings: 1, avgAgentScore: 94, complianceRate: 0, zeroErrorRate: 0, delta: null }, { rowType: "month", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", month: 12, label: "Desember 2026 · berjalan — data sementara", agentsAudited: 1, sessionsAudited: 1, findingsCount: 0, ticketsWithFindings: 0, avgAgentScore: 100, complianceRate: 100, zeroErrorRate: 100, delta: null }, { rowType: "quarter", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", month: null, quarter: "Q4", label: "Subtotal Q4 · berjalan — data sementara", agentsAudited: 1, sessionsAudited: 1, findingsCount: 0, ticketsWithFindings: 0, avgAgentScore: 100, complianceRate: 100, zeroErrorRate: 100, delta: null }],
+  trendMonthly: Array.from({ length: 6 }, (_, index) => ({ rowType: "month", serviceType: "call", month: index + 7, label: `${["Juli", "Agustus", "September", "Oktober", "November", "Desember"][index]} 2026${index === 5 ? " · berjalan — data sementara" : ""}`, agentsAudited: index === 0 ? 1 : null, sessionsAudited: index === 0 ? 1 : null, findingsCount: index === 0 ? 2 : null, ticketsWithFindings: index === 0 ? 1 : null, avgAgentScore: index === 0 ? 94 : null, complianceRate: index === 0 ? 0 : null, zeroErrorRate: index === 0 ? 0 : null, delta: null })),
+  teams: [{ rowType: "month", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", month: 1, label: "Januari 2026", agentsAudited: 1, sessionsAudited: 1, findingsCount: 2, ticketsWithFindings: 1, avgAgentScore: 94, complianceRate: 0, zeroErrorRate: 0, delta: null }, { rowType: "month", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", month: 12, label: "Desember 2026 · berjalan — data sementara", agentsAudited: 1, sessionsAudited: 1, findingsCount: 0, ticketsWithFindings: 0, avgAgentScore: 100, complianceRate: 100, zeroErrorRate: 100, delta: null }, { rowType: "quarter", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", month: null, quarter: "Q4", label: "Subtotal Q4 · berjalan — data sementara", agentsAudited: 1, sessionsAudited: 1, findingsCount: 0, ticketsWithFindings: 0, avgAgentScore: 100, complianceRate: 100, zeroErrorRate: 100, delta: null }, { rowType: "total", team: "Tim Uji", batchName: "Semua batch", serviceType: "call", month: null, label: "Total 1–12/2026", agentsAudited: 1, sessionsAudited: 1, findingsCount: 2, ticketsWithFindings: 1, avgAgentScore: 94, complianceRate: 0, zeroErrorRate: 0, delta: null }],
   agents: [{ agentId: "agent-1", name: "Alya Uji", team: "Tim Uji", batchName: "Batch 7", serviceType: "call", sessionsAudited: 1, findingsCount: 2, monthlyScores: { 1: 94 }, quarterScores: { Q1: 94, Q2: null, Q3: null, Q4: null }, periodScore: 94, monthsAtTarget: "0/1", rank: 1, trend: "stable" }],
   pareto: [{ serviceType: "call", parameter: "Kepatuhan prosedur", category: "non_critical", monthlyCounts: [{ month: 1, count: 2 }], total: 2, contribution: 100, cumulativeContribution: 100, agentsAffected: 1 }],
+  leaders: [
+    { leaderId: "leader-1", leaderName: "Leader Uji", agentsInScope: 1, serviceTypes: ["call"], scopeEmpty: false, monthly: [{ rowType: "month", serviceType: "call", month: 1, label: "Januari 2026", agentsAudited: 1, sessionsAudited: 1, findingsCount: 2, ticketsWithFindings: 1, avgAgentScore: 94, complianceRate: 0, zeroErrorRate: 0, delta: null }] },
+    { leaderId: "empty-leader", leaderName: "Leader Kosong", agentsInScope: 0, serviceTypes: ["call"], scopeEmpty: true, monthly: [] },
+  ],
+  critical: [{ service_type: "call", qa_periods: { month: 1, year: 2026 }, profiler_peserta: { nama: "Alya Uji", batch_name: "Batch 7" }, qa_indicators: { name: "Kepatuhan prosedur" }, no_tiket: "TKT-1", ketidaksesuaian: "RAW_CRITICAL_FINDING_SHOULD_NOT_APPEAR", sebaiknya: "RAW_CRITICAL_RECOMMENDATION_SHOULD_NOT_APPEAR", nilai: 2, is_phantom_padding: false, category: "critical" }],
+  followUps: [{ agentId: "agent-1", name: "Alya Uji", team: "Tim Uji", batchName: "Batch 7", reasons: ["score_below_target", "repeated_parameter"], worstParameters: [{ parameter: "Kepatuhan prosedur", category: "critical", count: 2 }], repeatMonthCount: 1 }],
   details: [
     { service_type: "call", qa_periods: { month: 1, year: 2026 }, profiler_peserta: { nama: "Alya Uji", batch_name: "Batch 7" }, qa_indicators: { name: "Kepatuhan prosedur" }, no_tiket: "TKT-1", ketidaksesuaian: "Contoh temuan", sebaiknya: "Contoh rekomendasi", nilai: 2, is_phantom_padding: false },
     { service_type: "call", qa_periods: { month: 1, year: 2026 }, profiler_peserta: { nama: "Alya Uji", batch_name: "Batch 7" }, qa_indicators: { name: "Ghost" }, no_tiket: "GHOST", ketidaksesuaian: "Phantom finding", sebaiknya: "Phantom recommendation", nilai: 2, is_phantom_padding: true },
@@ -30,7 +39,7 @@ test.beforeAll(async () => {
   await assertLocalDevOnlyTargetAt(ORIGIN);
 });
 
-test("preset periode mengisi filter dan ekspor workbook fase 1 berisi lima sheet berurutan", async ({ page }) => {
+test("preset periode mengisi filter dan ekspor workbook delapan sheet berurutan", async ({ page }) => {
   requestUrls.length = 0;
   sidakRpcUrls.length = 0;
   requestBodies.length = 0;
@@ -82,7 +91,12 @@ test("preset periode mengisi filter dan ekspor workbook fase 1 berisi lima sheet
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Excel Manajemen" }).click();
   const workbook = await readDownloadedWorkbook(await downloadPromise);
-  expect(Object.keys(workbook)).toEqual(["Ringkasan", "Rekap Tim", "Rekap Agen", "Pareto", "Detail Temuan"]);
+  expect(Object.keys(workbook)).toEqual(["Ringkasan", "Rekap Tim", "Rekap Leader", "Rekap Agen", "Pareto", "Critical", "Tindak Lanjut", "Detail Temuan"]);
+  expect(workbook["Rekap Leader"]?.flat().join(" ")).toContain("Leader Uji");
+  expect(workbook["Rekap Leader"]?.flat().join(" ")).toContain("scope kosong");
+  expect(workbook.Critical?.flat().join(" ")).toContain("Kepatuhan prosedur");
+  expect(workbook.Critical?.find((row) => row.includes("Kategori"))).toContain("Bulan");
+  expect(workbook["Tindak Lanjut"]?.flat().join(" ")).toContain("Alya Uji");
   const detailRows = workbook["Detail Temuan"] ?? [];
   expect(detailRows.find((row) => row.includes("Seharusnya"))).toContain("Seharusnya");
   for (const name of Object.keys(workbook)) {
@@ -100,7 +114,7 @@ test("preset periode mengisi filter dan ekspor workbook fase 1 berisi lima sheet
   expect(januaryRow[headers.indexOf("Tiket bertemuan")]).toBe("1");
   expect(summaryRows.find((row) => row.includes("Desember 2026 · berjalan — data sementara"))).toBeTruthy();
   expect(summaryRows.find((row) => row.includes("Subtotal Q4 · berjalan — data sementara"))).toBeTruthy();
-  expect(workbook.Ringkasan?.[0]?.[0]).toContain("Agen Alya Uji · Parameter Kepatuhan prosedur");
+  expect(workbook.Ringkasan?.[0]?.[0]).toContain("Agen Alya Uji · Parameter Kepatuhan prosedur (hanya berlaku untuk Detail Temuan)");
   expect(workbook.Ringkasan?.[0]?.[0]).not.toContain("agent-1");
   expect(workbook.Ringkasan?.[0]?.[0]).not.toContain("param-1");
   const exportedDetails = workbook["Detail Temuan"]?.flat().join(" ") ?? "";
@@ -109,6 +123,27 @@ test("preset periode mengisi filter dan ekspor workbook fase 1 berisi lima sheet
   expect(exportedDetails).toContain("TKT-1");
   const ticketPlaceholderRow = workbook["Detail Temuan"]?.find((row) => row.includes("Temuan tanpa tiket"));
   expect(ticketPlaceholderRow).toContain("-");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pdfButton = page.getByRole("button", { name: "Export PDF Manajemen" });
+  await expect(pdfButton).toBeVisible();
+  const pdfButtonBox = await pdfButton.boundingBox();
+  expect(pdfButtonBox?.height).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await pdfButton.focus();
+  const pdfDownloadPromise = page.waitForEvent("download");
+  await pdfButton.press("Enter");
+  const pdfDownload = await pdfDownloadPromise;
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const pdf = readPdfPages(readFileSync(await pdfDownload.path()));
+  const pdfText = printedReadBack(pdf.texts);
+  for (const section of ["LAPORAN MANAJEMEN SIDAK", "Filter", "Periode pembanding", "KPI", "Tren 6 Bulan", "Tren Bulanan Periode", "Top 10 Parameter", "Perbandingan Tim", "Perbandingan Leader", "Tindak Lanjut", "Alya Uji", "1 Mar 2026 07.00.00"]) {
+    expect(pdfText).toContain(section);
+  }
+  expect(pdfText).not.toContain("RAW_CRITICAL_FINDING_SHOULD_NOT_APPEAR");
+  expect(pdfText).not.toContain("RAW_CRITICAL_RECOMMENDATION_SHOULD_NOT_APPEAR");
+  expect(pdfText).not.toContain("Contoh temuan");
+  expect(pdfText).not.toContain("TKT-1");
   expect(requestUrls).toEqual([`${ORIGIN}/api/v1/sidak/reports/management`]);
   expect(sidakRpcUrls.length).toBeGreaterThan(0);
   const managementUrl = new URL(requestUrls[0]!);
@@ -141,6 +176,7 @@ test("management endpoint 500 shows a friendly error and never offers a stale ex
   await installMockAuthSession(page);
   let managementRequests = 0;
   let failManagement = false;
+  let failPdfImport = false;
   let holdResponse = false;
   let releaseResponse: (() => void) | null = null;
   let downloads = 0;
@@ -148,6 +184,7 @@ test("management endpoint 500 shows a friendly error and never offers a stale ex
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (url.origin === ORIGIN && !url.pathname.startsWith("/api/")) {
+      if (failPdfImport && url.pathname.toLowerCase().includes("jspdf")) return route.abort("failed");
       await route.continue();
       return;
     }
@@ -173,6 +210,12 @@ test("management endpoint 500 shows a friendly error and never offers a stale ex
   await page.getByRole("button", { name: "Buat laporan manajemen" }).click();
   await expect(page.getByText(/Laporan manajemen siap diunduh/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Export Excel Manajemen" })).toBeVisible();
+
+  failPdfImport = true;
+  await page.getByRole("button", { name: "Export PDF Manajemen" }).click();
+  await expect(page.getByText("File PDF belum bisa dibuat. Coba unduh lagi.", { exact: true })).toBeVisible();
+  expect(downloads).toBe(0);
+  failPdfImport = false;
 
   await page.getByRole("combobox", { name: "Dari bulan" }).click();
   await page.getByRole("option", { name: "Februari" }).click();

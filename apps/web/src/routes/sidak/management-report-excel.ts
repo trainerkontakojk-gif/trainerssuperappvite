@@ -21,9 +21,9 @@ function appendMetadata(
   const mode = data.metadata.mode === "individu" ? "Per Individu" : "Per Layanan";
   const allowed = data.metadata.allowedServiceTypes?.map((service) => SERVICE_LABELS[service] ?? service).join(", ") ?? "semua sesuai akses";
   const agent = data.metadata.agentName ?? data.metadata.agentId ?? "-";
-  const parameter = data.metadata.indicatorName ?? data.metadata.indicatorId ?? "semua";
+  const parameter = `${data.metadata.indicatorName ?? data.metadata.indicatorId ?? "semua"} (hanya berlaku untuk Detail Temuan)`;
   const monthsLabel = `${MONTH_NAMES[startMonth - 1]}–${MONTH_NAMES[endMonth - 1]} ${year}`;
-  sheet.addRow([`Filter: ${mode} · Layanan ${serviceLabel} · Agen ${agent} · Parameter ${parameter} (${data.metadata.indicatorScope}) · showArchived ${data.metadata.showArchived ? "ya" : "tidak"} · Akses layanan ${allowed} · Tahun ${year} · Bulan ${monthsLabel}`]);
+  sheet.addRow([`Filter: ${mode} · Layanan ${serviceLabel} · Agen ${agent} · Parameter ${parameter} · showArchived ${data.metadata.showArchived ? "ya" : "tidak"} · Akses layanan ${allowed} · Tahun ${year} · Bulan ${monthsLabel}`]);
   sheet.addRow([`data ditarik pada ${generatedAtJakarta} (Asia/Jakarta)`]);
   if (temporaryMonths.length) {
     sheet.addRow([`Bulan berjalan — data sementara: ${temporaryMonths.map((month) => MONTH_NAMES[month - 1]).join(", ")}`]);
@@ -108,6 +108,32 @@ export async function downloadManagementReportExcel(
   }
   setWidths(teams, teamHeaders.map((header) => Math.max(14, Math.min(header.length + 3, 28))));
 
+  const leaders = workbook.addWorksheet("Rekap Leader");
+  appendMetadata(leaders, data);
+  const leaderHeaders = ["Leader", "Agen dalam scope", "Layanan dalam scope", "Periode", "Jenis baris", "Layanan", "Kuartal", ...metricHeaders.slice(4)];
+  setHeader(leaders, leaderHeaders);
+  for (const leader of data.leaders) {
+    if (leader.scopeEmpty) {
+      leaders.addRow([leader.leaderName, leader.agentsInScope, "scope kosong", DASH, DASH, DASH, DASH, ...metricHeaders.slice(4).map(() => DASH)]);
+      continue;
+    }
+    for (const row of leader.monthly) {
+      leaders.addRow([
+        leader.leaderName, leader.agentsInScope,
+        leader.serviceTypes.map((service) => SERVICE_LABELS[service] ?? service).join(", "),
+        row.label,
+        row.rowType === "month" ? "Bulan" : row.rowType === "quarter" ? "Subtotal kuartal" : "Total rentang",
+        SERVICE_LABELS[row.serviceType] ?? row.serviceType,
+        row.quarter ?? DASH,
+        asBlank(row.agentsAudited), asBlank(row.sessionsAudited), asBlank(row.findingsCount),
+        asBlank(row.ticketsWithFindings), asBlank(row.avgAgentScore), asBlank(row.complianceRate),
+        asBlank(row.zeroErrorRate), asBlank(row.delta?.findings), asBlank(row.delta?.tickets),
+        asBlank(row.delta?.avgAgentScore), asBlank(row.delta?.complianceRate), asBlank(row.delta?.zeroErrorRate),
+      ]);
+    }
+  }
+  setWidths(leaders, leaderHeaders.map((header) => Math.max(14, Math.min(header.length + 3, 28))));
+
   const agents = workbook.addWorksheet("Rekap Agen");
   appendMetadata(agents, data);
   const agentHeaders = [
@@ -141,6 +167,34 @@ export async function downloadManagementReportExcel(
     ]);
   }
   setWidths(pareto, paretoHeaders.map((header) => Math.max(14, Math.min(header.length + 3, 32))));
+
+  const critical = workbook.addWorksheet("Critical");
+  appendMetadata(critical, data);
+  const criticalHeaders = ["Bulan", "Tahun", "Layanan", "Agen", "Batch", "No. Tiket", "Parameter", "Kategori", "Temuan", "Seharusnya", "Skor"];
+  setHeader(critical, criticalHeaders);
+  for (const row of data.critical) {
+    const facts = toRowFacts(row, SERVICE_LABELS);
+    critical.addRow([
+      MONTH_NAMES[row.month - 1], row.year, SERVICE_LABELS[row.service_type ?? ""] ?? row.service_type ?? DASH,
+      row.profiler_peserta?.nama ?? DASH, row.profiler_peserta?.batch_name ?? DASH, facts.ticket,
+      row.parameterName, "Critical", facts.finding, facts.recommendation, row.nilai ?? DASH,
+    ]);
+  }
+  setWidths(critical, [16, 10, 16, 24, 20, 22, 36, 14, 56, 56, 12]);
+
+  const followUps = workbook.addWorksheet("Tindak Lanjut");
+  appendMetadata(followUps, data);
+  const followUpHeaders = ["Nama Agen", "Tim", "Batch", "Pemicu", "Parameter terburuk (maks. 3)", "Jumlah bulan berulang"];
+  setHeader(followUps, followUpHeaders);
+  for (const row of data.followUps) {
+    followUps.addRow([
+      row.name, row.team, row.batchName,
+      row.reasons.map((reason) => reason === "score_below_target" ? "Skor rentang <95" : reason === "consecutive_decline" ? "Turun dua bulan berurutan" : "Parameter berulang").join(", "),
+      row.worstParameters.map((item) => `${item.parameter} (${item.count}${item.category === "critical" ? ", critical" : ""})`).join("; ") || DASH,
+      row.repeatMonthCount,
+    ]);
+  }
+  setWidths(followUps, [24, 22, 22, 36, 58, 20]);
 
   const details = workbook.addWorksheet("Detail Temuan");
   appendMetadata(details, data);

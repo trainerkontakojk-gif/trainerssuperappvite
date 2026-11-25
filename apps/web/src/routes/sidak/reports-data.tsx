@@ -15,6 +15,7 @@ import type {
 } from "@trainers/types";
 import { getSidakCalendarMonth } from "@trainers/types";
 import { downloadManagementReportExcel } from "./management-report-excel";
+import { downloadSidakManagementReportPdf } from "../../utils/sidakManagementReportPdf";
 import {
   isActionableReportRow,
   normalizeReportAgents,
@@ -68,12 +69,14 @@ type ManagementReportState =
   | { status: "loading" }
   | { status: "ready"; data: SidakManagementReportResponse; exportError?: string }
   | { status: "exportingExcel"; data: SidakManagementReportResponse }
+  | { status: "exportingPdf"; data: SidakManagementReportResponse }
   | { status: "error"; message: string };
 type ManagementReportAction =
   | { type: "clear" }
   | { type: "loading" }
   | { type: "ready"; data: SidakManagementReportResponse }
   | { type: "exportingExcel" }
+  | { type: "exportingPdf" }
   | { type: "exported" }
   | { type: "error"; message: string }
   | { type: "exportError"; message: string };
@@ -90,12 +93,16 @@ function managementReportReducer(
       return state.status === "ready" || state.status === "exportingExcel"
         ? { status: "exportingExcel", data: state.data }
         : state;
+    case "exportingPdf":
+      return state.status === "ready" || state.status === "exportingPdf"
+        ? { status: "exportingPdf", data: state.data }
+        : state;
     case "exported":
-      return state.status === "exportingExcel"
+      return state.status === "exportingExcel" || state.status === "exportingPdf"
         ? { status: "ready", data: state.data }
         : state;
     case "error": return { status: "error", message: action.message };
-    case "exportError": return state.status === "exportingExcel"
+    case "exportError": return state.status === "exportingExcel" || state.status === "exportingPdf"
       ? { status: "ready", data: state.data, exportError: action.message }
       : state;
   }
@@ -415,6 +422,21 @@ export default function SidakReportsData() {
     }
   };
 
+  const exportManagementPdf = async () => {
+    if (managementReport.status !== "ready") return;
+    const data = managementReport.data;
+    dispatchManagementReport({ type: "exportingPdf" });
+    try {
+      await downloadSidakManagementReportPdf(data);
+      dispatchManagementReport({ type: "exported" });
+    } catch {
+      dispatchManagementReport({
+        type: "exportError",
+        message: "File PDF belum bisa dibuat. Coba unduh lagi.",
+      });
+    }
+  };
+
   const fetchReport = async () => {
     const validationError = validateReportFilters({
       mode,
@@ -695,7 +717,7 @@ export default function SidakReportsData() {
                   type="button"
                   variant="outline"
                   onClick={fetchManagementReport}
-                  disabled={managementReport.status === "loading" || managementReport.status === "exportingExcel"}
+                  disabled={managementReport.status === "loading" || managementReport.status === "exportingExcel" || managementReport.status === "exportingPdf"}
                   className="min-h-[44px]"
                 >
                   {managementReport.status === "loading" ? (
@@ -705,12 +727,12 @@ export default function SidakReportsData() {
                   )}
                   {managementReport.status === "loading" ? "Membuat laporan..." : "Buat laporan manajemen"}
                 </Button>
-                {managementReport.status === "ready" || managementReport.status === "exportingExcel" ? (
+                {managementReport.status === "ready" || managementReport.status === "exportingExcel" || managementReport.status === "exportingPdf" ? (
                   <Button
                     type="button"
                     variant="outline"
                     onClick={exportManagementExcel}
-                    disabled={managementReport.status === "exportingExcel"}
+                    disabled={managementReport.status === "exportingExcel" || managementReport.status === "exportingPdf"}
                     className="min-h-[44px]"
                   >
                     {managementReport.status === "exportingExcel" ? (
@@ -719,6 +741,22 @@ export default function SidakReportsData() {
                       <Download data-icon="inline-start" aria-hidden="true" />
                     )}
                     {managementReport.status === "exportingExcel" ? "Membuat file..." : "Export Excel Manajemen"}
+                  </Button>
+                ) : null}
+                {managementReport.status === "ready" || managementReport.status === "exportingPdf" || managementReport.status === "exportingExcel" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={exportManagementPdf}
+                    disabled={managementReport.status === "exportingPdf" || managementReport.status === "exportingExcel"}
+                    className="min-h-[44px]"
+                  >
+                    {managementReport.status === "exportingPdf" ? (
+                      <Loader2 data-icon="inline-start" className="motion-reduce:animate-none" aria-hidden="true" />
+                    ) : (
+                      <Download data-icon="inline-start" aria-hidden="true" />
+                    )}
+                    {managementReport.status === "exportingPdf" ? "Membuat PDF..." : "Export PDF Manajemen"}
                   </Button>
                 ) : null}
                 {results && results.length > 0 && (
@@ -741,7 +779,9 @@ export default function SidakReportsData() {
               Laporan manajemen siap diunduh · {managementReport.data.agents.length} agen · {managementReport.data.pareto.length} parameter.
             </div>
           ) : managementReport.status === "exportingExcel" ? (
-            <p role="status" className="text-sm leading-relaxed text-fg2">Menyiapkan workbook Excel lima sheet.</p>
+            <p role="status" className="text-sm leading-relaxed text-fg2">Menyiapkan workbook Excel delapan sheet.</p>
+          ) : managementReport.status === "exportingPdf" ? (
+            <p role="status" className="text-sm leading-relaxed text-fg2">Menyiapkan ringkasan eksekutif PDF.</p>
           ) : null}
 
           {/* Status: error → loading → belum pernah mencari. */}

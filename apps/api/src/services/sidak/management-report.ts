@@ -4,6 +4,7 @@ import {
   type QAIndicator,
   type ServiceType,
   type SidakManagementReportAgentRow,
+  type SidakManagementReportLeaderRow,
   type SidakManagementReportMetricRow,
   type SidakManagementReportParetoRow,
   type SidakManagementReportRequest,
@@ -15,7 +16,8 @@ import {
   isSidakActionableReportRow,
 } from "@trainers/types";
 import { DEFAULT_SERVICE_WEIGHTS, getTemuanSessionKey } from "../../lib/scoring";
-import { isAgentExcluded } from "./agent-directory";
+import { buildCriticalAndFollowUps, getVisibleSidakLeaders } from "./management-report-phase2";
+import { getAgents, isAgentExcluded } from "./agent-directory";
 import {
   countFindingTickets,
   SIDAK_COMPLIANCE_TARGET,
@@ -45,7 +47,7 @@ type MetricPoint = {
   complianceCount: number;
   zeroErrorCount: number;
 };
-type ScopedSourceRow = ReportSourceRow & {
+export type ScopedSourceRow = ReportSourceRow & {
   peserta_id: string;
   period_id: string;
   service_type: ServiceType;
@@ -53,7 +55,7 @@ type ScopedSourceRow = ReportSourceRow & {
   profiler_peserta: ReportAgent;
   qa_periods: { month: number; year: number };
 };
-type MonthlyAgent = {
+export type MonthlyAgent = {
   id: string;
   name: string;
   team: string;
@@ -313,9 +315,27 @@ async function buildPareto(
     });
 }
 
+function aggregateLeaderPoints(points: MetricPoint[], agentIds: string[]): MetricPoint {
+  const auditedPeriods = points.reduce((sum, point) => sum + point.agents, 0);
+  const complianceCount = points.reduce((sum, point) => sum + point.complianceCount, 0);
+  const zeroErrorCount = points.reduce((sum, point) => sum + point.zeroErrorCount, 0);
+  const scoreSum = points.reduce((sum, point) => sum + point.avgScore * point.agents, 0);
+  return {
+    agents: new Set(agentIds).size,
+    sessions: points.reduce((sum, point) => sum + point.sessions, 0),
+    findings: points.reduce((sum, point) => sum + point.findings, 0),
+    tickets: points.reduce((sum, point) => sum + point.tickets, 0),
+    avgScore: auditedPeriods ? scoreSum / auditedPeriods : 0,
+    complianceRate: auditedPeriods ? complianceCount / auditedPeriods * 100 : 0,
+    zeroErrorRate: auditedPeriods ? zeroErrorCount / auditedPeriods * 100 : 0,
+    complianceCount,
+    zeroErrorCount,
+  };
+}
+
 export async function getSidakManagementReport(
   input: SidakManagementReportRequest,
-  scope: { agentIds: string[] | null; allowedServiceTypes?: ServiceType[] },
+  scope: { agentIds: string[] | null; allowedServiceTypes?: ServiceType[]; userId?: string; role?: string },
 ): Promise<SidakManagementReportResponse> {
   const services = input.serviceType
     ? [input.serviceType]
@@ -340,6 +360,8 @@ export async function getSidakManagementReport(
     return fromMonthSerial(serial);
   });
   const precedingMonthPeriods = months.map((month) => fromMonthSerial(monthSerial(input.year, month) - 1));
+  const trendMonths = Array.from({ length: 6 }, (_, index) => fromMonthSerial(endSerial - 5 + index));
+  const trendMonthKeys = new Set(trendMonths.map(({ year, month }) => `${year}:${month}`));
   const priorQuarterPeriods = [...new Map(months.flatMap((month) => {
     const quarterStart = Math.floor((month - 1) / 3) * 3 + 1;
     const previousQuarterStart = monthSerial(input.year, quarterStart) - 3;
@@ -352,7 +374,8 @@ export async function getSidakManagementReport(
   const allRelevant = [
     ...months.map((month) => ({ year: input.year, month })),
     ...comparisonMonths,
-  ];
+    ...trendMonths,
+  ].filter((period, index, periods) => periods.findIndex((candidate) => candidate.year === period.year && candidate.month === period.month) === index);
   const currentMonthKeys = new Set(months.map((month) => `${input.year}:${month}`));
   const comparisonMonthKeys = new Set(comparisonMonths.map(({ year, month }) => `${year}:${month}`));
   const queryMonthsByYear = new Map<number, number[]>();
@@ -374,7 +397,7 @@ export async function getSidakManagementReport(
   ))).flat();
   const relevantRows = fetchedRows.filter((row) => {
     const key = `${row.qa_periods?.year}:${row.qa_periods?.month}`;
-    return currentMonthKeys.has(key) || comparisonMonthKeys.has(key);
+    return currentMonthKeys.has(key) || comparisonMonthKeys.has(key) || trendMonthKeys.has(key);
   });
   const sourceRows = sourceRowsInScope(relevantRows.filter((row) =>
     currentMonthKeys.has(`${row.qa_periods?.year}:${row.qa_periods?.month}`),
@@ -382,11 +405,15 @@ export async function getSidakManagementReport(
   const previousSourceRows = sourceRowsInScope(relevantRows.filter((row) =>
     comparisonMonthKeys.has(`${row.qa_periods?.year}:${row.qa_periods?.month}`),
   ));
+  const trendSourceRows = sourceRowsInScope(relevantRows.filter((row) =>
+    trendMonthKeys.has(`${row.qa_periods?.year}:${row.qa_periods?.month}`),
+  ));
   const currentDetails = sourceRows.filter((row) =>
     isSidakActionableReportRow(row) && (!input.indicatorId || row.indicator_id === input.indicatorId),
   );
   const sessionsPerAgent = sessionsByAgentPeriod(sourceRows);
   for (const [key, count] of sessionsByAgentPeriod(previousSourceRows)) sessionsPerAgent.set(key, count);
+  for (const [key, count] of sessionsByAgentPeriod(trendSourceRows)) sessionsPerAgent.set(key, count);
   const sessionCounts = sessionsByServicePeriod(sessionsPerAgent);
   const dashboardCache = new Map<string, DashboardData>();
   const pointCache = new Map<string, MetricPoint>();
@@ -647,6 +674,11 @@ export async function getSidakManagementReport(
     label: MONTH_NAMES[month - 1],
   })));
   const monthlyAndQuarterRows: SidakManagementReportMetricRow[] = [];
+  const trendMonthly: SidakManagementReportMetricRow[] = services.flatMap((serviceType) => trendMonths.map(({ year, month }) => {
+    const point = pointCache.get(`${serviceType}:${year}:${month}`) ?? noAuditPoint();
+    const isTemporary = year === now.year && month === now.month;
+    return metricRow(serviceType, point, `${MONTH_NAMES[month - 1]} ${year}${isTemporary ? " · berjalan — data sementara" : ""}`, "month", month, null);
+  }));
   for (const serviceType of services) {
     const rows = currentMetricPoints.filter((row) => row.serviceType === serviceType);
     const monthly = reportMonths.filter((row) => row.serviceType === serviceType);
@@ -787,6 +819,102 @@ export async function getSidakManagementReport(
   const pareto = await buildPareto(
     services, months, input.year, sourceRows, dashboardCache, periodByYearMonth, contextFor, indicators,
   );
+  const leaders: SidakManagementReportLeaderRow[] = [];
+  const visibleLeaders = await getVisibleSidakLeaders(scope.role, scope.userId);
+  const leaderPesertaIds = new Set(visibleLeaders.flatMap((leader) =>
+    leader.pesertaIds.filter((id) => scope.agentIds === null || scope.agentIds.includes(id)),
+  ));
+  const eligibleLeaderAgents = leaderPesertaIds.size > 0
+    ? await getAgents({ agent_ids: [...leaderPesertaIds], showArchived: input.showArchived })
+    : [];
+  const eligibleLeaderPesertaIds = new Set(eligibleLeaderAgents
+    .filter((agent) => !isAgentExcluded(agent.tim, agent.batch_name, agent.jabatan))
+    .map((agent) => agent.id));
+  const rowsForLeader = [...sourceRows, ...previousSourceRows];
+  for (const leader of visibleLeaders) {
+    const allowedIds = new Set(leader.pesertaIds.filter((id) => scope.agentIds === null || scope.agentIds.includes(id)));
+    const eligibleAgentCount = [...allowedIds].filter((id) => eligibleLeaderPesertaIds.has(id)).length;
+    const leaderServices = services.filter((serviceType) =>
+      (leader.serviceTypes.length === 0 || leader.serviceTypes.includes(serviceType)) &&
+      (!allowedServices || allowedServices.length === 0 || allowedServices.includes(serviceType)),
+    );
+    const monthlyPoints = new Map<string, MetricPoint>();
+    const monthlyAgentIds = new Map<string, string[]>();
+    for (const serviceType of leaderServices) {
+      for (const { year, month } of allRelevant) {
+        const key = `${serviceType}:${year}:${month}`;
+        const period = periodByYearMonth.get(`${year}:${month}`);
+        const agents = (agentCache.get(key) ?? []).filter((agent) => allowedIds.has(agent.id));
+        monthlyAgentIds.set(key, agents.map((agent) => agent.id));
+        const countableRows = rowsForLeader.filter((row) => row.service_type === serviceType &&
+          row.qa_periods.year === year && row.qa_periods.month === month && allowedIds.has(row.peserta_id) &&
+          row.is_countable === true && row.is_phantom_padding !== true);
+        const complianceCount = agents.filter((agent) => agent.score >= SIDAK_COMPLIANCE_TARGET).length;
+        const zeroErrorCount = agents.filter((agent) => agent.findings === 0).length;
+        monthlyPoints.set(key, {
+          agents: agents.length,
+          sessions: agents.reduce((sum, agent) => sum + agent.sessions, 0),
+          findings: agents.reduce((sum, agent) => sum + agent.findings, 0),
+          tickets: countFindingTickets(countableRows),
+          avgScore: agents.length ? agents.reduce((sum, agent) => sum + agent.score, 0) / agents.length : 0,
+          complianceCount,
+          zeroErrorCount,
+          complianceRate: agents.length ? complianceCount / agents.length * 100 : 0,
+          zeroErrorRate: agents.length ? zeroErrorCount / agents.length * 100 : 0,
+        });
+        if (!period) monthlyPoints.set(key, noAuditPoint());
+      }
+    }
+    const pointForLeaderPeriods = (serviceType: ServiceType, periods: Array<{ year: number; month: number }>) => {
+      const points = periods.map(({ year, month }) => monthlyPoints.get(`${serviceType}:${year}:${month}`) ?? noAuditPoint());
+      const distinctIds = [...new Set(periods.flatMap(({ year, month }) => monthlyAgentIds.get(`${serviceType}:${year}:${month}`) ?? []))];
+      return aggregateLeaderPoints(points, distinctIds);
+    };
+    const leaderRows: SidakManagementReportMetricRow[] = [];
+    for (const serviceType of leaderServices) {
+      for (const month of months) {
+        const period = { year: input.year, month };
+        const point = pointForLeaderPeriods(serviceType, [period]);
+        const previous = fromMonthSerial(monthSerial(input.year, month) - 1);
+        const priorPoint = monthlyPoints.get(`${serviceType}:${previous.year}:${previous.month}`) ?? null;
+        const priorAvailable = periodByYearMonth.has(`${previous.year}:${previous.month}`) && (priorPoint?.agents ?? 0) > 0;
+        const label = `${MONTH_NAMES[month - 1]} ${input.year}${input.year === now.year && month === now.month ? " · berjalan — data sementara" : ""}`;
+        leaderRows.push(metricRow(serviceType, point, label, "month", month, deltaFor(point, priorPoint, priorAvailable)));
+      }
+      for (const quarter of QUARTERS) {
+        const quarterMonths = months.filter((month) => Math.ceil(month / 3) === Number(quarter[1]));
+        if (quarterMonths.length === 0) continue;
+        const currentPeriods = quarterMonths.map((month) => ({ year: input.year, month }));
+        const currentPoint = pointForLeaderPeriods(serviceType, currentPeriods);
+        const quarterStart = Math.floor((quarterMonths[0]! - 1) / 3) * 3 + 1;
+        const priorQuarterStart = fromMonthSerial(monthSerial(input.year, quarterStart) - 3);
+        const priorPeriods = Array.from({ length: 3 }, (_, index) => fromMonthSerial(monthSerial(priorQuarterStart.year, priorQuarterStart.month) + index));
+        const priorPoint = pointForLeaderPeriods(serviceType, priorPeriods);
+        const complete = priorPeriods.every(({ year, month }) => periodByYearMonth.has(`${year}:${month}`) &&
+          (monthlyPoints.get(`${serviceType}:${year}:${month}`)?.agents ?? 0) > 0);
+        const temporary = input.year === now.year && quarterMonths.includes(now.month);
+        leaderRows.push(metricRow(serviceType, currentPoint, `Subtotal ${quarter}${temporary ? " · berjalan — data sementara" : ""}`, "quarter", null, deltaFor(currentPoint, priorPoint, complete), quarter));
+      }
+      const currentPeriods = months.map((month) => ({ year: input.year, month }));
+      const currentPoint = pointForLeaderPeriods(serviceType, currentPeriods);
+      const priorPoint = pointForLeaderPeriods(serviceType, previousMonths);
+      const complete = previousMonths.every(({ year, month }) => periodByYearMonth.has(`${year}:${month}`) &&
+        (monthlyPoints.get(`${serviceType}:${year}:${month}`)?.agents ?? 0) > 0);
+      leaderRows.push(metricRow(serviceType, currentPoint, `Total ${input.startMonth}–${input.endMonth}/${input.year}`, "total", null, deltaFor(currentPoint, priorPoint, complete)));
+    }
+    leaders.push({
+      leaderId: leader.leaderId,
+      leaderName: leader.leaderName,
+      agentsInScope: eligibleAgentCount,
+      serviceTypes: leaderServices,
+      scopeEmpty: eligibleAgentCount === 0 || leaderServices.length === 0,
+      monthly: leaderRows,
+    });
+  }
+
+  const { critical, followUps } = await buildCriticalAndFollowUps({
+    services, months, year: input.year, sourceRows, periodByYearMonth, agentCache, contextFor, indicators,
+  });
   const dataTimestamp = new Date().toISOString();
   const currentMonth = now.month;
   const temporaryMonths = input.year === now.year && input.startMonth <= currentMonth && input.endMonth >= currentMonth
@@ -820,9 +948,13 @@ export async function getSidakManagementReport(
       mixedRuleVersions: versionIds.size > 1,
     },
     monthly: monthlyAndQuarterRows,
+    trendMonthly,
     teams: teamAggregates,
     agents,
     pareto,
+    leaders,
+    critical,
+    followUps,
     details: currentDetails,
   };
 }

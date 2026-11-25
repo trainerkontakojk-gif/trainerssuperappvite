@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-25
 
+- feat(sidak): add leader, critical, follow-up report sheets and executive PDF
 - feat(sidak): ship compact SIDAK conclusion strip
 - fix(sidak): enforce leader service scope on data reports
 - fix(sidak): make showArchived actually filter archived/soft-deleted peserta

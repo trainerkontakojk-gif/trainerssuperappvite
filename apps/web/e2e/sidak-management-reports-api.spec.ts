@@ -24,9 +24,20 @@ let app: SidakApiApp;
 let trainer: Awaited<ReturnType<typeof createUserWithJwt>>;
 let admin: Awaited<ReturnType<typeof createUserWithJwt>>;
 let leader: Awaited<ReturnType<typeof createUserWithJwt>>;
+let secondLeader: Awaited<ReturnType<typeof createUserWithJwt>>;
+let emptyScopeLeader: Awaited<ReturnType<typeof createUserWithJwt>>;
+let unrestrictedServiceLeader: Awaited<ReturnType<typeof createUserWithJwt>>;
 let unapprovedLeader: Awaited<ReturnType<typeof createUserWithJwt>>;
 let accessGroupId: string;
 let leaderRequestId: string;
+let secondAccessGroupId: string;
+let secondLeaderRequestId: string;
+let emptyAccessGroupId: string;
+let emptyLeaderRequestId: string;
+let unrestrictedAccessGroupId: string;
+let unrestrictedLeaderRequestId: string;
+let pendingLeaderRequestId: string;
+let revokedLeaderRequestId: string;
 let participantId: string;
 let secondParticipantId: string;
 let outsideParticipantId: string | null = null;
@@ -97,7 +108,12 @@ test.beforeAll(async () => {
   trainer = await createUserWithJwt(env, "trainer", `management-report-${namespace}`);
   admin = await createUserWithJwt(env, "admin", `management-report-${namespace}`);
   leader = await createUserWithJwt(env, "leader", `management-report-${namespace}`);
+  secondLeader = await createUserWithJwt(env, "leader", `management-report-second-${namespace}`);
+  emptyScopeLeader = await createUserWithJwt(env, "leader", `management-empty-${namespace}`);
+  unrestrictedServiceLeader = await createUserWithJwt(env, "leader", `management-unrestricted-service-${namespace}`);
   unapprovedLeader = await createUserWithJwt(env, "leader", `management-unapproved-${namespace}`);
+  pendingLeaderRequestId = sqlOne(env, `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(unapprovedLeader.userId)},'sidak','pending') RETURNING id;`);
+  revokedLeaderRequestId = sqlOne(env, `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(unapprovedLeader.userId)},'all','revoked') RETURNING id;`);
 
   for (const month of [1, 2]) {
     periodIds.set(month, sqlOne(env, `INSERT INTO qa_periods (month, year) VALUES (${month}, ${year}) RETURNING id;`));
@@ -168,13 +184,38 @@ test.beforeAll(async () => {
     `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(leader.userId)},'sidak','approved') RETURNING id;`,
   );
   runSql(env, `INSERT INTO leader_access_request_groups (request_id,access_group_id) VALUES (${quoted(leaderRequestId)},${quoted(accessGroupId)});`);
+  secondAccessGroupId = sqlOne(env, `INSERT INTO access_groups (name,is_active) VALUES (${quoted(`management-second-${namespace}`)},true) RETURNING id;`);
+  runSql(env, `INSERT INTO access_group_items (access_group_id,field_name,field_value,is_active) VALUES
+    (${quoted(secondAccessGroupId)},'peserta_id',${quoted(participantId)},true),
+    (${quoted(secondAccessGroupId)},'service_type','call',true),
+    (${quoted(secondAccessGroupId)},'service_type','chat',true);`);
+  secondLeaderRequestId = sqlOne(env, `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(secondLeader.userId)},'sidak','approved') RETURNING id;`);
+  runSql(env, `INSERT INTO leader_access_request_groups (request_id,access_group_id) VALUES (${quoted(secondLeaderRequestId)},${quoted(secondAccessGroupId)});`);
+  emptyAccessGroupId = sqlOne(env, `INSERT INTO access_groups (name,is_active) VALUES (${quoted(`management-empty-${namespace}`)},true) RETURNING id;`);
+  runSql(env, `INSERT INTO access_group_items (access_group_id,field_name,field_value,is_active) VALUES (${quoted(emptyAccessGroupId)},'service_type','call',true);`);
+  emptyLeaderRequestId = sqlOne(env, `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(emptyScopeLeader.userId)},'sidak','approved') RETURNING id;`);
+  runSql(env, `INSERT INTO leader_access_request_groups (request_id,access_group_id) VALUES (${quoted(emptyLeaderRequestId)},${quoted(emptyAccessGroupId)});`);
+  unrestrictedAccessGroupId = sqlOne(env, `INSERT INTO access_groups (name,is_active) VALUES (${quoted(`management-unrestricted-service-${namespace}`)},true) RETURNING id;`);
+  runSql(env, `INSERT INTO access_group_items (access_group_id,field_name,field_value,is_active) VALUES
+    (${quoted(unrestrictedAccessGroupId)},'peserta_id',${quoted(participantId)},true),
+    (${quoted(unrestrictedAccessGroupId)},'peserta_id',${quoted(excludedParticipantId)},true);`);
+  unrestrictedLeaderRequestId = sqlOne(env, `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(unrestrictedServiceLeader.userId)},'sidak','approved') RETURNING id;`);
+  runSql(env, `INSERT INTO leader_access_request_groups (request_id,access_group_id) VALUES (${quoted(unrestrictedLeaderRequestId)},${quoted(unrestrictedAccessGroupId)});`);
   app = (await import("../../api/src/app")).default;
   await resetSidakReferenceCache();
 });
 
 test.afterAll(async () => {
   if (leaderRequestId) runSql(env, `DELETE FROM leader_access_request_groups WHERE request_id=${quoted(leaderRequestId)}; DELETE FROM leader_access_requests WHERE id=${quoted(leaderRequestId)};`);
+  if (secondLeaderRequestId) runSql(env, `DELETE FROM leader_access_request_groups WHERE request_id=${quoted(secondLeaderRequestId)}; DELETE FROM leader_access_requests WHERE id=${quoted(secondLeaderRequestId)};`);
+  if (emptyLeaderRequestId) runSql(env, `DELETE FROM leader_access_request_groups WHERE request_id=${quoted(emptyLeaderRequestId)}; DELETE FROM leader_access_requests WHERE id=${quoted(emptyLeaderRequestId)};`);
+  if (unrestrictedLeaderRequestId) runSql(env, `DELETE FROM leader_access_request_groups WHERE request_id=${quoted(unrestrictedLeaderRequestId)}; DELETE FROM leader_access_requests WHERE id=${quoted(unrestrictedLeaderRequestId)};`);
+  if (pendingLeaderRequestId) runSql(env, `DELETE FROM leader_access_requests WHERE id=${quoted(pendingLeaderRequestId)};`);
+  if (revokedLeaderRequestId) runSql(env, `DELETE FROM leader_access_requests WHERE id=${quoted(revokedLeaderRequestId)};`);
   if (accessGroupId) runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(accessGroupId)}; DELETE FROM access_groups WHERE id=${quoted(accessGroupId)};`);
+  if (secondAccessGroupId) runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(secondAccessGroupId)}; DELETE FROM access_groups WHERE id=${quoted(secondAccessGroupId)};`);
+  if (emptyAccessGroupId) runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(emptyAccessGroupId)}; DELETE FROM access_groups WHERE id=${quoted(emptyAccessGroupId)};`);
+  if (unrestrictedAccessGroupId) runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(unrestrictedAccessGroupId)}; DELETE FROM access_groups WHERE id=${quoted(unrestrictedAccessGroupId)};`);
   if (outsideParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(outsideParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(outsideParticipantId)};`);
   if (excludedParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(excludedParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(excludedParticipantId)};`);
   if (secondParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(secondParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(secondParticipantId)};`);
@@ -189,7 +230,7 @@ test.afterAll(async () => {
     const remainingFolders = runSql(env, `SELECT id FROM profiler_folders WHERE year_id=${quoted(profilerYearId)};`);
     if (!remainingFolders) runSql(env, `DELETE FROM profiler_years WHERE id=${quoted(profilerYearId)} AND year=${year};`);
   }
-  for (const user of [trainer, admin, leader, unapprovedLeader]) {
+  for (const user of [trainer, admin, leader, secondLeader, emptyScopeLeader, unrestrictedServiceLeader, unapprovedLeader]) {
     if (!user) continue;
     const { error } = await createAdmin(env).auth.admin.deleteUser(user.userId);
     expect(error).toBeNull();
@@ -205,8 +246,20 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
   expect(data).toEqual(expect.objectContaining({
     metadata: expect.objectContaining({ year, startMonth: 1, endMonth: 3, serviceType: "call", mode: "layanan", indicatorScope: "detail-only", generatedAtJakarta: expect.any(String) }),
     monthly: expect.any(Array), teams: expect.any(Array), agents: expect.any(Array),
+    leaders: expect.any(Array), critical: expect.any(Array), followUps: expect.any(Array),
     pareto: expect.any(Array), details: expect.any(Array),
   }));
+  expect(data.followUps).toEqual(expect.arrayContaining([
+    expect.objectContaining({ agentId: participantId, name: `Agen Laporan ${namespace}`, reasons: expect.arrayContaining(["repeated_parameter"]), worstParameters: expect.any(Array), repeatMonthCount: expect.any(Number) }),
+  ]));
+  expect(data.followUps).toHaveLength(new Set(data.followUps.map((row: { agentId: string }) => row.agentId)).size);
+  const allServicesResponse = await requestReport({ year, startMonth: 1, endMonth: 2 }, secondLeader.token);
+  expect(allServicesResponse.status, await allServicesResponse.clone().text()).toBe(200);
+  const allServicesFollowUps = (await allServicesResponse.json()).data.followUps as Array<{ agentId: string; name: string }>;
+  expect(allServicesFollowUps.filter((row) => row.agentId === participantId)).toHaveLength(1);
+  expect(allServicesFollowUps.find((row) => row.agentId === participantId)?.name).toBe(`Agen Laporan ${namespace}`);
+  expect(allServicesFollowUps.some((row) => row.agentId === excludedParticipantId)).toBe(false);
+  expect(data.critical.every((row: { category: string; is_phantom_padding: boolean }) => row.category === "critical" && row.is_phantom_padding !== true)).toBe(true);
   const january = data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 1);
   const february = data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 2);
   const march = data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 3);
@@ -230,6 +283,28 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
   expect(data.monthly).toContainEqual(expect.objectContaining({ rowType: "quarter", quarter: "Q1", findingsCount: 3 }));
   expect(data.monthly).toContainEqual(expect.objectContaining({ rowType: "total", findingsCount: 3, ticketsWithFindings: 2, agentsAudited: 2 }));
   const rangeTotal = data.monthly.find((row: { rowType: string }) => row.rowType === "total");
+  expect(data.leaders).toEqual(expect.arrayContaining([
+    expect.objectContaining({ leaderId: leader.userId, leaderName: expect.any(String), agentsInScope: 1, serviceTypes: ["call"], scopeEmpty: false }),
+    expect.objectContaining({ leaderId: secondLeader.userId, leaderName: expect.any(String), agentsInScope: 1, serviceTypes: ["call"], scopeEmpty: false }),
+    expect.objectContaining({ leaderId: emptyScopeLeader.userId, agentsInScope: 0, serviceTypes: ["call"], scopeEmpty: true }),
+    expect.objectContaining({ leaderId: unrestrictedServiceLeader.userId, agentsInScope: 1, serviceTypes: ["call"], scopeEmpty: false }),
+  ]));
+  const unrestrictedLeader = data.leaders.find((item: { leaderId: string }) => item.leaderId === unrestrictedServiceLeader.userId);
+  expect(unrestrictedLeader.monthly).toContainEqual(expect.objectContaining({ rowType: "month", month: 1, agentsAudited: 1, findingsCount: 2 }));
+  expect(data.leaders).toHaveLength(4);
+  const leaderMonthAudits = data.leaders.map((item: { monthly: Array<{ rowType: string; month: number; agentsAudited: number | null }> }) => item.monthly.find((row) => row.rowType === "month" && row.month === 1)?.agentsAudited ?? null);
+  expect(leaderMonthAudits).toHaveLength(4);
+  expect(leaderMonthAudits).toEqual(expect.arrayContaining([1, 1, null]));
+  const adminReportResponse = await requestReport({ serviceType: "call", year, startMonth: 1, endMonth: 1 }, admin.token);
+  expect(adminReportResponse.status, await adminReportResponse.clone().text()).toBe(200);
+  const adminReport = (await adminReportResponse.json()).data;
+  expect(adminReport.leaders).toHaveLength(4);
+  expect(adminReport.leaders.find((item: { leaderId: string }) => item.leaderId === unrestrictedServiceLeader.userId)).toEqual(expect.objectContaining({
+    agentsInScope: 1,
+    serviceTypes: ["call"],
+    scopeEmpty: false,
+    monthly: expect.arrayContaining([expect.objectContaining({ rowType: "month", month: 1, agentsAudited: 1 })]),
+  }));
   const rangeDashboardResponse = await requestDashboardRange();
   expect(rangeDashboardResponse.status, await rangeDashboardResponse.clone().text()).toBe(200);
   const rangeDashboard = (await rangeDashboardResponse.json()).data;
@@ -264,6 +339,91 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
   ].sort());
   expect(JSON.stringify(data.details)).not.toContain("Temuan tanpa rekomendasi");
   expect(JSON.stringify(data.details)).not.toContain("__PHANTOM__MANAGEMENT");
+});
+
+test("follow-up decline requires three adjacent audited calendar months", async () => {
+  const followUpYear = Number(sqlOne(env, `SELECT candidate FROM generate_series(2000,2100) candidate WHERE NOT EXISTS (SELECT 1 FROM qa_periods WHERE year=candidate) ORDER BY abs(candidate - extract(year FROM clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::int) LIMIT 1;`));
+  const months = [1, 2, 3, 4];
+  const followUpPeriods = new Map<number, string>();
+  const participantIds: string[] = [];
+  try {
+    for (const month of months) {
+      followUpPeriods.set(month, sqlOne(env, `INSERT INTO qa_periods (month,year) VALUES (${month},${followUpYear}) RETURNING id;`));
+    }
+    const labels = ["Menurun", "Satu Penurunan", "Penurunan Terputus", "Target Skor", "Satu Bulan", "Parameter Berulang", "Parameter Terburuk"];
+    for (const [index, label] of labels.entries()) {
+      participantIds.push(sqlOne(env, `INSERT INTO profiler_peserta (batch_name,nama,tim,jabatan,nomor_urut) VALUES (${quoted(folderName)},${quoted(`${label} ${namespace}`)},'Tim Follow Up','Agent',${index + 1}) RETURNING id;`));
+    }
+    const indicatorId = sqlOne(env, "SELECT id FROM qa_indicators WHERE service_type='call' AND is_active ORDER BY sort_order,name LIMIT 1;");
+    const cases = [
+      { participantIndex: 0, sessions: [[1, 1], [2, 2], [3, 3]] },
+      { participantIndex: 1, sessions: [[1, 1], [2, 2]] },
+      { participantIndex: 2, sessions: [[1, 1], [3, 2], [4, 3]] },
+      { participantIndex: 3, sessions: [[1, 5]] },
+      { participantIndex: 4, sessions: [[1, 2]] },
+      { participantIndex: 5, sessions: [[1, 2], [2, 1]] },
+      { participantIndex: 6, sessions: [] },
+    ];
+    const rows: string[] = [];
+    for (const scenario of cases) {
+      for (const [month, count] of scenario.sessions) {
+        for (let session = 0; session < count; session += 1) {
+          const participantIdForSession = participantIds[scenario.participantIndex]!;
+          const ticket = quoted(`FOLLOWUP-${scenario.participantIndex}-${month}-${session}-${namespace}`);
+          rows.push(`(${quoted(participantIdForSession)},${quoted(followUpPeriods.get(month)!)},${quoted(indicatorId)},'call',${ticket},false,0,${quoted(`Temuan ${namespace}`)},${quoted(`Rekomendasi ${namespace}`)},${followUpYear})`);
+        }
+      }
+    }
+    const topIndicatorRows = runSql(env, "SELECT id,name,category,COALESCE(parameter_group,'') FROM qa_indicators WHERE service_type='call' AND is_active ORDER BY sort_order,name LIMIT 4;")
+      .split("\n")
+      .map((line) => line.split("|"));
+    if (topIndicatorRows.length < 4) throw new Error("Fixture memerlukan empat indikator call aktif.");
+    const expectedTop = topIndicatorRows.map(([id, name, category, group], index) => ({
+      id: id!,
+      parameter: group ? `${group} — ${name}` : name!,
+      category: category === "critical" ? "critical" as const : "non_critical" as const,
+      count: [3, 2, 2, 1][index]!,
+    }));
+    for (const [index, indicator] of expectedTop.entries()) {
+      for (let occurrence = 0; occurrence < indicator.count; occurrence += 1) {
+        const topAgentId = participantIds[6]!;
+        const ticket = quoted(`TOP-${index}-${occurrence}-${namespace}`);
+        rows.push(`(${quoted(topAgentId)},${quoted(followUpPeriods.get(1)! )},${quoted(indicator.id)},'call',${ticket},false,0,${quoted(`Temuan terburuk ${namespace}`)},${quoted(`Rekomendasi terburuk ${namespace}`)},${followUpYear})`);
+      }
+    }
+    runSql(env, `INSERT INTO qa_temuan (peserta_id,period_id,indicator_id,service_type,no_tiket,is_phantom_padding,nilai,ketidaksesuaian,sebaiknya,tahun) VALUES ${rows.join(",")};`);
+    await resetSidakReferenceCache();
+    const response = await requestReport({ serviceType: "call", year: followUpYear, startMonth: 1, endMonth: 4 });
+    expect(response.status, await response.clone().text()).toBe(200);
+    const report = (await response.json()).data;
+    const declining = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[0]);
+    const oneDecline = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[1]);
+    const gapDecline = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[2]);
+    expect(declining.reasons).toContain("consecutive_decline");
+    expect(oneDecline?.reasons ?? []).not.toContain("consecutive_decline");
+    expect(gapDecline?.reasons ?? []).not.toContain("consecutive_decline");
+    const belowTarget = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[3]);
+    expect(belowTarget.reasons).toContain("score_below_target");
+    const sameMonthOnly = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[4]);
+    expect(sameMonthOnly.reasons).not.toContain("repeated_parameter");
+    const repeated = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[5]);
+    expect(repeated.reasons).toContain("repeated_parameter");
+    expect(repeated.repeatMonthCount).toBe(2);
+    const topAgent = report.followUps.find((row: { agentId: string }) => row.agentId === participantIds[6]);
+    const expectedTopParameters = [...expectedTop]
+      .sort((a, b) => b.count - a.count || Number(b.category === "critical") - Number(a.category === "critical") || a.parameter.localeCompare(b.parameter, "id"))
+      .slice(0, 3)
+      .map(({ parameter, category, count }) => ({ parameter, category, count }));
+    expect(topAgent.worstParameters).toEqual(expectedTopParameters);
+  } finally {
+    if (participantIds.length) {
+      const ids = participantIds.map(quoted).join(",");
+      runSql(env, `DELETE FROM qa_temuan WHERE peserta_id IN (${ids}); DELETE FROM profiler_peserta WHERE id IN (${ids});`);
+    }
+    const periodIdsForCleanup = [...followUpPeriods.values()];
+    if (periodIdsForCleanup.length) runSql(env, `DELETE FROM qa_periods WHERE id IN (${periodIdsForCleanup.map(quoted).join(",")});`);
+    await resetSidakReferenceCache();
+  }
 });
 
 test("SIDAK archive filter excludes linked inactive accounts unless requested", async () => {
@@ -339,12 +499,27 @@ test("leader report stays within approved participant and service scope", async 
   expect(own.status).toBe(200);
   const ownBody = await own.json();
   expect(ownBody.data.agents.map((agent: { agentId: string }) => agent.agentId)).toEqual([participantId]);
+  expect(ownBody.data.leaders).toEqual(expect.arrayContaining([
+    expect.objectContaining({ leaderId: leader.userId, agentsInScope: 1 }),
+  ]));
+  expect(ownBody.data.leaders).toHaveLength(1);
+  expect(JSON.stringify(ownBody.data.leaders)).not.toContain(secondLeader.userId);
+  expect(JSON.stringify(ownBody.data.leaders)).not.toContain(`Agen Kedua ${namespace}`);
+  expect(ownBody.data.followUps.every((row: { agentId: string; name: string }) => row.agentId === participantId && row.name === `Agen Laporan ${namespace}`)).toBe(true);
+  const secondLeaderResponse = await requestReport({ serviceType: "call", year, startMonth: 1, endMonth: 2 }, secondLeader.token);
+  expect(secondLeaderResponse.status, await secondLeaderResponse.clone().text()).toBe(200);
+  const secondLeaderData = (await secondLeaderResponse.json()).data;
+  expect(secondLeaderData.leaders).toHaveLength(1);
+  expect(secondLeaderData.leaders[0].leaderId).toBe(secondLeader.userId);
+  expect(secondLeaderData.leaders[0].agentsInScope).toBe(1);
+  expect(secondLeaderData.leaders[0].monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 1).agentsAudited).toBe(1);
+  expect(JSON.stringify(secondLeaderData.leaders)).not.toContain(leader.userId);
   for (const sheet of [ownBody.data.monthly, ownBody.data.teams, ownBody.data.agents, ownBody.data.pareto, ownBody.data.details]) {
     expect(JSON.stringify(sheet)).not.toContain("OUT-OF-SCOPE");
     expect(JSON.stringify(sheet)).not.toContain("outOfScopeParticipant");
   }
   expect(ownBody.data.details.every((row: { peserta_id: string }) => row.peserta_id === participantId)).toBe(true);
-  const allSheets = JSON.stringify([ownBody.data.monthly, ownBody.data.teams, ownBody.data.agents, ownBody.data.pareto, ownBody.data.details]);
+  const allSheets = JSON.stringify([ownBody.data.monthly, ownBody.data.teams, ownBody.data.agents, ownBody.data.leaders, ownBody.data.critical, ownBody.data.followUps, ownBody.data.pareto, ownBody.data.details]);
   expect(allSheets).not.toContain(outsideParticipantId);
   expect(allSheets).not.toContain(`OUT-OF-SCOPE`);
   const forbiddenAgent = await requestReport({ serviceType: "call", year, startMonth: 1, endMonth: 2, pesertaId: outsideParticipantId }, leader.token);
@@ -475,13 +650,17 @@ test("management report tracks the published rule version effective in each mont
     runSql(env, `INSERT INTO qa_service_rule_indicators (rule_version_id,legacy_indicator_id,service_type,name,category,bobot,has_na,sort_order)
       SELECT ${quoted(versionId)}, id, service_type, name,
         CASE WHEN id=${quoted(indicatorIds[0]!)} THEN '${flip ? "non_critical" : "critical"}' ELSE category END,
-        bobot, has_na, sort_order FROM qa_indicators WHERE service_type='call' AND is_active AND id <> ${quoted(indicatorIds[0]!)};`);
+        bobot, has_na, sort_order FROM qa_indicators WHERE service_type='call' AND is_active;`);
   }
   await resetSidakReferenceCache();
   const response = await requestReport({ serviceType: "call", year, startMonth: 1, endMonth: 2 });
   expect(response.status, await response.clone().text()).toBe(200);
   const report = (await response.json()).data;
   expect(report.metadata.mixedRuleVersions).toBe(true);
+  expect(report.critical).toEqual(expect.arrayContaining([
+    expect.objectContaining({ indicator_id: indicatorIds[0], month: 1, category: "critical", is_phantom_padding: false }),
+  ]));
+  expect(report.critical.some((row: { indicator_id: string; month: number }) => row.indicator_id === indicatorIds[0] && row.month === 2)).toBe(false);
   expect(report.metadata.ruleVersions).toEqual(expect.arrayContaining([
     { serviceType: "call", month: 1, versionId: versionOneId },
     { serviceType: "call", month: 2, versionId: versionTwoId },

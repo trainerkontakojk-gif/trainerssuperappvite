@@ -104,6 +104,36 @@ export type SidakManagementReportParetoRow = {
   agentsAffected: number;
 };
 
+export type SidakManagementReportLeaderRow = {
+  leaderId: string;
+  leaderName: string;
+  agentsInScope: number;
+  serviceTypes: ServiceType[];
+  scopeEmpty: boolean;
+  monthly: SidakManagementReportMetricRow[];
+};
+
+export type SidakManagementReportCriticalRow = SidakManagementReportDetailRow & {
+  category: "critical";
+  month: number;
+  year: number;
+  parameterName: string;
+};
+
+export type SidakManagementReportFollowUpRow = {
+  agentId: string;
+  name: string;
+  team: string;
+  batchName: string;
+  reasons: Array<"score_below_target" | "consecutive_decline" | "repeated_parameter">;
+  worstParameters: Array<{
+    parameter: string;
+    category: "critical" | "non_critical";
+    count: number;
+  }>;
+  repeatMonthCount: number;
+};
+
 export type SidakManagementReportDetailRow = {
   id?: string;
   peserta_id?: string;
@@ -154,9 +184,13 @@ export interface SidakManagementReportResponse {
     mixedRuleVersions: boolean;
   };
   monthly: SidakManagementReportMetricRow[];
+  trendMonthly: SidakManagementReportMetricRow[];
   teams: SidakManagementReportTeamRow[];
   agents: SidakManagementReportAgentRow[];
   pareto: SidakManagementReportParetoRow[];
+  leaders: SidakManagementReportLeaderRow[];
+  critical: SidakManagementReportCriticalRow[];
+  followUps: SidakManagementReportFollowUpRow[];
   details: SidakManagementReportDetailRow[];
 
 }

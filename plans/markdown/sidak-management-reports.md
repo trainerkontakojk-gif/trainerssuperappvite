@@ -89,6 +89,10 @@ Fitur yang direncanakan adalah **Lane D**: endpoint/report contract baru dan pen
 
 ### Fase 2 — Rekap Leader, Critical, Tindak Lanjut, dan PDF
 
+**Status: Selesai (2026-11-25).** E2E API dan browser membuktikan scope leader, kategori critical historis, tindak lanjut, urutan delapan sheet, dan isi/privasi PDF.
+
+**Catatan model akses:** `leader_access_requests` saat ini tidak memiliki kolom expiry; implementasi memakai status `approved` dari `getLeaderScopeSnapshot` sebagai akses yang masih berlaku dan menguji status pending/revoked. Bila expiry dibutuhkan, perlu keputusan dan perubahan skema terpisah.
+
 Fase 2 menyisipkan sheet **Rekap Leader** (setelah Rekap Tim) serta **Critical** dan **Tindak Lanjut** (di antara Pareto dan Detail Temuan) sehingga workbook final berisi delapan sheet sesuai urutan di Requirement; E2E Fase 1 yang memeriksa urutan sheet diperbarui di fase ini sebagai bagian dari perubahan kontrak.
 
 **File yang direncanakan**
