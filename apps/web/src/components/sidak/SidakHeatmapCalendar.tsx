@@ -1,4 +1,11 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { SettingsSwitch } from "../settings/SettingsSwitch";
 
 export type HeatmapDay = { date: string; count: number };
@@ -117,6 +124,17 @@ const SELECTED_RING =
 const SELECTED_RING_FOCUS =
   "focus-visible:[box-shadow:inset_0_0_0_2px_var(--color-foreground),inset_0_0_0_3px_var(--color-surface)]";
 
+/**
+ * Mode forced colors (mis. Kontras Tinggi Windows) menghapus latar dan
+ * bayangan. Warna intensitas adalah datanya, jadi kotak dan legenda keluar dari
+ * penyesuaian; pilihan dan fokus diberi outline warna sistem di luar kotak.
+ */
+const KEEP_DATA_COLORS = "forced-color-adjust-none";
+const FORCED_SELECTED_OUTLINE =
+  "forced-colors:outline-2 forced-colors:outline-offset-1 forced-colors:outline-solid forced-colors:outline-[color:CanvasText]";
+const FORCED_FOCUS_OUTLINE =
+  "not-forced-colors:focus-visible:outline-none forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-offset-1 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[color:Highlight]";
+
 /** Label baris: Senin di atas, hanya baris ganjil yang diberi teks. */
 const WEEKDAY_LABELS = ["Sen", "", "Rab", "", "Jum", "", "Min"];
 const MONTH_SHORT = [
@@ -148,6 +166,34 @@ const CELL = "minmax(22px, 1fr)";
  * sentuh 24px).
  */
 const COMPACT_CELL = "minmax(var(--heatmap-cell), 1fr)";
+
+/**
+ * Tujuan tombol panah dari hari ke-`index` (urutan tanggal setahun), atau
+ * `null` bila tidak ada kotak ke arah itu. Kanan/kiri = minggu
+ * berikutnya/sebelumnya; atas/bawah = hari sebelum/sesudahnya selama masih di
+ * kolom yang sama; Home/End = awal/akhir tahun.
+ */
+function arrowTarget(days: readonly GridDay[], index: number, key: string) {
+  const current = days[index];
+  const sameColumn = (next: GridDay | undefined) =>
+    next && next.column === current.column ? next : null;
+  switch (key) {
+    case "ArrowRight":
+      return days[index + 7] ?? null;
+    case "ArrowLeft":
+      return days[index - 7] ?? null;
+    case "ArrowDown":
+      return sameColumn(days[index + 1]);
+    case "ArrowUp":
+      return sameColumn(days[index - 1]);
+    case "Home":
+      return days[0];
+    case "End":
+      return days[days.length - 1];
+    default:
+      return null;
+  }
+}
 
 function isoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -257,6 +303,40 @@ export default function SidakHeatmapCalendar({
     [year, showDates],
   );
 
+  // Satu tab stop untuk seluruh kalender (roving tabindex): hari yang terakhir
+  // difokus, lalu tanggal terpilih, hari bertemuan terakhir, atau 1 Januari.
+  const [focusedIso, setFocusedIso] = useState<string | null>(null);
+  const lastFindingIso = useMemo(
+    () => [...days].reverse().find((d) => d.count > 0)?.date ?? null,
+    [days],
+  );
+  const indexByIso = useMemo(
+    () => new Map(grid.days.map((d, index) => [d.iso, index])),
+    [grid],
+  );
+  const tabStopIso =
+    [focusedIso, selectedDate, lastFindingIso].find(
+      (iso) => iso != null && indexByIso.has(iso),
+    ) ?? grid.days[0].iso;
+
+  const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const from = (event.target as HTMLElement).dataset.date;
+    const index = from === undefined ? undefined : indexByIso.get(from);
+    if (index === undefined) return;
+    const target = arrowTarget(grid.days, index, event.key);
+    // Tanpa kotak di arah itu, biarkan tombol berperilaku bawaan.
+    if (!target) return;
+    event.preventDefault();
+    setFocusedIso(target.iso);
+    const cell = event.currentTarget.querySelector<HTMLElement>(
+      `[data-date="${target.iso}"]`,
+    );
+    cell?.focus({ preventScroll: true });
+    cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+  const hintId = useId();
+
   // Saat data baru tiba atau tata letak berganti, geser kisi supaya tanggal
   // terpilih atau hari bertemuan terakhir terlihat. Pemilihan tanggal
   // sesudahnya tidak menggeser.
@@ -264,18 +344,17 @@ export default function SidakHeatmapCalendar({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller || scroller.scrollWidth <= scroller.clientWidth) return;
-    const lastFinding = [...days].reverse().find((d) => d.count > 0)?.date;
     const cell =
       scroller.querySelector<HTMLElement>('[aria-current="date"]') ??
-      (lastFinding
-        ? scroller.querySelector<HTMLElement>(`[data-date="${lastFinding}"]`)
+      (lastFindingIso
+        ? scroller.querySelector<HTMLElement>(`[data-date="${lastFindingIso}"]`)
         : null);
     if (!cell) return;
     scroller.scrollLeft = Math.max(
       0,
       cell.offsetLeft + cell.offsetWidth - scroller.clientWidth + 48,
     );
-  }, [days, year, showDates]);
+  }, [days, lastFindingIso, year, showDates]);
 
   return (
     <section className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-4">
@@ -292,7 +371,7 @@ export default function SidakHeatmapCalendar({
                 <li key={b.label} className="flex items-center gap-1">
                   <span
                     aria-hidden="true"
-                    className={`size-3 rounded-sm ${LEVEL_CLASS[b.level]}`}
+                    className={`size-3 rounded-sm ${KEEP_DATA_COLORS} ${LEVEL_CLASS[b.level]}`}
                   />
                   <span className="tabular-nums">{b.label}</span>
                 </li>
@@ -319,11 +398,15 @@ export default function SidakHeatmapCalendar({
       <div
         ref={scrollerRef}
         data-testid="heatmap-calendar-scroller"
-        className="relative min-w-0 overflow-x-auto pb-1"
+        // scroll-pl-8: kotak yang dituju tombol panah tidak tertutup kolom label
+        // hari yang menempel. Di forced colors, padding memberi ruang outline.
+        className="relative min-w-0 scroll-pl-8 overflow-x-auto pb-1 forced-colors:p-1"
       >
         <div
           role="group"
           aria-label={`Kalender temuan ${year}`}
+          aria-describedby={hintId}
+          onKeyDown={moveFocus}
           className="grid w-full min-w-max gap-[3px] [--heatmap-cell:12px] pointer-coarse:[--heatmap-cell:21px]"
           style={{ gridTemplateColumns: grid.columns }}
         >
@@ -365,6 +448,8 @@ export default function SidakHeatmapCalendar({
               <button
                 key={iso}
                 type="button"
+                tabIndex={iso === tabStopIso ? 0 : -1}
+                onFocus={() => setFocusedIso(iso)}
                 onClick={() => onSelectDay?.({ date: iso, count })}
                 aria-label={label}
                 title={label}
@@ -372,7 +457,7 @@ export default function SidakHeatmapCalendar({
                 data-intensity={bucket.label}
                 data-date={iso}
                 style={{ gridRow: weekday + 2, gridColumn: column }}
-                className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow focus-visible:outline-none ${SELECTED_RING_FOCUS} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? SELECTED_RING : ""}`}
+                className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow ${KEEP_DATA_COLORS} ${FORCED_FOCUS_OUTLINE} ${SELECTED_RING_FOCUS} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? `${SELECTED_RING} ${FORCED_SELECTED_OUTLINE}` : ""}`}
               >
                 {/* Angka tanggal; jumlah temuan ada di label dan kartu terpilih. */}
                 {showDates && (
@@ -384,11 +469,12 @@ export default function SidakHeatmapCalendar({
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p id={hintId} className="text-xs text-muted-foreground">
         Kotak abu-abu berarti 0 temuan. Warna dibagi per kuartil hari
         bertemuan tahun ini; pilih tanggal untuk melihat jumlahnya. Nyalakan
         Tampilkan tanggal untuk angka tanggal dan jeda per bulan. Di layar
-        sempit, geser ke samping untuk bulan lain.
+        sempit, geser ke samping untuk bulan lain. Dengan keyboard, gunakan
+        tombol panah untuk berpindah tanggal dan Enter untuk memilih.
       </p>
     </section>
   );

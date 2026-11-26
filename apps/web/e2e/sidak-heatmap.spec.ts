@@ -502,6 +502,95 @@ test.describe("Halaman Heatmap", () => {
     ).toBeVisible();
   });
 
+  test("kalender satu tab stop dan dijelajahi dengan tombol panah", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3, "2026-03-10": 2 } };
+    await open(page, "trainer");
+
+    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const day = (name: string) => calendar.getByRole("button", { name });
+    await expect(calendar).toBeVisible();
+    await expect(calendar).toHaveAccessibleDescription(/tombol panah/);
+
+    // Satu tab stop untuk 365 hari, dibuka di hari bertemuan terakhir.
+    await expect(calendar.locator('button[tabindex="0"]')).toHaveCount(1);
+    await page.getByRole("switch", { name: "Tampilkan tanggal" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(day("10/03/2026: 2 temuan")).toBeFocused();
+
+    // Kanan/kiri = minggu berikutnya/sebelumnya, atas/bawah = hari dalam minggu.
+    await page.keyboard.press("ArrowRight");
+    await expect(day("17/03/2026: 0 temuan")).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(day("18/03/2026: 0 temuan")).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("ArrowUp");
+    await expect(day("16/03/2026: 0 temuan")).toBeFocused();
+    // Senin baris teratas: tidak ada kotak di atasnya, fokus tetap.
+    await page.keyboard.press("ArrowUp");
+    await expect(day("16/03/2026: 0 temuan")).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(day("09/03/2026: 0 temuan")).toBeFocused();
+    // Panah hanya memindah fokus; Enter yang memilih.
+    await expect(page.getByTestId("heatmap-selected-day")).toHaveCount(0);
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("heatmap-selected-day")).toContainText("9 Maret 2026");
+
+    await page.keyboard.press("Home");
+    await expect(day("01/01/2026: 0 temuan")).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(day("31/12/2026: 0 temuan")).toBeFocused();
+    await expect(calendar.locator('button[tabindex="0"]')).toHaveCount(1);
+
+    // Tab berikutnya keluar dari kalender, bukan ke hari sesudahnya.
+    await page.keyboard.press("Tab");
+    await expect(calendar.locator("button:focus")).toHaveCount(0);
+    // Shift+Tab kembali ke hari terakhir yang difokus.
+    await page.keyboard.press("Shift+Tab");
+    await expect(day("31/12/2026: 0 temuan")).toBeFocused();
+  });
+
+  test("mode forced colors tetap menampilkan intensitas, pilihan, dan fokus", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 1, "2026-01-06": 2, "2026-01-09": 12 } };
+    await page.emulateMedia({ forcedColors: "active" });
+    await open(page, "trainer");
+
+    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const bg = (name: string) =>
+      calendar.getByRole("button", { name }).evaluate((el) => getComputedStyle(el).backgroundColor);
+    await expect(calendar).toBeVisible();
+    // Warna intensitas tidak dihapus sistem: kotak kosong dan terpadat berbeda.
+    expect(await bg("09/01/2026: 12 temuan")).not.toBe(await bg("10/01/2026: 0 temuan"));
+    expect(await bg("05/01/2026: 1 temuan")).not.toBe(await bg("09/01/2026: 12 temuan"));
+
+    // Legenda ikut mempertahankan warnanya, satu warna per bucket.
+    const swatches = page
+      .getByText("Intensitas temuan", { exact: true })
+      .locator("..")
+      .locator('li > span[aria-hidden="true"]');
+    const swatchColors = await swatches.evaluateAll((els) =>
+      els.map((el) => getComputedStyle(el).backgroundColor),
+    );
+    expect(swatchColors.length).toBeGreaterThan(1);
+    expect(new Set(swatchColors).size).toBe(swatchColors.length);
+
+    // Hari terpilih bertanda outline warna sistem, juga setelah fokus pergi.
+    const outline = (name: string) =>
+      calendar.getByRole("button", { name }).evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { style: s.outlineStyle, width: parseFloat(s.outlineWidth) };
+      });
+    await calendar.getByRole("button", { name: "09/01/2026: 12 temuan" }).click();
+    await page.getByRole("heading", { name: "Kalender 2026" }).click();
+    expect(await outline("09/01/2026: 12 temuan")).toEqual({ style: "solid", width: 2 });
+    expect((await outline("10/01/2026: 0 temuan")).style).toBe("none");
+
+    // Fokus keyboard juga terlihat tanpa bayangan.
+    await calendar.getByRole("button", { name: "09/01/2026: 12 temuan" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(calendar.getByRole("button", { name: "16/01/2026: 0 temuan" })).toBeFocused();
+    expect(await outline("16/01/2026: 0 temuan")).toEqual({ style: "solid", width: 2 });
+  });
+
   test("legenda intensitas mengikuti sebaran data, bukan ambang tetap", async ({ page }) => {
     // Volume rendah. Ambang lama akan menampilkan bucket "6–10" dan "11+"
     // yang kosong, sehingga warna tidak lagi menjelaskan perbedaan antar hari.
