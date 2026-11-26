@@ -130,8 +130,12 @@ const LABEL_COLUMN = "28px";
 const MONTH_GAP = "10px";
 /** Lebar minimal satu kotak hari (cukup untuk angka dua digit). */
 const CELL = "minmax(22px, 1fr)";
-/** Lebar minimal satu kotak hari tanpa angka tanggal. */
-const COMPACT_CELL = "minmax(12px, 1fr)";
+/**
+ * Lebar minimal satu kotak hari tanpa angka tanggal, dari `--heatmap-cell` di
+ * kisi: 12px untuk mouse, 21px untuk layar sentuh (21px + celah 3px = target
+ * sentuh 24px).
+ */
+const COMPACT_CELL = "minmax(var(--heatmap-cell), 1fr)";
 
 function isoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -283,14 +287,14 @@ export default function SidakHeatmapCalendar({
               ))}
             </ul>
           </div>
-          <div className="-my-2 -mr-2 flex items-center text-xs text-muted-foreground">
+          <label className="-my-2 -mr-2 flex cursor-pointer items-center text-xs text-muted-foreground select-none">
             <span aria-hidden="true">Tampilkan tanggal</span>
             <SettingsSwitch
               checked={showDates}
               onCheckedChange={setShowDates}
               label="Tampilkan tanggal"
             />
-          </div>
+          </label>
         </div>
       </div>
 
@@ -308,7 +312,7 @@ export default function SidakHeatmapCalendar({
         <div
           role="group"
           aria-label={`Kalender temuan ${year}`}
-          className="grid w-full min-w-max gap-[3px]"
+          className="grid w-full min-w-max gap-[3px] [--heatmap-cell:12px] pointer-coarse:[--heatmap-cell:21px]"
           style={{ gridTemplateColumns: grid.columns }}
         >
           <div

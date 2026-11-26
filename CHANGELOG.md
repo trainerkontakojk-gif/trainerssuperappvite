@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- fix(sidak): widen compact heatmap cells to a 24px touch pitch on coarse pointers and make the "Tampilkan tanggal" text toggle its switch
 - feat(sidak): show the heatmap calendar as a compact continuous year grid by default, with a "Tampilkan tanggal" switch for day numbers and per-month gaps
 - docs(sidak): set chat operating hours to 07:45–16:50 in the heatmap time plan and treat only 13-digit tickets as Instagram comment replies when chat JAM falls outside them
 - docs(sidak): treat off-hours chat JAM by ticket format in the heatmap time plan, keeping non-`L` tickets as Instagram comment replies and holding `L` tickets for QA review instead of guessing AM/PM

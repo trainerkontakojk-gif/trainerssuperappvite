@@ -220,7 +220,8 @@ test.describe("Halaman Heatmap", () => {
     expect(Math.abs(feb1.x - jan31.x)).toBeLessThan(1);
     await expect(calendar.getByRole("button", { name: "05/01/2026: 3 temuan" })).toHaveText("");
     // Tampilan lengkap: tiap bulan dipisah jeda dan kotak menulis tanggalnya.
-    await toggle.click();
+    // Teks label ikut jadi area klik sakelar.
+    await page.getByText("Tampilkan tanggal", { exact: true }).click();
     await expect(toggle).toHaveAttribute("aria-checked", "true");
     await expect(calendar.getByRole("button", { name: "05/01/2026: 3 temuan" })).toHaveText("5");
     const jan31Full = await box("31/01/2026: 0 temuan");
@@ -273,6 +274,28 @@ test.describe("Halaman Heatmap", () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(pageOverflow).toBeLessThanOrEqual(1);
+  });
+
+  test.describe("layar sentuh", () => {
+    test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 900 } });
+
+    test("kotak ringkas tetap selebar target sentuh 24px", async ({ page }) => {
+      behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
+      await open(page, "trainer");
+
+      const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+      await expect(calendar).toBeVisible();
+      await expect(page.getByRole("switch", { name: "Tampilkan tanggal" })).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+      // WCAG 2.5.8: jarak antar-pusat kotak (lebar + celah) minimal 24px.
+      const mon = await calendar.getByRole("button", { name: "05/01/2026: 3 temuan" }).boundingBox();
+      const tue = await calendar.getByRole("button", { name: "06/01/2026: 0 temuan" }).boundingBox();
+      const nextMon = await calendar.getByRole("button", { name: "12/01/2026: 0 temuan" }).boundingBox();
+      expect(nextMon!.x - mon!.x).toBeGreaterThanOrEqual(24);
+      expect(tue!.y - mon!.y).toBeGreaterThanOrEqual(24);
+    });
   });
 
   test("bar hari di bawah kalender membandingkan Senin sampai Minggu", async ({ page }) => {
