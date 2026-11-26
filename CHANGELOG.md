@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-26
+
+- docs(sidak): record in the heatmap time plan that email JAM is the leader-to-agent distribution time and CSO/pencatatan JAM is the ticket creation time, label each service's time in one map, and drop the cross-service hour matrix
+
 ## 2026-11-25
 
 - docs(sidak): plan service-time and call-duration findings for the SIDAK heatmap, with the JAM meaning for email/CSO/pencatatan held as a gate before the production migration
