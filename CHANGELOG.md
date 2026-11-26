@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- fix(sidak): keep the heatmap 0-finding cells visible against the card in the dark theme
 - fix(sidak): give the heatmap selected and focused day a two-tone ring that keeps 3:1 contrast on the darkest and lightest cells in both themes
 - fix(sidak): raise the heatmap calendar month, weekday, and day-number labels to the 12px text floor
 - fix(sidak): widen compact heatmap cells to a 24px touch pitch on coarse pointers and make the "Tampilkan tanggal" text toggle its switch

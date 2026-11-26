@@ -323,6 +323,39 @@ test.describe("Halaman Heatmap", () => {
     }
   });
 
+  test("kotak 0 temuan tetap terlihat di atas kartu pada tema gelap", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
+    await open(page, "trainer");
+
+    const empty = page.getByRole("button", { name: "10/01/2026: 0 temuan" });
+    await expect(empty).toBeVisible();
+    // Kontras isi kotak kosong terhadap latar kartu (section). Tema gelap minimal
+    // sejelas tema terang, yang sudah menjadi acuan tampilan "kotak abu-abu".
+    const emptyVsCard = () =>
+      empty.evaluate((el) => {
+        const ctx = document.createElement("canvas").getContext("2d")!;
+        const lum = (color: string) => {
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 1, 1);
+          const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)).map((v) => {
+            const c = v / 255;
+            return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        const cell = lum(getComputedStyle(el).backgroundColor);
+        const card = lum(getComputedStyle(el.closest("section")!).backgroundColor);
+        return (Math.max(cell, card) + 0.05) / (Math.min(cell, card) + 0.05);
+      });
+
+    const light = await emptyVsCard();
+    await page.evaluate(() => document.documentElement.classList.add("dark"));
+    const dark = await emptyVsCard();
+    expect(light).toBeGreaterThan(1);
+    expect(dark).toBeGreaterThanOrEqual(light);
+  });
+
   test("teks kalender tidak di bawah batas 12px di kedua tampilan", async ({ page }) => {
     behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
     await open(page, "trainer");

@@ -89,7 +89,9 @@ function bucketForCount(count: number, buckets: readonly IntensityBucket[]) {
 
 /** Skala warna per tingkat intensitas (rose, terbalik di tema gelap). */
 const LEVEL_CLASS: Record<IntensityBucket["level"], string> = {
-  0: "bg-muted",
+  // Tema gelap: --muted sama dengan --surface kartu, jadi kotak kosong memakai
+  // --border agar tetap terlihat sebagai kotak abu-abu.
+  0: "bg-muted dark:bg-border",
   1: "bg-rose-200 dark:bg-rose-950",
   2: "bg-rose-400 dark:bg-rose-800",
   3: "bg-rose-600 dark:bg-rose-600",
