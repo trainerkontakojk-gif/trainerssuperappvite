@@ -1,7 +1,7 @@
 # Jam Layanan & Durasi Call di Heatmap SIDAK — Rencana Implementasi
 
 - **Status:** rencana, belum dieksekusi. Dokumen ini bukan bukti implementasi atau hasil pengujian.
-- **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM email, CSO, pencatatan dikonfirmasi). **Baseline:** `03589fb2` (`main`).
+- **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM semua layanan, kecocokan tanggal–jam, tanpa AHT, dan jam chat di luar operasional dikonfirmasi). **Baseline:** `03589fb2` (`main`).
 - **Risk lane:** Lane D — schema/migration, kontrak API publik, dan penulisan data prod oleh Hermes.
 - **Kontrak terkait:** `plans/markdown/sidak-heatmap.md` (tanggal bisnis), `plans/markdown/sidak-heatmap-insights-agent.md` (kontrak heatmap terbaru: leader scope, `count_by`, `agent_id`).
 
@@ -21,26 +21,29 @@ Sheet "Rekap Ketidaksesuaian QA 2026" (sumber sync Hermes di `vps-fajar`) punya 
 
 ### Keputusan yang sudah dikonfirmasi Fajar
 
-| Aspek            | Ketentuan                                                                                              | Dikonfirmasi |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | ------------ |
-| Digital chat     | JAM = saat interaksi layanan **dimulai**                                                               | 2026-11-25   |
-| Email            | JAM = saat email **didistribusikan dari leader ke agent** (bukan saat dibalas, bukan saat QA sampling) | 2026-11-26   |
-| CSO & pencatatan | JAM = saat **tiket layanan dibuat** (bukan saat layanan diterima, bukan saat QA sampling)              | 2026-11-26   |
-| Call             | DURASI **disimpan**; call tidak punya jam                                                              | 2026-11-25   |
-| BKO              | Tidak punya jam maupun durasi                                                                          | 2026-11-25   |
-| Pencatatan       | Punya JAM (di sheet EMAIL & MIX)                                                                       | 2026-11-25   |
-| Data lama        | Di-backfill dari sheet oleh Hermes; tanpa sumber jujur tetap `NULL`                                    | 2026-11-25   |
+| Aspek            | Ketentuan                                                                                               | Dikonfirmasi |
+| ---------------- | ------------------------------------------------------------------------------------------------------- | ------------ |
+| Digital chat     | JAM = saat interaksi layanan **dimulai**                                                                | 2026-11-25   |
+| Email            | JAM = saat email **didistribusikan dari leader ke agent** (bukan saat dibalas, bukan saat QA sampling)  | 2026-11-26   |
+| CSO & pencatatan | JAM = saat **tiket layanan dibuat** (bukan saat layanan diterima, bukan saat QA sampling)               | 2026-11-26   |
+| Call             | DURASI **disimpan**; call tidak punya jam                                                               | 2026-11-25   |
+| BKO              | Tidak punya jam maupun durasi                                                                           | 2026-11-25   |
+| Pencatatan       | Punya JAM (di sheet EMAIL & MIX)                                                                        | 2026-11-25   |
+| Data lama        | Di-backfill dari sheet oleh Hermes; tanpa sumber jujur tetap `NULL`                                     | 2026-11-25   |
+| SLIK             | JAM = jam layanan                                                                                       | 2026-11-26   |
+| Tanggal & jam    | Tanggal kolom G dan JAM kolom H = hari dan peristiwa yang sama (email wajib selesai di hari distribusi) | 2026-11-26   |
+| Ambang durasi    | Tidak ada target AHT; ambang diambil dari sebaran data (lihat Kategori)                                 | 2026-11-26   |
+| Jam chat         | Layanan chat tidak 24 jam; JAM chat di luar jam operasional adalah salah input, bukan layanan malam     | 2026-11-26   |
 
-Semua JAM yang sudah dikonfirmasi adalah **peristiwa di sisi agent/layanan**, bukan jam kerja QA. Karena itu semuanya disimpan di satu kolom `jam_layanan` (sama seperti `tanggal_layanan` yang juga sudah berbeda makna per layanan), dengan arti per layanan dicatat di satu peta (`SIDAK_TIME_SOURCE`) dan di `COMMENT` kolom. Tidak perlu kolom `jam_sampel`.
+Semua JAM adalah **peristiwa di sisi agent/layanan**, bukan jam kerja QA. Karena itu semuanya disimpan di satu kolom `jam_layanan` (sama seperti `tanggal_layanan` yang juga sudah berbeda makna per layanan), dengan arti per layanan dicatat di satu peta (`SIDAK_TIME_SOURCE`) dan di `COMMENT` kolom. Tidak perlu kolom `jam_sampel`.
 
-### Asumsi yang belum dikonfirmasi
+### Yang masih perlu dipastikan
 
-| ID  | Asumsi                                                                                                                           | Kalau ternyata salah                                                                     |
-| --- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| A3  | SLIK: JAM = peristiwa sisi layanan (jam layanan/proses verifikasi)                                                               | lihat G1                                                                                 |
-| A4  | Ambang kategori jam & durasi di bawah dipakai sampai ada target AHT resmi                                                        | ubah konstanta di `packages/types` saja                                                  |
-| A5  | Tanggal kolom G (TGL LAYANAN) dan JAM kolom H menunjuk peristiwa yang **sama** (mis. email: tanggal distribusi + jam distribusi) | matriks hari × jam salah pasang hari; hari diambil dari sumber lain atau matriks dihapus |
-| A6  | Jam chat 00:xx–05:xx dan 23:xx adalah layanan malam sungguhan, bukan salah ketik AM/PM                                           | Hermes menandai nilai itu untuk dicek manual, bukan mengoreksi diam-diam                 |
+| ID  | Hal                                                                | Sampai dipastikan                                                             |
+| --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| C1  | Rentang jam operasional chat (batas jam yang dianggap salah input) | Hermes memakai 07:00–17:59 sebagai rentang sah; di luar itu `NULL` + laporan. |
+
+Cek sheet DIGITAL CHAT Jan–Nov (2026-11-26, read-only lewat Google Sheets): 20 dari 1.661 baris ber-JAM di luar 07:00–17:59 atau tidak terbaca (Jan 11, Feb 2, Mar 3, Apr 2, Mei 1, Jul 1; Jun dan Agu–Nov nol). Sebagian besar berbentuk `11:xx:xx PM` atau `12:xx:xx AM`, pola khas penanda AM/PM yang tertukar (kemungkinan aslinya 11:xx siang / 12:xx siang); satu berisi tanggal (`17 Jul 2026`). Daftar tiketnya diserahkan ke Fajar untuk dicek di sumber; nilainya **tidak** dikoreksi otomatis.
 
 ### Kategori
 
@@ -87,14 +90,10 @@ Kategori dihitung dari nilai tersimpan, tidak pernah disimpan sebagai kolom — 
 ### Gerbang G1 — konfirmasi arti JAM
 
 - **Email, CSO, pencatatan: SELESAI (2026-11-26).** Ketiganya peristiwa sisi layanan (distribusi email / tiket dibuat), jadi masuk `jam_layanan`. Tidak ada `jam_sampel`. Backfill ketiganya tidak lagi menunggu G1, tetap menunggu izin prod per run.
-- **SLIK: masih terbuka (A3).** Kerja lokal Fase 0–5 boleh jalan dengan A3. Migration prod tidak menunggu SLIK selama jawabannya bukan "jam QA sampling"; **backfill SLIK (Fase 7) menunggu konfirmasi**, dan sampai itu SLIK tidak ditulis Hermes (tetap `NULL`).
-- **A5 (tanggal G = peristiwa yang sama dengan jam H) dikonfirmasi sebelum Fase 7.** Kalau salah untuk satu layanan, matriks hari × jam layanan itu tidak ditampilkan (hanya kategori jam), sampai ada sumber tanggal yang cocok.
+- **SLIK: SELESAI (2026-11-26)** — JAM = jam layanan.
+- **Tanggal kolom G dan JAM kolom H: SELESAI (2026-11-26)** — hari dan peristiwa yang sama, jadi matriks hari × jam boleh memakai `tanggal_layanan` untuk hari.
 
-Kalau konfirmasi SLIK = "jam QA melakukan sampling":
-
-1. Jangan masukkan nilainya ke `jam_layanan`. Tambah kolom `jam_sampel time(0) NULL` di migration yang sama, **sebelum** migration diterapkan ke prod.
-2. Ubah peta sumber jam (lihat di bawah) untuk layanan itu menjadi `"sampel"`; tampilannya pindah ke heatmap mode QA.
-3. Perbarui plan ini (Requirement + Tasklist) sebelum lanjut.
+G1 selesai seluruhnya; tidak ada `jam_sampel`. Fase 6–7 tinggal menunggu izin prod per langkah.
 
 ### Kondisi kode saat perencanaan
 
@@ -124,7 +123,7 @@ ALTER TABLE public.qa_temuan
     CHECK (jam_layanan IS NULL OR service_type NOT IN ('call', 'bko'));
 
 COMMENT ON COLUMN public.qa_temuan.jam_layanan IS
-  'Jam dinding WIB peristiwa sisi layanan; arti per service_type: chat = interaksi dimulai, email = email didistribusikan leader ke agent, cso/pencatatan = tiket layanan dibuat, slik = belum dikonfirmasi. Peta resmi: SIDAK_TIME_SOURCE di packages/types.';
+  'Jam dinding WIB peristiwa sisi layanan; arti per service_type: chat = interaksi dimulai, email = email didistribusikan leader ke agent, cso/pencatatan = tiket layanan dibuat, slik = jam layanan. Peta resmi: SIDAK_TIME_SOURCE di packages/types.';
 COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
   'Durasi panggilan Call dalam detik; hanya untuk service_type = call.';
 ```
@@ -170,13 +169,13 @@ COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
     slik: {
       kind: "jam",
       label: "Jam layanan",
-      meaning: "belum dikonfirmasi (A3)",
+      meaning: "saat layanan SLIK berlangsung",
     },
     call: { kind: "durasi", label: "Durasi panggilan" },
     bko: { kind: "none" },
   };
   ```
-  Label SLIK diganti begitu A3 dikonfirmasi; ini satu-satunya tempat yang berubah.
+  Mengubah label atau arti JAM cukup di peta ini.
 - `SIDAK_JAM_BUCKETS` (pagi/siang/sore/luar, batas dalam menit sejak 00:00) dan `SIDAK_DURASI_BUCKETS` (singkat/sedang/panjang, batas dalam detik) + `SIDAK_DURASI_REVIEW_BELOW_SECONDS = 60`. Fungsi `classifyJam()` / `classifyDurasi()` dipakai API dan web.
 
 ### API
@@ -238,7 +237,8 @@ Perubahan dikerjakan di `~/.hermes/skills/productivity/qa-rekap-md/scripts/`, de
 
 - **Baca sel mentah XLSX + format angkanya (numFmt)**, bukan teks gviz.
 - **Semantik kolom H ditentukan layanan baris** (hasil routing prefix), bukan nama sheet. Contoh: baris QADATA di sheet CALL berisi jam (`0.6118` = 14:41), bukan durasi.
-- Email, CSO, pencatatan, chat → `jam_layanan`; call → `durasi_detik`. **SLIK tidak ditulis** (dilewati dan dicatat di laporan) sampai A3 dikonfirmasi.
+- Email, CSO, pencatatan, chat, SLIK → `jam_layanan`; call → `durasi_detik`.
+- **Chat di luar jam operasional** (sementara: sebelum 07:00 atau sesudah 17:59, lihat C1) → `NULL` + masuk laporan sebagai salah input. Tidak dikoreksi otomatis (mis. menebak AM/PM), karena jam yang benar tidak bisa disimpulkan dari nilainya. Tim QA membetulkan di sheet, lalu sync berikutnya mengisinya.
 - **Aturan parse jam (fail closed — tidak cocok → `NULL` + masuk laporan):**
   - Serial waktu (pecahan hari) bila format selnya format waktu.
   - Angka `h.mm` (`8.02` → 08:02; satu digit menit dipad kanan: `7.2` → 07:20).
@@ -257,7 +257,7 @@ Perubahan dikerjakan di `~/.hermes/skills/productivity/qa-rekap-md/scripts/`, de
 
 Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **sebelum** kode yang membaca kolom baru di-push. Urutannya:
 
-1. G1 untuk email/CSO/pencatatan sudah selesai (2026-11-26). SLIK boleh masih terbuka; backfill SLIK menyusul.
+1. G1 selesai (2026-11-26) untuk semua layanan.
 2. Migration diterapkan ke prod `ruosnjmtywcrghjgqugz` (izin eksplisit Fajar).
 3. Push kode ke `main`.
 4. Hermes sync harian diaktifkan dengan field baru.
@@ -323,19 +323,18 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 - [ ] `thermo-nuclear` review; perbaiki temuan.
 - [ ] Root `pnpm typecheck`, `pnpm lint`, `pnpm build`; E2E fitur + regresi heatmap/tanggal yang ada (`sidak-heatmap*.spec.ts`, `sidak-temuan-dates*.spec.ts`, `sidak-temuan-import-dates.spec.ts`), satu run pada satu waktu.
 - [ ] Dokumentasi: kolom baru di `docs/database.md`, kontrak di `docs/modules.md`; entri `plans/README.md`.
-- [ ] **STOP — jawaban SLIK (A3) bukan "jam QA sampling"** (kalau belum dijawab, migration boleh jalan; SLIK tetap tidak ditulis). Minta izin Fajar → terapkan migration ke prod → verifikasi kolom/CHECK → baru push kode ke `main` (`push-ready`).
+- [ ] **STOP —** minta izin Fajar → terapkan migration ke prod → verifikasi kolom/CHECK → baru push kode ke `main` (`push-ready`).
 
 ### Fase 7 — Hermes sync & backfill
 
 - [ ] Sync harian: tambah field, read-back; satu run dry-run lalu run nyata (izin Fajar).
-- [ ] Konfirmasi A5 (tanggal kolom G = peristiwa jam kolom H) per layanan sebelum backfill.
-- [ ] Backfill per bulan Jan–Nov (email, CSO, pencatatan, chat, call; SLIK setelah A3): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
+- [ ] Pastikan C1 (rentang jam operasional chat) dan daftar tiket chat janggal sudah dicek/diperbaiki di sheet.
+- [ ] Backfill per bulan Jan–Nov (email, CSO, pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
 
 ## STOP conditions
 
-- Konfirmasi SLIK (A3) menyatakan JAM = jam sampling QA → hentikan sebelum migration prod, ubah plan (tambah `jam_sampel`, ubah `SIDAK_TIME_SOURCE`).
-- A5 ternyata salah untuk satu layanan (tanggal G dan jam H beda peristiwa) → jangan tampilkan matriks hari × jam layanan itu; laporkan ke Fajar.
+- Dry-run backfill menemukan baris yang tanggal kolom G-nya jelas tidak cocok dengan JAM kolom H (mis. email dibalas sebelum didistribusikan) → laporkan ke Fajar sebelum `--apply` bulan itu.
 - Tingkat terbaca kolom H untuk satu layanan < 90% pada dry-run → laporkan ke Fajar sebelum backfill layanan itu.
 - Kegagalan E2E yang sama setelah tiga ronde perbaikan → berhenti dan bawa bukti (`docs/AGENT_WORKFLOW.md` §7).
 - Penulisan ke Supabase prod (migration atau Hermes `--apply`) tanpa izin eksplisit Fajar untuk run itu → jangan dilakukan.

@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- docs(sidak): close the heatmap time plan's open questions (SLIK JAM is service time, column G date and column H JAM are the same event, no AHT target) and keep chat JAM outside operating hours as NULL plus a report instead of guessing AM/PM
 - docs(sidak): record in the heatmap time plan that email JAM is the leader-to-agent distribution time and CSO/pencatatan JAM is the ticket creation time, label each service's time in one map, and drop the cross-service hour matrix
 
 ## 2026-11-25
