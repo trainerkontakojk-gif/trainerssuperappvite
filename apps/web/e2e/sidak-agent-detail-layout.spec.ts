@@ -26,6 +26,7 @@ const AGENT_NAME = "Rahmawati Kusumaningrum";
 async function openRichDetail(
   page: Page,
   viewport: { width: number; height: number },
+  query?: string,
 ) {
   await page.setViewportSize(viewport);
   const audit: AgentAudit = {
@@ -39,6 +40,7 @@ async function openRichDetail(
     folders: LAYOUT_FOLDERS,
     folderAgents: LAYOUT_FOLDER_AGENTS,
     directoryAgents: LAYOUT_DIRECTORY_AGENTS,
+    query,
   });
   // Timeout dinaikkan untuk cold-start Vite, bukan untuk melonggarkan asersi.
   await expect(page.getByRole("heading", { name: AGENT_NAME })).toBeVisible({
@@ -55,6 +57,136 @@ async function box(locator: Locator) {
 
 function sidebar(page: Page) {
   return page.getByRole("complementary", { name: "Profil agen" });
+}
+
+test.describe("Detail agen dengan sentuhan", () => {
+  test.use({ hasTouch: true, isMobile: true, reducedMotion: "reduce" });
+
+  test("target profil, filter, tab, toggle heatmap, dan batang bulan minimal 44×44 px", async ({ page }) => {
+    await openRichDetail(page, { width: 375, height: 812 });
+    expect(await page.evaluate(() => matchMedia("(any-pointer: coarse)").matches)).toBe(true);
+    const aside = sidebar(page);
+    const tabs = page.getByRole("tablist", { name: "Bagian profil agen" });
+    const months = page.getByRole("button", { name: /^Pilih bulan/ });
+
+    const expectTouchSize = async (locator: Locator) => {
+      const { width, height } = await box(locator);
+      const name = (await locator.getAttribute("aria-label")) ?? await locator.innerText();
+      expect(width, `${name}: lebar`).toBeGreaterThanOrEqual(44);
+      expect(height, `${name}: tinggi`).toBeGreaterThanOrEqual(44);
+    };
+    for (const target of [
+      aside.getByLabel("Kembali ke daftar agen"),
+      aside.getByRole("combobox", { name: "Ganti agen" }),
+      aside.getByRole("button", { name: "Input Audit" }),
+      aside.getByRole("button", { name: "Unduh Laporan" }),
+      aside.getByRole("button", { name: "Muat ulang profil agen" }),
+      page.getByRole("combobox", { name: "Tahun audit" }),
+      page.getByRole("combobox", { name: "Pilihan layanan audit" }),
+      ...await tabs.getByRole("tab").all(),
+    ]) {
+      await expectTouchSize(target);
+    }
+
+    await expect(months).not.toHaveCount(0);
+    for (const month of await months.all()) await expectTouchSize(month);
+    const monthRail = page.locator('[data-scroll-x="agent-months"]');
+    await monthRail.scrollIntoViewIfNeeded();
+    const selectedMonth = months.and(page.getByRole("button", { pressed: true }));
+    const selectedBeforeSwipe = await selectedMonth.getAttribute("aria-label");
+    await swipe(page, monthRail, { x: -180, y: 0 });
+    await expect.poll(() => monthRail.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+    await expect(selectedMonth).toHaveAttribute("aria-label", selectedBeforeSwipe!);
+    const may = page.getByRole("button", { name: /^Pilih bulan Mei/ });
+    await may.tap();
+    await expect(may).toHaveAttribute("aria-pressed", "true");
+    const railBox = await box(monthRail);
+    const targetLabel = await box(monthRail.getByText("Target 95%", { exact: true }));
+    expect(targetLabel.x).toBeGreaterThanOrEqual(railBox.x);
+    expect(targetLabel.x + targetLabel.width).toBeLessThanOrEqual(railBox.x + railBox.width + 1);
+    await monthRail.screenshot({ path: test.info().outputPath("month-rail-375.png") });
+
+    await tabs.getByRole("tab", { name: "Temuan" }).tap();
+    await expectTouchSize(page.getByRole("combobox", { name: "Bulan temuan" }));
+    await expectTouchSize(page.getByRole("searchbox", { name: "Cari temuan" }));
+
+    await tabs.getByRole("tab", { name: "Heatmap" }).tap();
+    const units = page.getByRole("group", { name: "Hitung per" });
+    await expectTouchSize(units.getByRole("button", { name: "Parameter" }));
+    const tickets = units.getByRole("button", { name: "Tiket" });
+    await expectTouchSize(tickets);
+    await tickets.tap();
+    await expect(tickets).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("strip tab: fade mengikuti overflow, swipe tidak memilih, dan tautan menampilkan tab aktif", async ({ page }) => {
+    await openRichDetail(page, { width: 375, height: 812 }, "?tab=simulations");
+    const strip = page.locator('[data-scroll-x="agent-tabs"]');
+    const summary = page.getByRole("tab", { name: "Ringkasan" });
+    const simulation = page.getByRole("tab", { name: "Simulasi" });
+    const startFade = page.getByTestId("agent-tabs-fade-start");
+    const endFade = page.getByTestId("agent-tabs-fade-end");
+    const isFullyInStrip = async () => {
+      const target = await box(simulation);
+      const viewport = await box(strip);
+      return target.x >= viewport.x - 1 && target.x + target.width <= viewport.x + viewport.width + 1;
+    };
+
+    await expect(simulation).toHaveAttribute("aria-selected", "true");
+    await expect.poll(isFullyInStrip).toBe(true);
+    await expect(sidebar(page).getByRole("heading", { level: 1 })).toBeInViewport();
+    await strip.locator("..").screenshot({ path: test.info().outputPath("tab-strip-active-375.png") });
+
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    await expect(summary).toHaveAttribute("aria-selected", "true");
+    await expect(endFade).toBeVisible();
+    await expect(startFade).toBeHidden();
+    expect(await isFullyInStrip()).toBe(false);
+    await strip.locator("..").screenshot({ path: test.info().outputPath("tab-strip-start-375.png") });
+    await strip.scrollIntoViewIfNeeded();
+
+    const beforeVerticalSwipe = (await box(strip)).y;
+    await swipe(page, strip, { x: 0, y: -170 });
+    await expect.poll(async () => (await box(strip)).y).toBeLessThan(beforeVerticalSwipe - 20);
+    await expect(summary).toHaveAttribute("aria-selected", "true");
+    expect(await strip.evaluate((el) => el.scrollLeft)).toBe(0);
+
+    await strip.scrollIntoViewIfNeeded();
+    await swipe(page, strip, { x: -170, y: 0 });
+    await expect(startFade).toBeVisible();
+    await expect(endFade).toBeHidden();
+    await expect(summary).toHaveAttribute("aria-selected", "true");
+    await expect.poll(isFullyInStrip).toBe(true);
+    await simulation.tap();
+    await expect(page).toHaveURL(/tab=simulations/);
+
+    await page.setViewportSize({ width: 900, height: 812 });
+    await expect(startFade).toBeHidden();
+    await expect(endFade).toBeHidden();
+  });
+});
+
+async function swipe(page: Page, locator: Locator, delta: { x: number; y: number }) {
+  const anchor = await box(locator);
+  const x = anchor.x + anchor.width * 0.75;
+  const y = anchor.y + anchor.height * 0.5;
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x, y }],
+    });
+    for (let step = 1; step <= 6; step++) {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [{ x: x + delta.x * step / 6, y: y + delta.y * step / 6 }],
+      });
+    }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } finally {
+    await cdp.detach();
+  }
 }
 
 test.describe("Tata letak detail agent", () => {

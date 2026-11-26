@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- fix(sidak): enlarge agent detail touch targets and reveal the active tab without scrolling the page
 - fix(sidak): make agent detail tabs manually activated, expose keyboard-scrollable tables, and provide a named trend chart with readable monthly totals
 - fix(sidak): give heatmap calendar cells a 24px target pitch on every pointer and expose the calendar as an ARIA grid with weekday rows and aria-selected day cells
 - fix(sidak): make the heatmap calendar one tab stop with arrow-key, Home, and End navigation, and keep its intensity colors, selection, and focus visible in forced-colors mode

@@ -323,7 +323,7 @@ export default function SidakAgentDetailPage() {
                 size="icon-lg"
                 aria-label="Kembali ke daftar agen"
                 title="Kembali ke daftar agen"
-                className="size-10 shrink-0 text-muted-foreground"
+                className="size-10 shrink-0 text-muted-foreground any-pointer-coarse:size-[44px]"
               >
                 <ArrowLeft className="size-4" aria-hidden="true" />
               </Button>

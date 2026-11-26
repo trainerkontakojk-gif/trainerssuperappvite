@@ -233,7 +233,11 @@ export default function AgentProfileSidebar({
 
       <div className="flex flex-col gap-2">
         {isStaff ? (
-          <Button type="button" onClick={onInputAudit} className="h-10 w-full">
+          <Button
+            type="button"
+            onClick={onInputAudit}
+            className="h-10 w-full any-pointer-coarse:min-h-[44px]"
+          >
             <Plus data-icon="inline-start" aria-hidden="true" />
             <span>Input Audit</span>
           </Button>
@@ -245,7 +249,7 @@ export default function AgentProfileSidebar({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 min-w-0 flex-1 px-3"
+                  className="h-10 min-w-0 flex-1 px-3 any-pointer-coarse:min-h-[44px]"
                 />
               }
             >
@@ -291,7 +295,7 @@ export default function AgentProfileSidebar({
                   : "Muat ulang profil agen"
               }
               title="Muat ulang"
-              className="size-10 shrink-0"
+              className="size-10 shrink-0 any-pointer-coarse:size-[44px]"
             >
               <RefreshCw
                 className={

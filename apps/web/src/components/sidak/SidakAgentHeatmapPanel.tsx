@@ -127,7 +127,7 @@ export default function SidakAgentHeatmapPanel({
                 type="button"
                 aria-pressed={countBy === value}
                 onClick={() => setCountBy(value)}
-                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground motion-reduce:transition-none any-pointer-coarse:min-h-[44px] any-pointer-coarse:min-w-[44px] ${
                   countBy === value
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-background text-foreground hover:bg-muted"

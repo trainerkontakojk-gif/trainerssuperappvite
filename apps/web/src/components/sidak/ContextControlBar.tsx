@@ -60,7 +60,7 @@ interface Props {
 }
 
 const triggerClassName =
-  "!h-10 w-full min-w-0 rounded-lg border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-muted/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40";
+  "!h-10 w-full min-w-0 rounded-lg border-border bg-background px-3 text-sm font-medium text-foreground hover:bg-muted/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 any-pointer-coarse:min-h-[44px]";
 
 const labelClassName = "mb-1.5 text-xs font-medium text-muted-foreground";
 
@@ -246,7 +246,7 @@ export default function ContextControlBar({
                   placeholder="No. tiket atau parameter"
                   value={temuanQuery}
                   onChange={(event) => onTemuanQueryChange(event.target.value)}
-                  className="h-10 rounded-lg"
+                  className="h-10 rounded-lg any-pointer-coarse:min-h-[44px]"
                 />
               </div>
             </>

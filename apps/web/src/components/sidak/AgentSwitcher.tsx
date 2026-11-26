@@ -83,7 +83,7 @@ export default function AgentSwitcher({
           <Button
             type="button"
             variant="outline"
-            className="h-10 w-full justify-between px-3 font-normal text-muted-foreground"
+            className="h-10 w-full justify-between px-3 font-normal text-muted-foreground any-pointer-coarse:min-h-[44px]"
           />
         }
       >

@@ -73,21 +73,24 @@ export default function MonthRail({
         </p>
       </div>
 
-      <div className="relative">
-        <div
-          aria-hidden="true"
-          data-testid="qa-target-line"
-          className="pointer-events-none absolute inset-x-0 border-t border-dashed border-foreground/40"
-          style={{
-            bottom: `calc(1.75rem + (100% - 3.25rem) * ${targetPct / 100})`,
-          }}
-        >
-          <span className="absolute -top-2.5 right-0 bg-background pl-1.5 text-xs font-medium text-foreground/70">
-            Target {SIDAK_QA_TARGET}%
-          </span>
-        </div>
+      <div
+        data-scroll-x="agent-months"
+        className="any-pointer-coarse:overflow-x-auto any-pointer-coarse:overscroll-x-contain"
+      >
+        <div className="relative grid grid-cols-12 gap-1 sm:gap-2 any-pointer-coarse:w-max any-pointer-coarse:min-w-full any-pointer-coarse:grid-cols-[repeat(12,minmax(44px,1fr))]">
+          <div
+            aria-hidden="true"
+            data-testid="qa-target-line"
+            className="pointer-events-none absolute inset-x-0 flex h-0 items-start justify-end border-t border-dashed border-foreground/40"
+            style={{
+              bottom: `calc(1.75rem + (100% - 3.25rem) * ${targetPct / 100})`,
+            }}
+          >
+            <span className="sticky right-0 -mt-2.5 bg-background pl-1.5 text-xs font-medium text-foreground/70">
+              Target {SIDAK_QA_TARGET}%
+            </span>
+          </div>
 
-        <div className="grid grid-cols-12 gap-1 sm:gap-2">
           {MONTHS_SHORT.map((label, index) => {
             const month = index + 1;
             const summary = byMonth.get(month);
@@ -120,7 +123,7 @@ export default function MonthRail({
                 onClick={() => onMonthSelect(month)}
                 aria-pressed={isActive}
                 aria-label={`Pilih bulan ${label} ${year}, skor ${summary.finalScore.toFixed(1)} persen, ${summary.findingsCount} temuan${isBelowQaTarget ? ", QA di bawah target 95 persen" : ""}`}
-                className={`group flex h-48 flex-col items-center gap-1 rounded-lg px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none sm:h-56 ${
+                className={`group flex h-48 flex-col items-center gap-1 rounded-lg px-0.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none sm:h-56 ${
                   isActive ? "bg-muted ring-1 ring-border" : "hover:bg-muted/60"
                 }`}
               >
