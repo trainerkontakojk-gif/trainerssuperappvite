@@ -1,7 +1,7 @@
 # Jam Layanan & Durasi Call di Heatmap SIDAK — Rencana Implementasi
 
 - **Status:** rencana, belum dieksekusi. Dokumen ini bukan bukti implementasi atau hasil pengujian.
-- **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM semua layanan, kecocokan tanggal–jam, tanpa AHT, dan jam chat di luar operasional dikonfirmasi). **Baseline:** `03589fb2` (`main`).
+- **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM semua layanan, kecocokan tanggal–jam, tanpa AHT, jam operasional chat, dan perubahan arti JAM email). **Baseline:** `03589fb2` (`main`).
 - **Risk lane:** Lane D — schema/migration, kontrak API publik, dan penulisan data prod oleh Hermes.
 - **Kontrak terkait:** `plans/markdown/sidak-heatmap.md` (tanggal bisnis), `plans/markdown/sidak-heatmap-insights-agent.md` (kontrak heatmap terbaru: leader scope, `count_by`, `agent_id`).
 
@@ -21,21 +21,52 @@ Sheet "Rekap Ketidaksesuaian QA 2026" (sumber sync Hermes di `vps-fajar`) punya 
 
 ### Keputusan yang sudah dikonfirmasi Fajar
 
-| Aspek            | Ketentuan                                                                                                                                                                           | Dikonfirmasi |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| Digital chat     | JAM = saat interaksi layanan **dimulai**                                                                                                                                            | 2026-11-25   |
-| Email            | JAM = saat email **didistribusikan dari leader ke agent** (bukan saat dibalas, bukan saat QA sampling)                                                                              | 2026-11-26   |
-| CSO & pencatatan | JAM = saat **tiket layanan dibuat** (bukan saat layanan diterima, bukan saat QA sampling)                                                                                           | 2026-11-26   |
-| Call             | DURASI **disimpan**; call tidak punya jam                                                                                                                                           | 2026-11-25   |
-| BKO              | Tidak punya jam maupun durasi                                                                                                                                                       | 2026-11-25   |
-| Pencatatan       | Punya JAM (di sheet EMAIL & MIX)                                                                                                                                                    | 2026-11-25   |
-| Data lama        | Di-backfill dari sheet oleh Hermes; tanpa sumber jujur tetap `NULL`                                                                                                                 | 2026-11-25   |
-| SLIK             | JAM = jam layanan                                                                                                                                                                   | 2026-11-26   |
-| Tanggal & jam    | Tanggal kolom G dan JAM kolom H = hari dan peristiwa yang sama (email wajib selesai di hari distribusi)                                                                             | 2026-11-26   |
-| Ambang durasi    | Tidak ada target AHT; ambang diambil dari sebaran data (lihat Kategori)                                                                                                             | 2026-11-26   |
-| Jam chat         | Chat live beroperasi **07:45–16:50**. JAM chat di luar itu bisa human error (mis. AM/PM tertukar), chat yang masuk sebelum agent sempat logout, atau balasan komentar IG (asinkron) | 2026-11-26   |
+| Aspek            | Ketentuan                                                                                                                                                                                      | Dikonfirmasi |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Digital chat     | JAM = saat interaksi layanan **dimulai**                                                                                                                                                       | 2026-11-25   |
+| Email            | JAM berubah arti: dulu saat email **didistribusikan** leader ke agent, akhir-akhir ini saat email **dibalas** agent (konfirmasi QA). SIDAK hanya memakai arti "dibalas" (lihat Arti JAM email) | 2026-11-26   |
+| CSO & pencatatan | JAM = saat **tiket layanan dibuat** (bukan saat layanan diterima, bukan saat QA sampling)                                                                                                      | 2026-11-26   |
+| Call             | DURASI **disimpan**; call tidak punya jam                                                                                                                                                      | 2026-11-25   |
+| BKO              | Tidak punya jam maupun durasi                                                                                                                                                                  | 2026-11-25   |
+| Pencatatan       | Punya JAM (di sheet EMAIL & MIX)                                                                                                                                                               | 2026-11-25   |
+| Data lama        | Di-backfill dari sheet oleh Hermes; tanpa sumber jujur tetap `NULL`                                                                                                                            | 2026-11-25   |
+| SLIK             | JAM = jam layanan                                                                                                                                                                              | 2026-11-26   |
+| Tanggal & jam    | Tanggal kolom G dan JAM kolom H = hari dan peristiwa yang sama (email wajib selesai di hari yang sama)                                                                                         | 2026-11-26   |
+| Ambang durasi    | Tidak ada target AHT; ambang diambil dari sebaran data (lihat Kategori)                                                                                                                        | 2026-11-26   |
+| Jam chat         | Chat live beroperasi **07:45–16:50**. JAM chat di luar itu bisa human error (mis. AM/PM tertukar), chat yang masuk sebelum agent sempat logout, atau balasan komentar IG (asinkron)            | 2026-11-26   |
 
 Semua JAM adalah **peristiwa di sisi agent/layanan**, bukan jam kerja QA. Karena itu semuanya disimpan di satu kolom `jam_layanan` (sama seperti `tanggal_layanan` yang juga sudah berbeda makna per layanan), dengan arti per layanan dicatat di satu peta (`SIDAK_TIME_SOURCE`) dan di `COMMENT` kolom. Tidak perlu kolom `jam_sampel`.
+
+### Arti JAM email (profil 2026-11-26)
+
+Profil read-only 674 baris email (prefix QAEMAIL/RECEMAIL/QEMAIL) di sheet EMAIL & MIX Jan–Nov. Header kolom H selalu `JAM`, tanpa keterangan arti.
+
+| Bulan   | n   | Median JAM  | % di 07–08 | % ≥ 12:00 |
+| ------- | --- | ----------- | ---------- | --------- |
+| Jan–Mei | 256 | 07:34–08:15 | 66–95      | 5–15      |
+| Jun–Agu | 195 | 08:35–08:59 | 47–55      | 3–12      |
+| Sep–Nov | 223 | 10:16–11:22 | 25–28      | 35–48     |
+
+- **Jan–Mei:** menumpuk di awal shift, cocok dengan jam distribusi.
+- **Jun–Agu:** campuran; median per minggu naik-turun (sebagian minggu kembali penuh di 07–08, sebagian bermedian 09:19–10:50). Pelonggaran pertama terlihat di minggu 25–29 Mei.
+- **Sep–Nov:** tersebar sepanjang hari, bentuknya mirip CSO/pencatatan, cocok dengan jam dibalas. Konsisten di tiap paruh bulan.
+- TL berganti bersamaan dengan periode (Jan–Apr, Mei–Agu, Sep–Nov masing-masing satu TL dominan), jadi data tidak bisa memisahkan "berubah per tanggal" dari "berubah per TL/petugas".
+- Okt–Nov ada 19 email bernilai 05:xx–06:xx, tidak ada di Feb–Jun; penyebabnya belum diketahui.
+
+**Keputusan rancangan (rekomendasi, menunggu E1):**
+
+- SIDAK memakai satu arti saja untuk email: **jam email dibalas**. Itu yang dekat dengan saat kesalahan dibuat; jam distribusi hanya mencerminkan jadwal pembagian.
+- Ada tanggal mulai berlaku (`validFrom`) untuk email di `SIDAK_TIME_SOURCE`, sementara **2026-09-01**. Temuan email dengan `tanggal_layanan` sebelum tanggal itu tidak diberi jam oleh Hermes (`NULL`), dan tampil sebagai "Jam tidak tersedia — sebelum <tanggal>, JAM email berarti jam distribusi", **bukan** "belum diisi".
+- Agregasi API juga mengabaikan jam email sebelum `validFrom`, jadi nilai lama yang terlanjur tertulis (Hermes, import, atau input manual) tidak pernah tercampur ke heatmap.
+- Input manual/import email sebelum `validFrom` menolak jam dengan pesan manusiawi.
+
+### Yang masih perlu dipastikan
+
+| ID  | Hal                                                                                                      | Sampai dipastikan                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| E1  | Tanggal pasti QA mulai mengisi JAM email sebagai jam dibalas (dan apakah berlaku untuk semua petugas QA) | `validFrom` = 2026-09-01; Jun–Agu dianggap campuran, tidak diberi jam                 |
+| E2  | 19 JAM email 05:xx–06:xx di Okt–Nov: email memang dibalas sebelum shift, atau salah input                | Disimpan, masuk laporan dry-run untuk dicek                                           |
+| E3  | Arti JAM CSO & pencatatan pernah berubah juga atau tidak                                                 | Dianggap tetap "tiket dibuat" sepanjang tahun (profil non-email konsisten siang–sore) |
 
 ### Cek jam chat di luar jam operasional
 
@@ -77,8 +108,8 @@ Kategori dihitung dari nilai tersimpan, tidak pernah disimpan sebagai kolom — 
 ### Batasan interpretasi (wajib tampil di UI)
 
 - Heatmap ini menunjukkan **di jam berapa temuan menumpuk**, bukan tingkat kesalahan per jam: tidak ada denominator jumlah layanan per jam.
-- Arti JAM berbeda per layanan: chat = interaksi dimulai; email = email didistribusikan leader ke agent; CSO & pencatatan = tiket layanan dibuat. Label section dan kalimat penjelas mengikuti layanan yang dipilih.
-- Email: puncak pagi (07–08) mencerminkan **jadwal distribusi** di awal shift, bukan jam agent paling banyak salah. Jeda distribusi → balasan tidak tercatat.
+- Arti JAM berbeda per layanan: chat = interaksi dimulai; email = email dibalas agent (hanya sejak `validFrom`); CSO & pencatatan = tiket layanan dibuat. Label section dan kalimat penjelas mengikuti layanan yang dipilih.
+- Email: hanya temuan sejak `validFrom` yang punya jam. UI menyebut periode itu, supaya rentang tahun penuh tidak dibaca sebagai profil Jan–Des.
 - CSO & pencatatan: jam tiket dibuat dekat dengan saat agent mencatat/menginput, jadi paling dekat ke jam terjadinya kesalahan input; tetap bukan jam terima layanan.
 - Tidak ada matriks gabungan lintas layanan: peristiwanya berbeda, jadi menjumlahkannya ke satu sel jam menyesatkan. Untuk "Semua layanan" hanya tampil tabel kategori per layanan (lihat UI).
 - Distribusi durasi hanya mencakup call **yang punya temuan**, bukan seluruh call.
@@ -94,7 +125,7 @@ Kategori dihitung dari nilai tersimpan, tidak pernah disimpan sebagai kolom — 
 
 ### Gerbang G1 — konfirmasi arti JAM
 
-- **Email, CSO, pencatatan: SELESAI (2026-11-26).** Ketiganya peristiwa sisi layanan (distribusi email / tiket dibuat), jadi masuk `jam_layanan`. Tidak ada `jam_sampel`. Backfill ketiganya tidak lagi menunggu G1, tetap menunggu izin prod per run.
+- **Email, CSO, pencatatan: SELESAI (2026-11-26).** Ketiganya peristiwa sisi layanan (email dibalas / tiket dibuat), jadi masuk `jam_layanan`. Tidak ada `jam_sampel`. Email memakai `validFrom` (lihat Arti JAM email); tanggalnya E1.
 - **SLIK: SELESAI (2026-11-26)** — JAM = jam layanan.
 - **Tanggal kolom G dan JAM kolom H: SELESAI (2026-11-26)** — hari dan peristiwa yang sama, jadi matriks hari × jam boleh memakai `tanggal_layanan` untuk hari.
 
@@ -128,7 +159,7 @@ ALTER TABLE public.qa_temuan
     CHECK (jam_layanan IS NULL OR service_type NOT IN ('call', 'bko'));
 
 COMMENT ON COLUMN public.qa_temuan.jam_layanan IS
-  'Jam dinding WIB peristiwa sisi layanan; arti per service_type: chat = interaksi dimulai, email = email didistribusikan leader ke agent, cso/pencatatan = tiket layanan dibuat, slik = jam layanan. Peta resmi: SIDAK_TIME_SOURCE di packages/types.';
+  'Jam dinding WIB peristiwa sisi layanan; arti per service_type: chat = interaksi dimulai, email = email dibalas agent (hanya sejak tanggal validFrom di SIDAK_TIME_SOURCE), cso/pencatatan = tiket layanan dibuat, slik = jam layanan. Peta resmi: SIDAK_TIME_SOURCE di packages/types.';
 COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
   'Durasi panggilan Call dalam detik; hanya untuk service_type = call.';
 ```
@@ -158,8 +189,9 @@ COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
     },
     email: {
       kind: "jam",
-      label: "Jam email didistribusikan",
-      meaning: "saat email didistribusikan leader ke agent",
+      label: "Jam email dibalas",
+      meaning: "saat agent membalas email",
+      validFrom: "2026-09-01", // E1; sebelum ini JAM email = jam distribusi, tidak dipakai
     },
     cso: {
       kind: "jam",
@@ -226,10 +258,10 @@ COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
 
 Jalankan `ui-ux-pro-max` sebelum implementasi dan `impeccable` audit/polish sebelum gerbang akhir.
 
-- `/sidak/heatmap`, **mode Agent**: section baru di bawah kalender; judulnya label layanan dari `SIDAK_TIME_SOURCE` (mis. "Jam email didistribusikan", "Jam tiket dibuat"), bukan "Jam layanan" generik.
+- `/sidak/heatmap`, **mode Agent**: section baru di bawah kalender; judulnya label layanan dari `SIDAK_TIME_SOURCE` (mis. "Jam email dibalas", "Jam tiket dibuat"), bukan "Jam layanan" generik.
   - **Satu layanan dipilih (chat/email/CSO/pencatatan/SLIK):** matriks Senin–Minggu × kolom `<07`, `07`…`16`, `≥17` (dua kolom tepi menampung jam di luar operasional) + ringkasan Pagi/Siang/Sore/Di luar jam (jumlah + persen, rentang jam tertulis) + kalimat arti JAM layanan itu (`meaning`).
   - **Semua layanan:** tanpa matriks. Tabel kategori per layanan (baris = layanan + labelnya, kolom = Pagi/Siang/Sore/Di luar jam/Belum diisi) dan ajakan "Pilih satu layanan untuk melihat pola per hari dan jam".
-  - Kalimat batasan interpretasi (lihat Requirement), termasuk catatan email = jadwal distribusi.
+  - Kalimat batasan interpretasi (lihat Requirement), termasuk periode berlaku jam email.
   - Layanan Call/semua: kartu "Durasi panggilan" Singkat/Sedang/Panjang + penanda "< 1 menit perlu dicek".
   - Layanan BKO: status "Layanan ini tidak punya data jam/durasi" — dibedakan tegas dari "belum diisi".
 - **Mode QA**: section jam tidak tampil; catatan singkat "Jam hanya tersedia di mode Agent".
@@ -243,6 +275,7 @@ Perubahan dikerjakan di `~/.hermes/skills/productivity/qa-rekap-md/scripts/`, de
 - **Baca sel mentah XLSX + format angkanya (numFmt)**, bukan teks gviz.
 - **Semantik kolom H ditentukan layanan baris** (hasil routing prefix), bukan nama sheet. Contoh: baris QADATA di sheet CALL berisi jam (`0.6118` = 14:41), bukan durasi.
 - Email, CSO, pencatatan, chat, SLIK → `jam_layanan`; call → `durasi_detik`.
+- **Email sebelum `validFrom`:** tidak ditulis (`NULL`), dicatat di laporan sebagai "arti lama", bukan sebagai sel tak terbaca. Hermes membaca `validFrom` dari satu konstanta yang sama nilainya dengan `packages/types` (dicek di laporan dry-run).
 - **Chat di luar jam operasional 07:45–16:50** (batas inklusif, konstanta di skrip Hermes), dibedakan menurut format tiket:
   - Tiket 13 digit `26\d{11}` → balasan komentar; jam disimpan apa adanya. Tidak dilaporkan sebagai salah.
   - Tiket lain (`L` + 10 digit, nomor HP, format lain) → bisa human error, chat masuk sebelum agent sempat logout, atau komentar. Tidak bisa dibedakan dari nilainya. Disimpan `NULL` + masuk laporan. **Tidak dikoreksi otomatis** (tidak menebak AM/PM).
@@ -300,6 +333,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - Batas durasi: 59 detik singkat + review, 299 singkat, 300 sedang, 899 sedang, 900 panjang.
   - `service_type` kosong → `hours = null`, `hoursByService` per layanan; data email + chat di jam yang sama tidak pernah dijumlah ke satu sel.
   - `hours.label` sama dengan `SIDAK_TIME_SOURCE`.
+  - Email: jam pada temuan dengan `tanggal_layanan` sebelum `validFrom` tidak masuk sel/kategori dan dihitung terpisah sebagai "tidak tersedia", bukan `missingTime`.
   - Weekday Senin=1.
   - `count_by=tiket`.
   - `is_countable=false` dan phantom dikeluarkan.
@@ -318,7 +352,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 
 - [ ] `ui-ux-pro-max` untuk section jam & durasi (acceptance criteria, state kosong/NA/missing, mobile).
 - [ ] RED: `sidak-heatmap-time.spec.ts`:
-  - Matriks + ringkasan persen tampil di mode Agent untuk satu layanan, dengan judul sesuai label layanan (email: "Jam email didistribusikan"; CSO: "Jam tiket dibuat").
+  - Matriks + ringkasan persen tampil di mode Agent untuk satu layanan, dengan judul sesuai label layanan (email: "Jam email dibalas"; CSO: "Jam tiket dibuat").
   - "Semua layanan": tidak ada matriks; tabel kategori per layanan + ajakan memilih layanan.
   - Tersembunyi di mode QA.
   - Kartu durasi tampil untuk Call.
@@ -338,12 +372,13 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 
 - [ ] Sync harian: tambah field, read-back; satu run dry-run lalu run nyata (izin Fajar).
 - [ ] Pastikan 20 tiket chat di luar 07:45–16:50 (daftar di laporan dry-run) sudah dibetulkan di sheet atau dikonfirmasi benar.
-- [ ] Backfill per bulan Jan–Nov (email, CSO, pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
+- [ ] E1 dijawab (tanggal pasti `validFrom` email); kalau beda dari 2026-09-01, ubah konstanta sebelum backfill email.
+- [ ] Backfill per bulan Jan–Nov (email hanya sejak `validFrom`, CSO, pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
 
 ## STOP conditions
 
-- Dry-run backfill menemukan baris yang tanggal kolom G-nya jelas tidak cocok dengan JAM kolom H (mis. email dibalas sebelum didistribusikan) → laporkan ke Fajar sebelum `--apply` bulan itu.
+- Dry-run backfill menemukan baris yang tanggal kolom G-nya jelas tidak cocok dengan JAM kolom H (mis. email bertanggal sesudah `validFrom` dengan pola jam distribusi yang jelas) → laporkan ke Fajar sebelum `--apply` bulan itu.
 - Tingkat terbaca kolom H untuk satu layanan < 90% pada dry-run → laporkan ke Fajar sebelum backfill layanan itu.
 - Kegagalan E2E yang sama setelah tiga ronde perbaikan → berhenti dan bawa bukti (`docs/AGENT_WORKFLOW.md` §7).
 - Penulisan ke Supabase prod (migration atau Hermes `--apply`) tanpa izin eksplisit Fajar untuk run itu → jangan dilakukan.
