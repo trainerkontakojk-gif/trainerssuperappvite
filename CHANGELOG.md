@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- docs(sidak): record that email JAM meaning differs per QA officer rather than by date, store no email time for existing data, and enable it only once QA standardizes on reply time in the heatmap time plan
 - docs(sidak): record in the heatmap time plan that email JAM switched from distribution time to reply time, and use only reply time from a validFrom date (provisionally 2026-09-01) so the two meanings never mix
 - fix(sidak): replace heatmap focus shadows with two-tone outlines and clarify theme defaults
 - fix(sidak): finish agent detail audit for color tokens, headings, dialog focus, and loading feedback
