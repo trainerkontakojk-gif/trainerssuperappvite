@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- docs(sidak): record the November full sync, the service-before-sample date order rule, and the January–October time backfill dry-run in the heatmap time plan
 - docs(sidak): record the Hermes daily sync carrying service time and call duration, and the scoped November 2026 fill, in the heatmap time plan
 - docs(sidak): record the production apply of the service time and call duration migration and close the heatmap time plan's release gate
 - feat(sidak): store optional service time and call duration on QA findings and display per-service time profiles in the Agent heatmap and input/edit/import flows

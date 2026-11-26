@@ -363,8 +363,16 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - Snapshot diff per id bersih (hanya dua kolom itu yang berubah), dry-run ulang `patch 0`, verifier jam/durasi `field mismatch 0`.
   - Sisa `GS-only 10` adalah insert chat yang sengaja ditahan.
   - Dokumentasi skill Hermes: `references/jam-durasi-kolom-h.md`.
+  - Lanjutan 2026-11-26, sync penuh November (izin Fajar): `inserted 10, patched 5`, snapshot diff bersih. Hasil akhir 559/559 baris, verifier BERSIH, dry-run ulang `insert 0 / patch 0`.
+- [x] Aturan urutan tanggal (keputusan Fajar 2026-11-26: tanggal layanan tidak pernah melebihi tanggal sampel QA).
+  - Aturan ada di `parse_waktu.order_service_dates()` dan dipakai `batch_sync_sidak.py`: G > F dengan selisih ≤ 31 hari ditukar; selisih > 31 hari ditahan dan tanggal SIDAK dipertahankan. Semua baris dilaporkan di `date_report` plan.
+  - November: 5 baris SIDAK ditukar.
+  - Januari–Oktober: ±222 baris SIDAK masih terbalik dan menunggu izin. `backfill-temuan-dates.py` belum memakai aturan ini.
 - [ ] Cek laporan dry-run: 20 tiket chat di luar 07:45–16:50 tercatat `NULL` + laporan sesuai aturan; Jul 106 (berisi tanggal) diteruskan ke QA untuk diisi jamnya. Keduanya tidak menahan `--apply`.
 - [ ] Backfill per bulan Jan–Nov (pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
+  - November selesai.
+  - Dry-run Jan–Okt 2026-11-26 (scoped `batch_sync_sidak.py`): 3.495 dari 3.912 baris SIDAK terisi; 70 NULL + laporan; 347 tidak cocok kunci plan, 181 di antaranya di Januari (ekor Desember dan anomali tahun). 1 id Januari menerima dua nilai, jadi ditahan.
+  - Menunggu izin apply.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
 
 ## STOP conditions
