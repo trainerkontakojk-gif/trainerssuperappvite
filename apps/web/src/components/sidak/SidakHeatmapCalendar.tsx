@@ -105,6 +105,16 @@ const LEVEL_TEXT: Record<IntensityBucket["level"], string> = {
   4: "text-white dark:text-rose-950",
 };
 
+/**
+ * Ring pilihan/fokus dua warna di dalam kotak: 2px warna teks di luar, 1px
+ * warna permukaan di dalamnya. Satu warna saja tenggelam di kotak tergelap
+ * (tema terang) atau paling terang (tema gelap); pasangan ini selalu kontras.
+ */
+const SELECTED_RING =
+  "[box-shadow:inset_0_0_0_2px_var(--color-foreground),inset_0_0_0_3px_var(--color-surface)]";
+const SELECTED_RING_FOCUS =
+  "focus-visible:[box-shadow:inset_0_0_0_2px_var(--color-foreground),inset_0_0_0_3px_var(--color-surface)]";
+
 /** Label baris: Senin di atas, hanya baris ganjil yang diberi teks. */
 const WEEKDAY_LABELS = ["Sen", "", "Rab", "", "Jum", "", "Min"];
 const MONTH_SHORT = [
@@ -360,7 +370,7 @@ export default function SidakHeatmapCalendar({
                 data-intensity={bucket.label}
                 data-date={iso}
                 style={{ gridRow: weekday + 2, gridColumn: column }}
-                className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? "ring-2 ring-inset ring-foreground" : ""}`}
+                className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow focus-visible:outline-none ${SELECTED_RING_FOCUS} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? SELECTED_RING : ""}`}
               >
                 {/* Angka tanggal; jumlah temuan ada di label dan kartu terpilih. */}
                 {showDates && (

@@ -277,6 +277,52 @@ test.describe("Halaman Heatmap", () => {
     expect(pageOverflow).toBeLessThanOrEqual(1);
   });
 
+  test("ring tanggal terpilih kontras di kotak terang dan tergelap, tema terang dan gelap", async ({ page }) => {
+    behaviour = {
+      kind: "data",
+      counts: { "2026-01-05": 1, "2026-01-06": 2, "2026-01-07": 3, "2026-01-08": 4, "2026-01-09": 12 },
+    };
+    await open(page, "trainer");
+
+    // WCAG 2.4.13/1.4.11: penanda fokus/pilihan minimal 3:1 terhadap isi kotak.
+    // Warna bayangan dan latar diubah ke sRGB lewat canvas agar oklch ikut terbaca.
+    const ringContrast = (name: string) =>
+      page.getByRole("button", { name }).evaluate((el) => {
+        const ctx = document.createElement("canvas").getContext("2d")!;
+        const rgb = (color: string) => {
+          ctx.clearRect(0, 0, 1, 1);
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 1, 1);
+          return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
+        };
+        const lum = (c: number[]) => {
+          const [r, g, b] = c.map((v) => {
+            const s = v / 255;
+            return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        const style = getComputedStyle(el);
+        const fill = lum(rgb(style.backgroundColor));
+        const rings = style.boxShadow.match(/(?:rgba?|oklch|oklab|lab|lch|color)\([^)]*\)/g) ?? [];
+        return Math.max(
+          0,
+          ...rings.map((c) => {
+            const l = lum(rgb(c));
+            return (Math.max(l, fill) + 0.05) / (Math.min(l, fill) + 0.05);
+          }),
+        );
+      });
+
+    for (const theme of ["light", "dark"] as const) {
+      await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
+      for (const name of ["09/01/2026: 12 temuan", "10/01/2026: 0 temuan"]) {
+        await page.getByRole("button", { name }).click();
+        expect(await ringContrast(name), `${theme} ${name}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
   test("teks kalender tidak di bawah batas 12px di kedua tampilan", async ({ page }) => {
     behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
     await open(page, "trainer");
