@@ -24,8 +24,8 @@ const ICONS = {
 const TONES: Record<string, { border: string; bg: string; text: string }> = {
   loading: { border: "border-primary/20", bg: "bg-primary/5", text: "text-primary" },
   error: { border: "border-destructive/25", bg: "bg-destructive/10", text: "text-destructive" },
-  warning: { border: "border-amber-500/25", bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400" },
-  success: { border: "border-emerald-500/25", bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400" },
+  warning: { border: "border-warning/25", bg: "bg-warning/10", text: "text-warning" },
+  success: { border: "border-success/25", bg: "bg-success/10", text: "text-success" },
   empty: { border: "border-border/50", bg: "bg-muted/35", text: "text-muted-foreground" },
 };
 

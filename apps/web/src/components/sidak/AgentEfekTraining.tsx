@@ -14,7 +14,7 @@ export default function AgentEfekTraining({
   if (!entries?.length) return null;
   return (
     <section aria-labelledby="agent-efek-training" className="py-2.5">
-      <h2 id="agent-efek-training" className="text-sm font-normal text-fg2">
+      <h2 id="agent-efek-training" className="font-display text-lg font-bold tracking-tight text-foreground">
         Ikut pelatihan
       </h2>
       <ul className="mt-1 space-y-0.5">

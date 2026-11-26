@@ -29,16 +29,16 @@ export function sidakScoreLabel(score: number): string {
 
 /** Kelas warna teks per status, aman untuk mode terang dan gelap. */
 export const SIDAK_SCORE_TEXT: Record<SidakScoreTone, string> = {
-  ok: "text-emerald-700 dark:text-emerald-400",
-  warn: "text-amber-700 dark:text-amber-400",
-  bad: "text-rose-700 dark:text-rose-400",
+  ok: "text-success",
+  warn: "text-warning",
+  bad: "text-destructive-text",
 };
 
 /** Kelas warna isian (batang grafik) per status. */
 export const SIDAK_SCORE_FILL: Record<SidakScoreTone, string> = {
-  ok: "bg-emerald-600 dark:bg-emerald-500",
-  warn: "bg-amber-500 dark:bg-amber-400",
-  bad: "bg-rose-600 dark:bg-rose-500",
+  ok: "bg-success",
+  warn: "bg-warning",
+  bad: "bg-destructive",
 };
 
 /**

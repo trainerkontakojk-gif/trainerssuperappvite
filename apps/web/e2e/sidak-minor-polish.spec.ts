@@ -131,13 +131,13 @@ test.describe("Sisa perapian SIDAK (hermetic)", () => {
 
     // Same tones as utils/sidakScoreStatus.ts: >=95 met, >=85 near, else attention.
     await expect(page.getByText("96.0%", { exact: true })).toHaveClass(
-      /text-emerald-700/,
+      /\btext-success\b/,
     );
     await expect(page.getByText("88.0%", { exact: true })).toHaveClass(
-      /text-amber-700/,
+      /\btext-warning\b/,
     );
     await expect(page.getByText("72.0%", { exact: true })).toHaveClass(
-      /text-rose-700/,
+      /\btext-destructive-text\b/,
     );
     expectHermetic(audit);
   });

@@ -59,15 +59,19 @@ Aplikasi memiliki mode _Dark_ (sebagai _default_) dan _Light_. Gunakan variabel 
 --inv-bg: #fafafa;
 --inv-fg: #0a0a0a;
 
-/* Status (dipetakan ke Tailwind `success` / `warning`; merah memakai `destructive`) */
+/* Status (dipetakan ke utilitas Tailwind dengan nama yang sama) */
 --success: #047857; /* terang — gelap: #34d399 */
 --warning: #b45309; /* terang — gelap: #fbbf24 */
+--info: #1d4ed8; /* terang — gelap: #93c5fd */
+--destructive-text: #be123c; /* terang — gelap: #fb7185; teks di permukaan netral */
 ```
 
 > **Aturan Implementasi CSS:**
 > Pastikan selektor kelas `.dark` diaplikasikan dengan benar agar komponen anak mewarisi variabel _dark mode_ (contoh: `.dark .my-component { ... }`).
 >
 > Tema punya tiga preferensi: ikut sistem (default, tanpa nilai di `localStorage`), atau override `light`/`dark` yang disimpan di key `theme`. Kelas `.dark` dan `<meta name="color-scheme">` diterapkan lebih dulu oleh `apps/web/public/theme-init.js`, lalu dikelola `useThemeMode`. `index.css` memetakan isi meta itu ke properti CSS `color-scheme`, sehingga kontrol bawaan browser (scrollbar, input, autofill) ikut tema.
+
+Gunakan `destructive` untuk isian aksi atau penanda, dan `destructive-foreground` untuk teks di atas isian solid tersebut. Untuk teks merah di permukaan netral, gunakan `destructive-text`. Tingkat intensitas kalender SIDAK memakai pasangan token `--sidak-heatmap-*` di `apps/web/src/index.css`; kotak dan legenda berbagi token latar yang sama.
 
 ### Aturan Warna Tambahan
 
@@ -206,6 +210,9 @@ Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang 
 
 - Navigasi `Ringkasan`, `Tren`, `Temuan`, `Heatmap`, dan `Simulasi` harus tampak sebagai kontrol interaktif, bukan teks navigasi biasa: tampilkan state aktif yang jelas serta state hover dan focus yang terlihat. Panah kiri/kanan dan Home/End memindahkan fokus; Enter/Spasi memilih tab dan memperbarui alamat. Saat masuk kembali dengan keyboard, fokus mulai dari tab terpilih. Garis bawah tab terpilih tetap terlihat dalam forced colors.
 - Pada tab Tren dan Simulasi, area gulir tabel dapat dicapai dengan Tab dan digulir dengan panah. Grafik Tren punya nama dan deskripsi total bulanan untuk pembaca layar; rincian parameter tersedia di tabel.
+- Nama agen adalah `h1`. Judul bagian `h2` memakai `font-display` dan `text-lg`. Di tab Temuan, bulan, tiket, dan temuan berturut-turut memakai `h3`, `h4`, dan `h5`.
+- Heatmap mengumumkan tanggal terpilih dan jumlahnya tanpa memindahkan fokus. Saat satuan berubah, tampilkan indikator muat dan tandai hasil lama sebagai belum diperbarui. Tombol `Coba lagi` di Quickview hanya memuat ulang peringkat dan forecast.
+- Di dialog edit temuan, satu input berlabel per tanggal berada dalam kelompok `Tanggal temuan`. Base UI mengatur fokus dialog dan mengembalikannya ke pemicu ketika ditutup.
 - Pertahankan lebar tiap tab sesuai labelnya. Strip tab bergulir horizontal dengan scrollbar native; fade melengkapi petunjuk di sisi yang masih bisa digulir. Saat tab dipilih atau dibuka lewat alamat, geser strip untuk menampilkan tab aktif tanpa menggulir halaman.
 - Pada perangkat dengan pointer sentuh, target aksi profil, filter, tab, toggle satuan Heatmap, dan batang bulan minimal 44×44 CSS px. Jika batang bulan tidak muat, area grafik bisa difokuskan dan digulir dengan panah; garis target tetap sejajar dengan batang.
 - Susun Ringkasan dengan hierarki eksplisit: judul dan deskripsi, Quickview performa, lalu nilai skor per bulan. Gunakan divider dan jarak section untuk mengelompokkan konten; hindari badge dekoratif atau kartu tambahan yang tidak menambah makna.

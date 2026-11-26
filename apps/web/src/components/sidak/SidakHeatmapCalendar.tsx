@@ -95,24 +95,22 @@ function bucketForCount(count: number, buckets: readonly IntensityBucket[]) {
   );
 }
 
-/** Skala warna per tingkat intensitas (rose, terbalik di tema gelap). */
+/** Skala intensitas yang sama untuk legenda dan kotak kalender. */
 const LEVEL_CLASS: Record<IntensityBucket["level"], string> = {
-  // Tema gelap: --muted sama dengan --surface kartu, jadi kotak kosong memakai
-  // --border agar tetap terlihat sebagai kotak abu-abu.
-  0: "bg-muted dark:bg-border",
-  1: "bg-rose-200 dark:bg-rose-950",
-  2: "bg-rose-400 dark:bg-rose-800",
-  3: "bg-rose-600 dark:bg-rose-600",
-  4: "bg-rose-800 dark:bg-rose-400",
+  0: "bg-[var(--sidak-heatmap-0)]",
+  1: "bg-[var(--sidak-heatmap-1)]",
+  2: "bg-[var(--sidak-heatmap-2)]",
+  3: "bg-[var(--sidak-heatmap-3)]",
+  4: "bg-[var(--sidak-heatmap-4)]",
 };
 
 /** Warna angka tanggal di atas tiap tingkat, kontras di tema terang dan gelap. */
 const LEVEL_TEXT: Record<IntensityBucket["level"], string> = {
   0: "text-muted-foreground",
-  1: "text-rose-900 dark:text-rose-100",
-  2: "text-rose-950 dark:text-rose-50",
-  3: "text-white",
-  4: "text-white dark:text-rose-950",
+  1: "text-[color:var(--sidak-heatmap-1-text)]",
+  2: "text-[color:var(--sidak-heatmap-2-text)]",
+  3: "text-[color:var(--sidak-heatmap-3-text)]",
+  4: "text-[color:var(--sidak-heatmap-4-text)]",
 };
 
 /**
@@ -363,7 +361,7 @@ export default function SidakHeatmapCalendar({
   return (
     <section className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h3 className="text-sm font-semibold text-foreground">
+        <h3 className="font-display text-base font-bold tracking-tight text-foreground">
           Kalender {year}
         </h3>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">

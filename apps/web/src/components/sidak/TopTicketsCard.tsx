@@ -32,7 +32,7 @@ export default function TopTicketsCard({ tickets, onTicketSelect }: Props) {
       className="flex min-w-0 flex-col"
     >
       <div className="flex items-baseline justify-between gap-3 pb-2">
-        <h4 className="font-outfit text-base font-semibold tracking-tight text-foreground">
+        <h4 className="font-display text-base font-semibold tracking-tight text-foreground">
           Tiket pengurang skor terbesar
         </h4>
         <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">

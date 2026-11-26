@@ -359,7 +359,7 @@ test.describe("Edit tanggal di detail agent (EditTemuanModal)", () => {
     return a;
   }
 
-  test("modal menampilkan tanggal tersimpan dan 'Belum diisi' saat kosong", async ({ page }) => {
+  test("modal menampilkan tanggal pada kontrol dan 'Belum diisi' saat kosong", async ({ page }) => {
     const a = await openModal(page, {
       row: { tanggal_layanan: "2026-01-05", tanggal_sampel: null },
     });
@@ -372,9 +372,9 @@ test.describe("Edit tanggal di detail agent (EditTemuanModal)", () => {
     // tanggal layanan dan bukan string Odd.
     await expect(sampel).toHaveValue("");
 
-    // Keterangan di bawah editor menyatakan kondisi sebenarnya per tanggal.
-    await expect(page.getByText("2026-01-05").first()).toBeVisible();
-    await expect(page.getByText("Belum diisi").first()).toBeVisible();
+    // Tanggal tersimpan hanya muncul pada kontrol; tanggal kosong punya deskripsi.
+    await expect(page.getByRole("dialog").getByText("2026-01-05", { exact: true })).toHaveCount(0);
+    await expect(sampel).toHaveAccessibleDescription("Belum diisi");
 
     expect(a.blockedExternal).toEqual([]);
     expect(a.blockedApi).toEqual([]);

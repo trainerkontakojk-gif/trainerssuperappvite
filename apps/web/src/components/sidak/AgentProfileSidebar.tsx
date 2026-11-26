@@ -204,13 +204,13 @@ export default function AgentProfileSidebar({
               className="rounded-2xl object-cover"
             />
           ) : null}
-          <AvatarFallback className="rounded-2xl bg-muted font-outfit text-3xl font-bold tracking-tight text-muted-foreground lg:text-5xl">
+          <AvatarFallback className="rounded-2xl bg-muted font-display text-3xl font-bold tracking-tight text-muted-foreground lg:text-5xl">
             {initialsOf(nama)}
           </AvatarFallback>
         </Avatar>
 
         <div className="min-w-0 flex-1">
-          <h1 className="break-words font-outfit text-xl font-bold leading-tight tracking-tight text-balance text-foreground lg:text-2xl">
+          <h1 className="break-words font-display text-xl font-bold leading-tight tracking-tight text-balance text-foreground lg:text-2xl">
             {nama}
           </h1>
           <ul

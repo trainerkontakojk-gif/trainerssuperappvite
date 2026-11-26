@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,24 +29,34 @@ interface Props {
   onFormChange: (field: keyof EditForm, value: any) => void;
   onSave: () => void;
   onClose: () => void;
-  /** Tanggal tersimpan pada baris ini; `null` berarti belum diisi. */
-  tanggalLayanan: string | null;
-  tanggalSampel: string | null;
 }
 
 const NILAI_OPTIONS = [
-  { value: 3, label: "Sesuai", desc: "Memenuhi ekspektasi", color: "emerald" },
-  { value: 2, label: "Perbaikan", desc: "Perbaikan kecil", color: "blue" },
-  { value: 1, label: "Tidak Sesuai", desc: "Perbaikan besar", color: "amber" },
-  { value: 0, label: "Kritis", desc: "Kegagalan kritis", color: "rose" },
+  {
+    value: 3,
+    label: "Sesuai",
+    desc: "Memenuhi ekspektasi",
+    activeClass: "border-success bg-chart-green/5 text-success",
+  },
+  {
+    value: 2,
+    label: "Perbaikan",
+    desc: "Perbaikan kecil",
+    activeClass: "border-info bg-info/5 text-info",
+  },
+  {
+    value: 1,
+    label: "Tidak Sesuai",
+    desc: "Perbaikan besar",
+    activeClass: "border-warning bg-surface text-warning dark:bg-warning/10",
+  },
+  {
+    value: 0,
+    label: "Kritis",
+    desc: "Kegagalan kritis",
+    activeClass: "border-destructive-text bg-destructive/5 text-destructive-text",
+  },
 ];
-
-const ACTIVE_VALUE_CLASSES: Record<string, string> = {
-  emerald: "border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  blue: "border-blue-500/40 bg-blue-500/15 text-blue-700 dark:text-blue-300",
-  amber: "border-amber-500/40 bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  rose: "border-rose-500/40 bg-rose-500/15 text-rose-700 dark:text-rose-300",
-};
 
 export default function EditTemuanModal({
   open,
@@ -56,41 +66,8 @@ export default function EditTemuanModal({
   onFormChange,
   onSave,
   onClose,
-  tanggalLayanan,
-  tanggalSampel,
 }: Props) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
-    const frame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled])',
-        ),
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("keydown", handleKeyDown);
-      previousFocus?.focus();
-    };
-  }, [open]);
 
   return (
     <Dialog
@@ -100,16 +77,14 @@ export default function EditTemuanModal({
       }}
     >
       <DialogContent
-        ref={dialogRef}
+        initialFocus={closeButtonRef}
         showCloseButton={false}
-        aria-labelledby="edit-temuan-title"
-        className="max-h-[calc(100vh-2rem)] max-w-2xl gap-0 overflow-y-auto bg-surface p-0"
+        className="max-h-[calc(100vh-2rem)] gap-0 overflow-y-auto bg-surface p-0 sm:max-w-2xl"
       >
         <DialogHeader className="relative border-b border-border p-5 pr-16">
           <p className="text-xs font-semibold text-muted-foreground">Edit temuan</p>
           <DialogTitle
-            id="edit-temuan-title"
-            className="mt-0.5 break-words font-outfit text-lg font-bold leading-snug"
+            className="mt-0.5 break-words font-display text-lg font-bold leading-snug"
           >
             {indicatorName}
           </DialogTitle>
@@ -145,7 +120,7 @@ export default function EditTemuanModal({
                     aria-pressed={isActive}
                     className={`h-auto min-h-14 flex-col gap-0.5 rounded-lg p-2 ${
                       isActive
-                        ? ACTIVE_VALUE_CLASSES[option.color]
+                        ? `${option.activeClass} hover:bg-surface`
                         : "text-muted-foreground"
                     }`}
                   >
@@ -182,55 +157,37 @@ export default function EditTemuanModal({
             />
           </div>
 
-          {/*
-            Tanggal ditampilkan terpisah dari input di bawah supaya "belum diisi"
-            terlihat jelas tanpa harus membuka editor. Edit hanya berlaku pada
-            baris temuan ini.
-          */}
-          <div className="flex flex-col gap-2">
-            <Label>Tanggal temuan</Label>
-            <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <div className="rounded-lg border border-border px-3 py-2">
-                <dt className="text-xs text-muted-foreground">Tanggal layanan</dt>
-                <dd className="text-sm text-foreground">
-                  {tanggalLayanan ?? "Belum diisi"}
-                </dd>
-              </div>
-              <div className="rounded-lg border border-border px-3 py-2">
-                <dt className="text-xs text-muted-foreground">Tanggal sampel</dt>
-                <dd className="text-sm text-foreground">
-                  {tanggalSampel ?? "Belum diisi"}
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="edit-temuan-tanggal-layanan">
-                Tanggal layanan
-              </Label>
-              <Input
-                id="edit-temuan-tanggal-layanan"
-                type="date"
-                value={form.tanggal_layanan ?? ""}
-                onChange={(event) =>
-                  onFormChange("tanggal_layanan", event.target.value)
-                }
-              />
+          <fieldset className="min-w-0">
+            <legend className="mb-2 text-sm font-semibold text-foreground">
+              Tanggal temuan
+            </legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                ["tanggal_layanan", "Tanggal layanan"],
+                ["tanggal_sampel", "Tanggal sampel"],
+              ] as const).map(([field, label]) => {
+                const id = `edit-temuan-${field}`;
+                const empty = !form[field];
+                return (
+                  <div key={field} className="flex min-w-0 flex-col gap-2">
+                    <Label htmlFor={id}>{label}</Label>
+                    <Input
+                      id={id}
+                      type="date"
+                      value={form[field] ?? ""}
+                      aria-describedby={empty ? `${id}-empty` : undefined}
+                      onChange={(event) => onFormChange(field, event.target.value)}
+                    />
+                    {empty ? (
+                      <p id={`${id}-empty`} className="text-xs text-muted-foreground">
+                        Belum diisi
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="edit-temuan-tanggal-sampel">Tanggal sampel</Label>
-              <Input
-                id="edit-temuan-tanggal-sampel"
-                type="date"
-                value={form.tanggal_sampel ?? ""}
-                onChange={(event) =>
-                  onFormChange("tanggal_sampel", event.target.value)
-                }
-              />
-            </div>
-          </div>
+          </fieldset>
         </div>
 
         <DialogFooter className="mx-0 mb-0 rounded-none border-t border-border bg-muted/10 p-5">

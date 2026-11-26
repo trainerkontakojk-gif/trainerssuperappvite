@@ -4,7 +4,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -65,10 +64,10 @@ function formatDeltaPercent(value: number | null): string {
 
 function deltaTone(value: number | null): string {
   // Positive delta means the agent has MORE findings than the average
-  // (worse quality). We surface it as a muted amber/rose neutral tone.
+  // (worse quality), so use the attention tone.
   if (value === null) return "text-muted-foreground";
-  if (value > 0) return "text-rose-700 dark:text-rose-400";
-  if (value < 0) return "text-emerald-700 dark:text-emerald-400";
+  if (value > 0) return "text-destructive-text";
+  if (value < 0) return "text-success";
   return "text-muted-foreground";
 }
 
@@ -118,9 +117,9 @@ export default function AgentComparisonTable({
       }
     >
       <CardHeader className="min-w-0 border-b border-border px-5 py-4">
-        <CardTitle className="font-outfit text-lg font-bold tracking-tight text-foreground">
+        <h3 className="font-display text-base font-bold tracking-tight text-foreground">
           Perbandingan Temuan
-        </CardTitle>
+        </h3>
         <CardDescription className="mt-1 break-words text-sm text-muted-foreground">
           {scopeLine}
         </CardDescription>

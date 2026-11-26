@@ -151,6 +151,28 @@ test.describe("Detail agent — quickview performa", () => {
     await expect(page.getByText("Network failure")).toHaveCount(0);
   });
 
+  test("audit #15: Coba lagi hanya memuat ulang Quickview dan memulihkan isinya", async ({ page }) => {
+    const audit = await open(page, { quickviewFailStatus: 500 });
+    const aside = profile(page);
+    await expect(aside.getByText("Peringkat dan forecast belum dapat dimuat")).toBeVisible();
+    const detailsBefore = audit.detailQueries?.length;
+    let retries = 0;
+    await page.route((url) => url.pathname.endsWith("/quickview"), async (route) => {
+      retries += 1;
+      await route.fulfill({ json: { success: true, data: richQuickviewPayload() } });
+    });
+
+    const retry = aside.getByRole("button", { name: "Coba lagi", exact: true });
+    await expect(retry).toBeVisible();
+    await retry.focus();
+    await page.keyboard.press("Enter");
+    await expect(aside.getByRole("group", { name: "Tim Gabungan: peringkat 7" })).toBeVisible();
+    await expect(aside.getByRole("region", { name: /Performa tahun 2026/ })).toBeFocused();
+    await expect(retry).toHaveCount(0);
+    expect(retries).toBe(1);
+    expect(audit.detailQueries?.length).toBe(detailsBefore);
+  });
+
   test("cohort tanpa pembanding vs agen di luar peringkat", async ({
     page,
   }) => {

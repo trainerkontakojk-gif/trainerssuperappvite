@@ -66,12 +66,12 @@ export default function AgentAuditDossier({
     >
       <div className="flex flex-col gap-4 border-b border-border px-4 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-5">
         <div className="flex flex-col gap-1">
-          <h3 className="font-outfit text-base font-semibold tracking-tight text-foreground">
+          <h3 className="font-display text-base font-semibold tracking-tight text-foreground">
             {title}
           </h3>
           <div className="flex items-baseline gap-2">
             <span
-              className={`font-outfit text-4xl font-bold leading-none tracking-tight tabular-nums ${colors.text}`}
+              className={`font-display text-4xl font-bold leading-none tracking-tight tabular-nums ${colors.text}`}
             >
               {finalScore.toFixed(1)}
             </span>

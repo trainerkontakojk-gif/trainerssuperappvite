@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import { LoaderCircle } from "lucide-react";
 import { getErrorMessage } from "../../lib/api";
 import { fetchSidakHeatmap } from "../../lib/sidak-heatmap-client";
 import SidakHeatmapCalendar, {
@@ -18,6 +27,33 @@ import {
   type SidakHeatmapTicketRef,
   type ServiceType,
 } from "@trainers/types";
+
+type HeatmapRequest =
+  | { status: "loading"; data: SidakHeatmapResponse | null }
+  | { status: "ready"; data: SidakHeatmapResponse }
+  | { status: "error"; error: string };
+
+type HeatmapAction =
+  | { type: "load" }
+  | { type: "loaded"; data: SidakHeatmapResponse }
+  | { type: "failed"; error: string };
+
+function heatmapRequestReducer(
+  state: HeatmapRequest,
+  action: HeatmapAction,
+): HeatmapRequest {
+  switch (action.type) {
+    case "load":
+      return {
+        status: "loading",
+        data: state.status === "error" ? null : state.data,
+      };
+    case "loaded":
+      return { status: "ready", data: action.data };
+    case "failed":
+      return { status: "error", error: action.error };
+  }
+}
 
 /**
  * Tab Heatmap di detail agent.
@@ -41,11 +77,15 @@ export default function SidakAgentHeatmapPanel({
   onOpenTicket?: (ticket: SidakHeatmapTicketRef) => void;
 }) {
   const [countBy, setCountBy] = useState<SidakHeatmapCountBy>("parameter");
-  const [data, setData] = useState<SidakHeatmapResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [request, dispatch] = useReducer(heatmapRequestReducer, {
+    status: "loading",
+    data: null,
+  });
   const [selected, setSelected] = useState<HeatmapDay | null>(null);
   const generationRef = useRef(0);
+  const headingId = useId();
+  const loading = request.status === "loading";
+  const data = request.status === "error" ? null : request.data;
 
   const resolvedService: ServiceType | undefined = VALID_SERVICE_TYPES.includes(
     serviceType as ServiceType,
@@ -55,8 +95,7 @@ export default function SidakAgentHeatmapPanel({
 
   const load = useCallback(async () => {
     const generation = ++generationRef.current;
-    setLoading(true);
-    setError(null);
+    dispatch({ type: "load" });
     try {
       const res = await fetchSidakHeatmap({
         mode: "agent",
@@ -65,13 +104,14 @@ export default function SidakAgentHeatmapPanel({
         serviceType: resolvedService,
         agentId,
       });
-      if (generation === generationRef.current) setData(res);
+      if (generation === generationRef.current) dispatch({ type: "loaded", data: res });
     } catch (e) {
       if (generation === generationRef.current) {
-        setError(getErrorMessage(e, "Heatmap belum dapat dimuat. Coba lagi beberapa saat."));
+        dispatch({
+          type: "failed",
+          error: getErrorMessage(e, "Heatmap belum dapat dimuat. Coba lagi beberapa saat."),
+        });
       }
-    } finally {
-      if (generation === generationRef.current) setLoading(false);
     }
   }, [agentId, year, countBy, resolvedService]);
 
@@ -99,16 +139,27 @@ export default function SidakAgentHeatmapPanel({
   }, [agentId, year, countBy, resolvedService]);
 
   return (
-    <div className="flex min-w-0 flex-col gap-5">
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-outfit text-xl font-bold tracking-tight text-foreground">
+          <h2 id={headingId} className="font-display text-lg font-bold tracking-tight text-foreground">
             Heatmap temuan
           </h2>
           <p className="mt-1 max-w-[75ch] text-sm text-muted-foreground">
             Jumlah temuan agen ini per tanggal layanan, untuk tahun dan
             layanan yang dipilih. Angka menunjukkan banyaknya temuan, bukan
             tingkat kesalahan.
+          </p>
+          <p role="status" className={loading ? "mt-2 flex items-start gap-2 text-sm text-foreground" : "sr-only"}>
+            {loading ? (
+              <>
+                <LoaderCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 motion-safe:animate-spin" />
+                <span>
+                  <span className="font-medium">Memuat heatmap per {countBy}…</span>
+                  {data ? " Kalender masih menampilkan hasil sebelumnya." : null}
+                </span>
+              </>
+            ) : data ? `Heatmap per ${data.countBy} sudah dimuat.` : null}
           </p>
         </div>
         <fieldset className="shrink-0">
@@ -140,15 +191,15 @@ export default function SidakAgentHeatmapPanel({
         </fieldset>
       </div>
 
-      {error && (
+      {request.status === "error" && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 p-4"
         >
-          <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">
+          <p className="text-sm font-semibold text-destructive-text">
             Gagal memuat heatmap
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{request.error}</p>
           <button
             type="button"
             onClick={() => void load()}
@@ -160,14 +211,15 @@ export default function SidakAgentHeatmapPanel({
       )}
 
       {loading && !data && (
-        <div aria-busy="true" aria-live="polite" data-testid="agent-heatmap-loading">
-          <p className="text-sm text-muted-foreground">Memuat heatmap…</p>
-          <div className="mt-2 h-40 animate-pulse rounded-xl bg-muted/40" />
-        </div>
+        <div aria-hidden="true" className="h-40 rounded-xl bg-muted/40 motion-safe:animate-pulse" />
       )}
 
-      {!error && data && (
-        <div className="flex min-w-0 flex-col gap-4">
+      {data && (
+        <div
+          inert={loading}
+          aria-hidden={loading || undefined}
+          className="flex min-w-0 flex-col gap-4"
+        >
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(16rem,1fr)] lg:items-start">
             <div className="flex min-w-0 flex-col gap-4">
               <div data-testid="agent-heatmap-calendar" className="min-w-0">
@@ -186,44 +238,46 @@ export default function SidakAgentHeatmapPanel({
               className="flex min-w-0 flex-col gap-3"
             >
               <div className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4">
-                <p className="text-xs text-muted-foreground">Tanggal dipilih</p>
-                {selected ? (
-                  <>
-                    <p
-                      className="font-display text-base font-bold text-foreground"
-                      data-testid="agent-heatmap-selected-day"
-                    >
-                      {formatInsightDateWithWeekday(selected.date)}
+                <div role="status" aria-atomic="true" className="flex flex-col gap-1">
+                  <p className="text-xs text-muted-foreground">Tanggal dipilih</p>
+                  {selected ? (
+                    <>
+                      <p
+                        className="font-display text-base font-bold text-foreground"
+                        data-testid="agent-heatmap-selected-day"
+                      >
+                        {formatInsightDateWithWeekday(selected.date)}
+                      </p>
+                      <p className="text-sm tabular-nums text-fg2">
+                        {selected.count} temuan
+                        {selectedTickets.length > 0 ? (
+                          <>
+                            {" · tiket "}
+                            <span className="font-mono">
+                              {selectedTickets.map((t) => t.noTiket).join(", ")}
+                            </span>
+                          </>
+                        ) : null}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Pilih tanggal di kalender untuk melihat jumlah temuannya.
                     </p>
-                    <p className="text-sm tabular-nums text-fg2">
-                      {selected.count} temuan
-                      {selectedTickets.length > 0 ? (
-                        <>
-                          {" · tiket "}
-                          <span className="font-mono">
-                            {selectedTickets.map((t) => t.noTiket).join(", ")}
-                          </span>
-                        </>
-                      ) : null}
-                    </p>
-                    {onOpenTicket
-                      ? selectedTickets.map((ticket) => (
-                          <button
-                            key={`${ticket.noTiket}-${ticket.year}-${ticket.month}`}
-                            type="button"
-                            onClick={() => onOpenTicket(ticket)}
-                            className="inline-flex min-h-[44px] items-center self-start text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                          >
-                            Buka {ticket.noTiket} di tab Temuan
-                          </button>
-                        ))
-                      : null}
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Pilih tanggal di kalender untuk melihat jumlah temuannya.
-                  </p>
-                )}
+                  )}
+                </div>
+                {onOpenTicket
+                  ? selectedTickets.map((ticket) => (
+                      <button
+                        key={`${ticket.noTiket}-${ticket.year}-${ticket.month}`}
+                        type="button"
+                        onClick={() => onOpenTicket(ticket)}
+                        className="inline-flex min-h-[44px] items-center self-start text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      >
+                        Buka {ticket.noTiket} di tab Temuan
+                      </button>
+                    ))
+                  : null}
               </div>
 
               <dl className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-border [&>div]:bg-surface gap-px">
@@ -275,9 +329,9 @@ export default function SidakAgentHeatmapPanel({
             </aside>
           </div>
 
-          <SidakHeatmapInsights days={data.days} />
+          <SidakHeatmapInsights days={data.days} headingLevel={3} />
         </div>
       )}
-    </div>
+    </section>
   );
 }

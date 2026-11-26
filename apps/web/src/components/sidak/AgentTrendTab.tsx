@@ -6,7 +6,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import ParamTrendChart from "./ParamTrendChart";
 import QaStatePanel from "./QaStatePanel";
@@ -113,9 +112,9 @@ export default function AgentTrendTab({
       <CardHeader className="border-b border-border p-4 sm:p-6">
         <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
           <div>
-            <CardTitle className="font-outfit text-lg font-bold tracking-tight">
+            <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
               Tren temuan per bulan
-            </CardTitle>
+            </h2>
             <CardDescription className="mt-1 text-sm text-muted-foreground">
               Jumlah temuan {trendRangeLabel ? `${trendRangeLabel} ` : ""}
               ({labels.length} bulan berdata). Pilih satu parameter untuk

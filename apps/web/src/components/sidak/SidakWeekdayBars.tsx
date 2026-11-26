@@ -118,7 +118,7 @@ export function SidakWeekdayPattern({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h3
           id="sidak-weekday-pattern-title"
-          className="text-sm font-semibold text-foreground"
+          className="font-display text-base font-bold tracking-tight text-foreground"
         >
           Temuan per hari dalam minggu
         </h3>

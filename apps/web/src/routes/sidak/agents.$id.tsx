@@ -253,7 +253,7 @@ export default function SidakAgentDetailPage() {
             >
               <AlertTriangle className="size-7" aria-hidden="true" />
             </EmptyMedia>
-            <EmptyTitle className="font-outfit text-xl font-bold">
+            <EmptyTitle className="font-display text-xl font-bold">
               Agen tidak ditemukan
             </EmptyTitle>
             <EmptyDescription>
@@ -359,7 +359,7 @@ export default function SidakAgentDetailPage() {
             latestSummary ? (
               <section aria-label="Skor terbaru" className="py-2.5">
                 <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="min-w-0 text-sm font-normal text-fg2">
+                  <h2 className="min-w-0 font-display text-lg font-bold tracking-tight text-foreground">
                     Skor {monthsFull[latestSummary.month - 1]}{" "}
                     {latestSummary.year}
                   </h2>
@@ -395,6 +395,7 @@ export default function SidakAgentDetailPage() {
                 loading={quickviewLoading}
                 error={quickviewError}
                 scopeLabel={quickviewScopeLabel}
+                onRetry={refetchQuickview}
               />
               <AgentEfekTraining entries={quickviewData?.efekTraining} />
             </>
@@ -473,7 +474,7 @@ export default function SidakAgentDetailPage() {
                       <div className="flex flex-col gap-0.5">
                         <h2
                           id="agent-monthly-score-heading"
-                          className="font-outfit text-lg font-bold tracking-tight text-foreground"
+                          className="font-display text-lg font-bold tracking-tight text-foreground"
                         >
                           Skor per bulan
                         </h2>
@@ -524,7 +525,7 @@ export default function SidakAgentDetailPage() {
             temuan: (
               <div className="flex min-w-0 flex-col gap-5">
                 <div className="flex flex-col gap-0.5">
-                  <h2 className="font-outfit text-lg font-bold tracking-tight text-foreground">
+                  <h2 className="font-display text-lg font-bold tracking-tight text-foreground">
                     Temuan audit
                   </h2>
                   <p className="text-sm text-muted-foreground">
@@ -569,8 +570,6 @@ export default function SidakAgentDetailPage() {
         }
         onSave={handleEditSave}
         onClose={() => setEditingTemuan(null)}
-        tanggalLayanan={editingTemuan?.tanggal_layanan ?? null}
-        tanggalSampel={editingTemuan?.tanggal_sampel ?? null}
       />
     </div>
   );

@@ -5,13 +5,13 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type {
   SidakAgentForecastQuickview,
   SidakAgentQuickviewResponse,
   SidakAgentRankQuickview,
 } from "@trainers/types";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** Arah peringkat detail agen sengaja kebalikan halaman Ranking. */
@@ -40,11 +40,11 @@ const FORECAST_PRESENTATION: Record<
 > = {
   improving: {
     Icon: TrendingDown,
-    className: "text-emerald-700 dark:text-emerald-400",
+    className: "text-success",
   },
   declining: {
     Icon: TrendingUp,
-    className: "text-rose-700 dark:text-rose-400",
+    className: "text-destructive-text",
   },
   stable: {
     Icon: Minus,
@@ -52,7 +52,7 @@ const FORECAST_PRESENTATION: Record<
   },
   insufficient_data: {
     Icon: ShieldAlert,
-    className: "text-amber-700 dark:text-amber-400",
+    className: "text-warning",
   },
 };
 
@@ -61,6 +61,7 @@ interface AgentPerformanceQuickviewProps {
   loading: boolean;
   error: string | null;
   scopeLabel?: string;
+  onRetry: () => void;
 }
 
 interface RankMetricProps {
@@ -177,66 +178,74 @@ export default function AgentPerformanceQuickview({
   loading,
   error,
   scopeLabel,
+  onRetry,
 }: AgentPerformanceQuickviewProps) {
-  if (loading && !data) {
-    return <QuickviewSkeleton />;
-  }
+  const sectionRef = useRef<HTMLElement>(null);
+  if (!data && !loading && !error) return null;
 
-  if (error && !data) {
-    return (
-      <Alert
-        role="status"
-        className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5"
-      >
-        <ShieldAlert
-          className="text-amber-700 dark:text-amber-400"
-          aria-hidden="true"
-        />
-        <AlertTitle className="text-sm font-medium text-foreground">
+  let content: ReactNode;
+  if (data) {
+    const sameScope =
+      data.combinedTeam?.scopeId !== null &&
+      data.combinedTeam?.scopeId !== undefined &&
+      data.combinedTeam.scopeId === data.leaderTeam?.scopeId;
+    content = (
+      <>
+        <div className="flex flex-col">
+          <RankMetric
+            label="Tim Gabungan"
+            rowLabel="Peringkat tim gabungan"
+            metric={data.combinedTeam}
+            className=""
+          />
+          <RankMetric
+            label="Tim Leader"
+            rowLabel={`Peringkat ${data.leaderTeam?.scopeLabel ?? "tim leader"}`}
+            metric={data.leaderTeam}
+            sameAsCombined={sameScope}
+            className=""
+          />
+          <ForecastMetric forecast={data.forecast} />
+        </div>
+        <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
+          {RANKING_BASIS_NOTE} Bila semua angka kinerja sama, nama A–Z lalu ID agen
+          menentukan urutan; nama bukan ukuran kinerja.
+          {scopeLabel ? ` Cakupan ${scopeLabel}.` : null}
+        </p>
+      </>
+    );
+  } else if (loading) {
+    content = <QuickviewSkeleton />;
+  } else {
+    content = (
+      <div className="grid grid-cols-[auto_1fr] items-start gap-x-2 gap-y-2 rounded-xl border border-border bg-card p-3">
+        <ShieldAlert className="mt-0.5 size-4 text-warning" aria-hidden="true" />
+        <p role="status" className="text-sm font-medium text-foreground">
           Peringkat dan forecast belum dapat dimuat
-        </AlertTitle>
-        <AlertDescription className="mt-1 text-xs">
-          Tekan Muat ulang di atas untuk mencoba lagi.
-        </AlertDescription>
-      </Alert>
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          className="col-start-2 min-h-11 justify-self-start"
+          onClick={() => {
+            sectionRef.current?.focus({ preventScroll: true });
+            onRetry();
+          }}
+        >
+          Coba lagi
+        </Button>
+      </div>
     );
   }
 
-  if (!data) {
-    return null;
-  }
-
-  const sameScope =
-    data.combinedTeam?.scopeId !== null &&
-    data.combinedTeam?.scopeId !== undefined &&
-    data.combinedTeam.scopeId === data.leaderTeam?.scopeId;
-
   return (
     <section
+      ref={sectionRef}
+      tabIndex={-1}
       aria-label={scopeLabel ? `Performa ${scopeLabel}` : "Performa agen"}
-      className="flex min-w-0 flex-col"
+      className="flex min-w-0 flex-col focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
-      <div className="flex flex-col">
-        <RankMetric
-          label="Tim Gabungan"
-          rowLabel="Peringkat tim gabungan"
-          metric={data.combinedTeam}
-          className=""
-        />
-        <RankMetric
-          label="Tim Leader"
-          rowLabel={`Peringkat ${data.leaderTeam?.scopeLabel ?? "tim leader"}`}
-          metric={data.leaderTeam}
-          sameAsCombined={sameScope}
-          className=""
-        />
-        <ForecastMetric forecast={data.forecast} />
-      </div>
-      <p className="pt-1 text-xs leading-relaxed text-muted-foreground">
-        {RANKING_BASIS_NOTE} Bila semua angka kinerja sama, nama A–Z lalu ID agen
-        menentukan urutan; nama bukan ukuran kinerja.
-        {scopeLabel ? ` Cakupan ${scopeLabel}.` : null}
-      </p>
+      {content}
     </section>
   );
 }

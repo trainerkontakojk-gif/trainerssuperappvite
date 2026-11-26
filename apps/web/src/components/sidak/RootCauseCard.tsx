@@ -47,7 +47,7 @@ export default function RootCauseCard({
     <section aria-label="Akar masalah" className="flex min-w-0 flex-col">
       <div className="flex items-baseline justify-between gap-3 pb-2">
         <div className="min-w-0">
-          <h4 className="font-outfit text-base font-semibold tracking-tight text-foreground">
+          <h4 className="font-display text-base font-semibold tracking-tight text-foreground">
             Akar masalah
           </h4>
           <p className="text-xs text-muted-foreground">
@@ -93,7 +93,7 @@ export default function RootCauseCard({
                 </span>
               ) : null}
             </div>
-            <h5 className="mt-2 break-words text-sm font-semibold leading-snug text-foreground">
+            <h5 className="mt-2 break-words font-display text-sm font-semibold leading-snug text-foreground">
               {primary.label}
             </h5>
             <p className="mt-0.5 text-xs text-muted-foreground">

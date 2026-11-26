@@ -235,45 +235,47 @@ export default function AgentTemuanTab({
               className="border-b border-border pb-4 last:border-0 last:pb-0"
             >
               <section aria-labelledby={headingId}>
-                <CollapsibleTrigger
-                  render={
-                    <Button
-                      id={headingId}
-                      variant="ghost"
-                      size="lg"
-                      className="h-auto min-h-11 w-full justify-between rounded-xl px-3 py-3 text-left hover:bg-muted/40"
-                      aria-controls={panelId}
-                    />
-                  }
-                >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
-                      <BarChart2 className="size-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block break-words text-base font-bold text-foreground">
-                        {monthLabel}
+                <h3>
+                  <CollapsibleTrigger
+                    render={
+                      <Button
+                        id={headingId}
+                        variant="ghost"
+                        size="lg"
+                        className="h-auto min-h-11 w-full justify-between rounded-xl px-3 py-3 text-left hover:bg-muted/40"
+                        aria-controls={panelId}
+                      />
+                    }
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+                        <BarChart2 className="size-4" aria-hidden="true" />
                       </span>
-                      <span className="mt-1 block text-xs text-muted-foreground">
-                        {monthItems.length} temuan · {Object.keys(tickets).length}{" "}
-                        tiket
-                        {monthPhantoms.length > 0 ? (
-                          <>
-                            {" · "}
-                            {monthPhantoms.length} sesi tanpa temuan
-                          </>
-                        ) : null}
+                      <span className="min-w-0">
+                        <span className="block break-words font-display text-base font-bold tracking-tight text-foreground">
+                          {monthLabel}
+                        </span>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {monthItems.length} temuan · {Object.keys(tickets).length}{" "}
+                          tiket
+                          {monthPhantoms.length > 0 ? (
+                            <>
+                              {" · "}
+                              {monthPhantoms.length} sesi tanpa temuan
+                            </>
+                          ) : null}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground">
-                    {isOpen ? (
-                      <ChevronUp className="size-5" aria-hidden="true" />
-                    ) : (
-                      <ChevronDown className="size-5" aria-hidden="true" />
-                    )}
-                  </span>
-                </CollapsibleTrigger>
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground">
+                      {isOpen ? (
+                        <ChevronUp className="size-5" aria-hidden="true" />
+                      ) : (
+                        <ChevronDown className="size-5" aria-hidden="true" />
+                      )}
+                    </span>
+                  </CollapsibleTrigger>
+                </h3>
 
                 <CollapsibleContent
                   id={panelId}
@@ -294,14 +296,14 @@ export default function AgentTemuanTab({
                             #{ticketIndex + 1}
                           </span>
                           <Ticket className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                          <span className="min-w-0">
-                            <span className="block text-xs font-semibold text-muted-foreground">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-muted-foreground">
                               No. Tiket
-                            </span>
-                            <span className="mt-0.5 block break-words font-mono text-sm font-bold text-foreground">
+                            </p>
+                            <h4 className="mt-0.5 break-words font-display text-sm font-bold tracking-tight text-foreground">
                               {ticket.label}
-                            </span>
-                          </span>
+                            </h4>
+                          </div>
                         </div>
                         <span className="text-xs text-muted-foreground">
                           {ticket.items.length} temuan
@@ -329,13 +331,13 @@ export default function AgentTemuanTab({
                                       variant="outline"
                                       className={
                                         isCritical
-                                          ? "h-auto rounded-lg border-rose-300 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300"
-                                          : "h-auto rounded-lg border-blue-300 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                                          ? "h-auto rounded-lg border-destructive/30 bg-destructive/5 px-2 py-1 text-xs font-semibold text-destructive-text"
+                                          : "h-auto rounded-lg border-info/30 bg-info/5 px-2 py-1 text-xs font-semibold text-info"
                                       }
                                     >
                                       {isCritical ? "Kritis" : "Non-kritis"}
                                     </Badge>
-                                    <h5 className="mt-2 break-words text-base font-bold leading-snug text-foreground">
+                                    <h5 className="mt-2 break-words font-display text-base font-bold leading-snug text-foreground">
                                       {item.indicatorName}
                                     </h5>
                                   </div>
@@ -349,7 +351,7 @@ export default function AgentTemuanTab({
                                         aria-label={"Edit temuan " + item.indicatorName}
                                         title="Edit temuan"
                                         onClick={() => onEdit(item)}
-                                        className="min-h-11 min-w-11 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/40"
+                                        className="min-h-11 min-w-11 text-info hover:bg-info/10 hover:text-info dark:hover:bg-info/10"
                                       >
                                         <Pencil className="size-4" aria-hidden="true" />
                                       </Button>
@@ -361,7 +363,7 @@ export default function AgentTemuanTab({
                                         title="Hapus temuan"
                                         onClick={() => onDelete(item.id)}
                                         disabled={deletingId === item.id}
-                                        className="min-h-11 min-w-11 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                                        className="min-h-11 min-w-11 text-destructive-text hover:bg-destructive/10 hover:text-destructive-text dark:hover:bg-destructive/10"
                                       >
                                         {deletingId === item.id ? (
                                           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -404,17 +406,17 @@ export default function AgentTemuanTab({
                     <section
                       key={session.id}
                       aria-label="Sesi tanpa temuan"
-                      className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-4"
+                      className="rounded-xl border border-dashed border-success/40 bg-chart-green/5 p-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-chart-green/5 text-success">
                             <ShieldCheck className="size-4" aria-hidden="true" />
                           </span>
                           <div>
                             <Badge
                               variant="outline"
-                              className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              className="border-success/30 bg-chart-green/5 text-success"
                             >
                               Sesi tanpa temuan
                             </Badge>
@@ -423,7 +425,7 @@ export default function AgentTemuanTab({
                             </p>
                           </div>
                         </div>
-                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                        <span className="text-xs font-medium text-success">
                           Skor audit {session.score}
                         </span>
                       </div>

@@ -16,6 +16,7 @@ import {
   richAgentDetailPayload,
   richQuickviewPayload,
 } from "./helpers/sidakAgentDetailLayoutFixture";
+import { findLowContrastText, setDocumentTheme } from "./helpers/textContrast";
 
 const AGENT_NAME = "Rahmawati Kusumaningrum";
 
@@ -79,7 +80,10 @@ const SIMULATIONS = [
   ),
 ];
 
-async function open(page: Page) {
+async function open(
+  page: Page,
+  heatmapCounts: Record<string, number> = { "2026-10-06": 2, "2026-10-09": 1 },
+) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const audit: AgentAudit = {
     mockedApi: [],
@@ -93,7 +97,7 @@ async function open(page: Page) {
     }),
     quickviewPayload: richQuickviewPayload(),
     folders: LAYOUT_FOLDERS,
-    heatmapCounts: { "2026-10-06": 2, "2026-10-09": 1 },
+    heatmapCounts,
   });
   const simulationQueries: string[] = [];
   await page.route(
@@ -495,6 +499,155 @@ test.describe("Simulasi: detail telaah", () => {
     await expect(dialog).toHaveCount(0);
     await expect(trigger).toBeFocused();
   });
+});
+
+test("audit #12: heading mengikuti tingkat bagian dan memakai ukuran serta font yang sama", async ({ page }) => {
+  await open(page);
+  const summary = page.getByRole("tabpanel", { name: "Ringkasan" });
+  const readHeadingStyle = (heading: Locator) => heading.evaluate((node) => {
+    const { fontFamily, fontSize } = getComputedStyle(node);
+    return { fontFamily, fontSize };
+  });
+  const sectionStyle = await readHeadingStyle(summary.getByRole("heading", { level: 2, name: "Skor per bulan" }));
+
+  for (const [tab, title] of [
+    ["Tren", "Tren temuan per bulan"],
+    ["Simulasi", "Riwayat simulasi"],
+    ["Heatmap", "Heatmap temuan"],
+    ["Temuan", "Temuan audit"],
+  ]) {
+    await page.getByRole("tab", { name: tab }).click();
+    const heading = page.getByRole("tabpanel", { name: tab }).getByRole("heading", { level: 2, name: title });
+    await expect(heading).toBeVisible();
+    expect(await readHeadingStyle(heading)).toEqual(sectionStyle);
+  }
+
+  const findings = page.getByRole("tabpanel", { name: "Temuan" });
+  const month = findings.getByRole("button", { name: /Juni 2026.*temuan/ });
+  await month.click();
+  await expect(findings.getByRole("heading", { level: 3, name: /Juni 2026/ })).toBeVisible();
+  const ticket = findings.getByRole("region", { name: "Tiket TKT-2026-06-118" });
+  await expect(ticket.getByRole("heading", { level: 4, name: "TKT-2026-06-118" })).toBeVisible();
+  await expect(ticket.getByRole("heading", { level: 5 })).toHaveCount(2);
+});
+
+test("audit #8/#15: dialog mengelompokkan tanggal dan mengembalikan fokus", async ({ page }, testInfo) => {
+  await open(page);
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.getByRole("tab", { name: "Temuan" }).click();
+  const findings = page.getByRole("tabpanel", { name: "Temuan" });
+  await findings.getByRole("button", { name: /Juni 2026.*temuan/ }).click();
+  const ticket = findings.getByRole("region", { name: "Tiket TKT-2026-06-118" });
+  const edit = ticket.getByRole("button", { name: /^Edit temuan/ }).first();
+  await edit.focus();
+  await page.keyboard.press("Enter");
+
+  const dialog = page.getByRole("dialog");
+  const close = dialog.getByRole("button", { name: "Tutup edit temuan" });
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: "Simpan Perubahan" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+
+  const dates = dialog.getByRole("group", { name: "Tanggal temuan" });
+  await expect(dates.getByLabel("Tanggal layanan")).toHaveValue("2026-06-11");
+  await expect(dates.getByLabel("Tanggal sampel")).toHaveAccessibleDescription("Belum diisi");
+  await expect(dialog.getByText("2026-06-11", { exact: true })).toHaveCount(0);
+  await dates.scrollIntoViewIfNeeded();
+  await dialog.screenshot({ path: testInfo.outputPath("edit-temuan-375.png") });
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(edit).toBeFocused();
+});
+
+test("audit #9/#14: status tanggal dan loading heatmap diumumkan tanpa memindahkan fokus", async ({ page }, testInfo) => {
+  await open(page);
+  await page.getByRole("tab", { name: "Heatmap" }).click();
+  const panel = page.getByRole("tabpanel", { name: "Heatmap" });
+  const calendar = panel.getByRole("grid", { name: "Kalender temuan 2026" });
+  const aside = panel.getByRole("complementary", { name: "Ringkasan heatmap agen" });
+  const selection = aside.getByRole("status");
+  await expect(calendar).toBeVisible();
+  await expect.soft(selection).toContainText("Pilih tanggal di kalender");
+  const day = calendar.getByRole("button", { name: "06/10/2026: 2 temuan" });
+  await day.click();
+  await expect.soft(selection).toContainText("2 temuan");
+  await expect(aside.getByTestId("agent-heatmap-selected-day")).toBeVisible();
+  await expect(day).toBeFocused();
+
+  let releaseRequest!: () => void;
+  const pending = new Promise<void>((resolve) => { releaseRequest = resolve; });
+  await page.route((url) => url.pathname === "/api/v1/sidak/heatmap" && url.searchParams.get("count_by") === "tiket", async (route) => {
+    await pending;
+    await route.fallback();
+  });
+  const ticket = panel.getByRole("button", { name: "Tiket", exact: true });
+  await ticket.click();
+  try {
+    await expect(panel.getByRole("status").filter({ hasText: "Memuat heatmap per tiket" })).toBeVisible();
+    await expect(calendar).toHaveCount(0);
+    await expect(ticket).toBeFocused();
+    await panel.screenshot({ path: testInfo.outputPath("heatmap-loading.png") });
+  } finally {
+    releaseRequest();
+  }
+  await expect(calendar).toBeVisible();
+  await expect(panel.getByText("Memuat heatmap per tiket…")).toHaveCount(0);
+  await expect(panel.getByRole("status").filter({ hasText: "Heatmap per tiket sudah dimuat." })).toHaveCount(1);
+  await expect(ticket).toBeFocused();
+});
+
+test("token warna detail agen mengikuti tema dan angka heatmap tetap terbaca", async ({
+  page,
+}, testInfo) => {
+  await open(page, {
+    "2026-10-01": 1,
+    "2026-10-02": 2,
+    "2026-10-03": 3,
+    "2026-10-04": 4,
+    "2026-10-05": 5,
+    "2026-10-06": 6,
+  });
+  const forecast = page
+    .getByRole("group", { name: "Forecast: Memburuk" })
+    .getByText("Memburuk", { exact: true });
+  await expect(forecast).toBeVisible();
+  const override = await page.addStyleTag({
+    content: ":root { --destructive-text: #654321; }",
+  });
+  await expect.soft(forecast).toHaveCSS("color", "rgb(101, 67, 33)");
+  await override.evaluate((style) => {
+    style.parentNode?.removeChild(style);
+  });
+
+  await page.getByRole("tab", { name: "Heatmap" }).click();
+  await page.getByRole("switch", { name: "Tampilkan tanggal" }).click();
+  const calendar = page.getByTestId("agent-heatmap-calendar");
+  const cells = calendar.locator("[data-intensity]");
+  const peak = calendar.locator('[data-date="2026-10-06"]');
+  const contrastOptions = { selector: "[data-intensity]" };
+  let lightPeak: string | undefined;
+  for (const [theme, width] of [["light", 1440], ["dark", 375]] as const) {
+    await page.setViewportSize({ width, height: 1000 });
+    await setDocumentTheme(page, theme);
+    const colors = await cells.evaluateAll((days) => [
+      ...new Set(days.map((day) => getComputedStyle(day).backgroundColor)),
+    ]);
+    expect(colors).toHaveLength(5);
+    const peakColor = await peak.evaluate((day) => getComputedStyle(day).backgroundColor);
+    if (theme === "light") lightPeak = peakColor;
+    else expect(peakColor).not.toBe(lightPeak);
+    expect.soft(await findLowContrastText(calendar, contrastOptions), theme).toEqual([]);
+    await peak.scrollIntoViewIfNeeded();
+    await calendar.screenshot({ path: testInfo.outputPath(`heatmap-${theme}.png`) });
+  }
+
+  await page.emulateMedia({ forcedColors: "active" });
+  expect.soft(await findLowContrastText(calendar, contrastOptions), "forced colors").toEqual([]);
+  await page.addStyleTag({ content: ":root { --sidak-heatmap-4: #765432; }" });
+  await expect(peak).toHaveCSS("background-color", "rgb(118, 84, 50)");
 });
 
 test.describe("Heatmap detail agen ke tab Temuan", () => {

@@ -143,7 +143,7 @@ export default function MonthRail({
                 type="button"
                 onClick={() => onMonthSelect(month)}
                 aria-pressed={isActive}
-                aria-label={`Pilih bulan ${label} ${year}, skor ${summary.finalScore.toFixed(1)} persen, ${summary.findingsCount} temuan${isBelowQaTarget ? ", QA di bawah target 95 persen" : ""}`}
+                aria-label={`Pilih bulan ${label} ${year}, skor ${summary.finalScore.toFixed(1)} persen, ${summary.findingsCount} temuan${isBelowQaTarget ? `, QA di bawah target ${SIDAK_QA_TARGET} persen` : ""}`}
                 className={`group flex h-48 flex-col items-center gap-1 rounded-lg px-0.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none sm:h-56 ${
                   isActive ? "bg-muted ring-1 ring-border" : "hover:bg-muted/60"
                 }`}

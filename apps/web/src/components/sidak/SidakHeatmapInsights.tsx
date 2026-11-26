@@ -46,8 +46,10 @@ function InsightCard({
 
 export default function SidakHeatmapInsights({
   days,
+  headingLevel = 2,
 }: {
   days: HeatmapDay[];
+  headingLevel?: 2 | 3;
 }) {
   const data = useMemo(() => buildHeatmapInsights(days), [days]);
 
@@ -56,6 +58,7 @@ export default function SidakHeatmapInsights({
   }
 
   const year = data.busiestDay.date.slice(0, 4);
+  const Heading = headingLevel === 3 ? "h3" : "h2";
 
   return (
     <section
@@ -64,9 +67,11 @@ export default function SidakHeatmapInsights({
       className="space-y-3 rounded-xl border border-border bg-surface p-4"
     >
       <div>
-        <h2 className="text-sm font-semibold text-foreground">
+        <Heading className={headingLevel === 3
+          ? "font-display text-base font-bold tracking-tight text-foreground"
+          : "text-sm font-semibold text-foreground"}>
           Pola temuan ketidaksesuaian
-        </h2>
+        </Heading>
         <p className="mt-1 max-w-[75ch] text-sm text-foreground">
           Sepanjang {year} tercatat{" "}
           <span className="font-semibold">

@@ -25,8 +25,10 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-text: var(--destructive-text);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -120,8 +122,10 @@
     --accent-foreground: var(--fg);
     --destructive: #dc2626;
     --destructive-foreground: #fafafa;
+    --destructive-text: #be123c; /* teks di permukaan netral, bukan teks di atas fill */
     --success: #047857; /* status naik/membaik */
     --warning: #b45309; /* status perlu perhatian */
+    --info: #1d4ed8;
     /* Verdict TNA (diverging: tercapai / sebagian / tidak). Divalidasi skill
        dataviz terhadap --bg: CVD ΔE 8,6, normal ΔE 30,9. */
     --verdict-good: #047857;
@@ -214,8 +218,10 @@
     --accent-foreground: var(--fg);
     --destructive: #dc2626;
     --destructive-foreground: #fef2f2;
+    --destructive-text: #fb7185;
     --success: #34d399;
     --warning: #fbbf24;
+    --info: #93c5fd;
     /* Verdict TNA gelap: hijau digeser ke pita terang 0,48–0,67 (CVD ΔE 8,7). */
     --verdict-good: #0f9f6e;
     --verdict-mid: #525252;
@@ -268,6 +274,29 @@
     --chart-amber: rgb(245, 158, 11);
     --chart-violet: #8b5cf6;
     --chart-cyan: #06b6d4;
+  }
+
+  /* SIDAK: latar dan angka tanggal tetap berpasangan, termasuk dalam forced colors. */
+  :root {
+    --sidak-heatmap-0: var(--muted);
+    --sidak-heatmap-1: oklch(89.2% 0.058 10.001);
+    --sidak-heatmap-1-text: oklch(41% 0.159 10.272);
+    --sidak-heatmap-2: oklch(71.2% 0.194 13.428);
+    --sidak-heatmap-2-text: oklch(27.1% 0.105 12.094);
+    --sidak-heatmap-3: oklch(58.6% 0.253 17.585);
+    --sidak-heatmap-3-text: #fff;
+    --sidak-heatmap-4: oklch(45.5% 0.188 13.697);
+    --sidak-heatmap-4-text: #fff;
+  }
+
+  .dark {
+    --sidak-heatmap-0: var(--border); /* --muted sama dengan permukaan kalender */
+    --sidak-heatmap-1: oklch(27.1% 0.105 12.094);
+    --sidak-heatmap-1-text: oklch(94.1% 0.03 12.58);
+    --sidak-heatmap-2: oklch(45.5% 0.188 13.697);
+    --sidak-heatmap-2-text: oklch(96.9% 0.015 12.422);
+    --sidak-heatmap-4: oklch(71.2% 0.194 13.428);
+    --sidak-heatmap-4-text: oklch(27.1% 0.105 12.094);
   }
 }
 

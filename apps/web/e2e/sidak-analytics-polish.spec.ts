@@ -153,10 +153,10 @@ test.describe("Perapian analitik SIDAK (hermetic)", () => {
     const table = page.getByRole("region", { name: "Daftar ranking agen" });
     const cell = (text: string) =>
       table.getByRole("cell", { name: text, exact: true });
-    await expect(cell("90.0%")).toHaveClass(/text-amber-700/);
-    await expect(cell("90.0%")).not.toHaveClass(/text-emerald/);
-    await expect(cell("96.0%")).toHaveClass(/text-emerald-700/);
-    await expect(cell("70.0%")).toHaveClass(/text-rose-700/);
+    await expect(cell("90.0%")).toHaveClass(/\btext-warning\b/);
+    await expect(cell("90.0%")).not.toHaveClass(/\btext-success\b/);
+    await expect(cell("96.0%")).toHaveClass(/\btext-success\b/);
+    await expect(cell("70.0%")).toHaveClass(/\btext-destructive-text\b/);
     expectHermetic(audit);
   });
 
@@ -166,8 +166,8 @@ test.describe("Perapian analitik SIDAK (hermetic)", () => {
     const audit = await openRankingPage(page);
     const table = page.getByRole("region", { name: "Daftar ranking agen" });
     const label = (text: string) => table.getByText(text).last();
-    await expect(label("Prioritas naik +1")).toHaveClass(/text-rose-700/);
-    await expect(label("Prioritas turun 1")).toHaveClass(/text-emerald-700/);
+    await expect(label("Prioritas naik +1")).toHaveClass(/\btext-destructive-text\b/);
+    await expect(label("Prioritas turun 1")).toHaveClass(/\btext-success\b/);
     await expect(label("Tetap")).toHaveClass(/text-muted-foreground/);
     await expect(label("Baru")).toHaveClass(/text-muted-foreground/);
     expectHermetic(audit);
