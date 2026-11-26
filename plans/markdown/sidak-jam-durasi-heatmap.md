@@ -387,8 +387,21 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 - [x] Insert Januari–Juli yang dilewati sync (85 baris): hanya yang benar-benar baru yang masuk.
   - Cek lintas periode (tiket + peserta) menyisakan 8 dari 11 kandidat; 3 lainnya ternyata sudah ada di SIDAK dengan indikator atau layanan lain.
   - 77 baris tidak di-insert. Laporan pembandingnya (sheet vs SIDAK) ada di Hermes `fix-final/qa-report/`: 59 tiket sama dengan indikator/layanan beda (8 di antaranya satu baris sheet dengan 2+ indikator) dan 18 temuan sama di tiket lain.
-  - Koreksi indikator menunggu QA dan Fajar.
+  - Koreksi indikator menunggu QA dan Fajar. Diputuskan 2026-11-26 lewat sinkron teks/nilai di bawah.
+- [x] Sinkron teks, nilai, dan indikator sheet → SIDAK Jan–Nov (keputusan Fajar 2026-11-26: sheet adalah sumber yang benar; konfirmasi bila ragu).
+  - Semua lewat `guarded_write.py` dengan plan sha256 di-pin, PATCH di-guard nilai lama, read-back, dan snapshot diff 10 periode (semua BERSIH). Sinkron ini tidak menambah atau menghapus baris (8.312 sebelum dan sesudah).
+  - 1.236 patch aman (teks/nilai/tanggal), 27 patch beda format saja (`<br>`, penomoran), 55 patch teks beda yang dikonfirmasi Fajar, 31 patch penyelesaian (18 baris ragu diikuti sheet apa adanya, 16 baris tiket placeholder: tiket SIDAK dipertahankan, sisanya ikut sheet), dan 2 patch rule version insert Gunawan Januari.
+  - 1 patch salah sasaran (3f328335, dicocokkan oleh dua baris sheet) dikembalikan; cek tabrakan tidak menemukan kasus lain.
+  - Tidak ditulis: 2 kunci yang di sheet berisi dua temuan untuk satu tiket+indikator (QACALL19012026C/20012026A pada L2601031800, QADC11062026F pada L2606027267). Unique index `uq_qa_temuan_duplicate_input` hanya mengizinkan satu temuan per tiket+indikator, jadi SIDAK mempertahankan satu baris (gabungan) dan QA perlu memutuskan. RECCSO09032026A: kolom sheet bergeser, indikator diterapkan, teks SIDAK dipertahankan.
+  - `guarded_write.py` kini meng-encode filter URL, menangkap HTTP error tanpa kehilangan catatan eksekusi, dan menolak insert yang bentrok dengan unique index sebelum menulis.
+  - `sidak_rows.extract_tiket` mengenali tiket Instagram 13 digit (`26MMDD` + 7 digit) setelah L/P dan OL/WI. Dengan begitu 9 baris chat Mar–Mei cocok dengan SIDAK, tidak lagi diusulkan insert.
+  - `batch_sync_sidak.py` menahan kunci yang diklaim 2+ baris sheet berbeda isi (`key_conflict` di plan, tidak ditulis). Beda jam/durasi saja tetap ditangani `time_conflict`.
+  - Bukti dua perubahan ini: dry-run Jan–Nov lama vs baru per entri tidak menunjukkan perbedaan selain yang diharapkan. Satu efek baru: baris SIDAK Juli d12f05c4 bertiket placeholder `QADC30062026I` (izin Fajar) dipatch ke tiket sheet `2606300000001`, BERSIH.
+  - Pasca-cek final Jan–Nov: patch 1 (RECCSO09032026A, sengaja), key_conflict 2, dan insert 9. Kesembilan insert itu adalah baris sheet tanpa tiket yang temuannya sudah ada di SIDAK dengan tiket asli.
+  - Sisa catatan: `backfill-temuan-dates.py` tetap memakai parser sendiri (perilakunya beda). Sync memilih rule version terbaru per layanan, bukan per periode.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
+  - Cek data 2026-11-26 (baca prod lewat API Hermes, belum lewat UI): 2.333 nilai jam (chat + pencatatan + SLIK) dengan sebaran pagi 38,36% / siang 31,80% / sore 29,19% / luar jam 0,64%, selisih ≤ 0,81 poin dari sheet setelah aturan. Durasi call 1.748 nilai, median 9:15 (singkat 11,96%, sedang 69,62%, panjang 18,42%).
+  - Masih terbuka: angka profiling awal (2.561 jam, 1.379 durasi) tidak bisa direproduksi; profil ulang workbook memberi 2.958 dan 1.348. Ada baris sheet tanpa pasangan SIDAK (11 chat, 33 SLIK, 54 call) dan bobot call beda (1.276 baris sheet = 1.838 temuan prod). 3f328335 durasinya tetap NULL karena dua nilai sumber bertentangan. Tampilan UI per role belum dicek; E2E tidak boleh diarahkan ke prod.
 
 ## STOP conditions
 

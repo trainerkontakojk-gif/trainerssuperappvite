@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- docs(sidak): record the January–November sheet text, score, and indicator sync, the Hermes 13-digit Instagram ticket parsing, the duplicate-key hold in the sync, and the data-level profile check in the heatmap time plan
 - docs(sidak): record the per-ticket service time apply, the six wrong-date fixes, the eight new finding inserts, and the 77-row indicator comparison report for QA in the heatmap time plan
 - docs(sidak): record the January–October service time and call duration backfill, the reversed service date fix, and the per-ticket matching dry-run in the heatmap time plan
 - docs(sidak): record the November full sync, the service-before-sample date order rule, and the January–October time backfill dry-run in the heatmap time plan
