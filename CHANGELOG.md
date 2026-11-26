@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- fix(sidak): replace heatmap focus shadows with two-tone outlines and clarify theme defaults
 - fix(sidak): finish agent detail audit for color tokens, headings, dialog focus, and loading feedback
 - fix(sidak): restore keyboard tab entry, forced-colors selection, native scrolling cues, and table captions in agent detail
 - fix(sidak): enlarge agent detail touch targets and reveal the active tab without scrolling the page

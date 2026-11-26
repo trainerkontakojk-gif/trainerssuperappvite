@@ -36,7 +36,7 @@ Setiap _engineer_ atau sub-agen (AI) **WAJIB** merujuk pada dokumen ini saat mel
 
 ## 2. Color Palette (CSS Variables)
 
-Aplikasi memiliki mode _Dark_ (sebagai _default_) dan _Light_. Gunakan variabel CSS ini untuk warna, jangan menggunakan warna _hardcode_ (`#hex`).
+Secara default tema mengikuti preferensi sistem. Pengguna bisa memilih tema terang atau gelap secara eksplisit. Gunakan variabel CSS ini untuk warna, jangan menggunakan warna _hardcode_ (`#hex`).
 
 ```css
 /* Mode Terang (Light) */
@@ -49,7 +49,7 @@ Aplikasi memiliki mode _Dark_ (sebagai _default_) dan _Light_. Gunakan variabel 
 --inv-bg: #0a0a0a; /* Background kebalikan (Tombol Primary) */
 --inv-fg: #fafafa; /* Teks kebalikan (Teks Tombol Primary) */
 
-/* Mode Gelap (Dark - Default) */
+/* Mode Gelap (Dark) */
 --bg: #0a0a0a;
 --surface: #171717;
 --border: #262626;

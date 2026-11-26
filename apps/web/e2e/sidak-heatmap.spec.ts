@@ -277,17 +277,19 @@ test.describe("Halaman Heatmap", () => {
     expect(pageOverflow).toBeLessThanOrEqual(1);
   });
 
-  test("ring tanggal terpilih kontras di kotak terang dan tergelap, tema terang dan gelap", async ({ page }) => {
+  test("penanda fokus dan pilihan tanpa bayangan tetap kontras di kedua tema", async ({ page }, testInfo) => {
     behaviour = {
       kind: "data",
       counts: { "2026-01-05": 1, "2026-01-06": 2, "2026-01-07": 3, "2026-01-08": 4, "2026-01-09": 12 },
     };
     await open(page, "trainer");
 
-    // WCAG 2.4.13/1.4.11: penanda fokus/pilihan minimal 3:1 terhadap isi kotak.
-    // Warna bayangan dan latar diubah ke sRGB lewat canvas agar oklch ikut terbaca.
-    const ringContrast = (name: string) =>
-      page.getByRole("button", { name }).evaluate((el) => {
+    // WCAG 1.4.11: sedikitnya satu garis terlihat 3:1 terhadap isi kotak.
+    // Canvas menormalkan warna terkomputasi, termasuk oklch, ke sRGB.
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
+    const day = (name: string) => calendar.getByRole("button", { name });
+    const indicator = (name: string) =>
+      day(name).evaluate((el) => {
         const ctx = document.createElement("canvas").getContext("2d")!;
         const rgb = (color: string) => {
           ctx.clearRect(0, 0, 1, 1);
@@ -303,23 +305,51 @@ test.describe("Halaman Heatmap", () => {
           return 0.2126 * r + 0.7152 * g + 0.0722 * b;
         };
         const style = getComputedStyle(el);
+        const stroke = getComputedStyle(el, "::after");
         const fill = lum(rgb(style.backgroundColor));
-        const rings = style.boxShadow.match(/(?:rgba?|oklch|oklab|lab|lch|color)\([^)]*\)/g) ?? [];
-        return Math.max(
-          0,
-          ...rings.map((c) => {
-            const l = lum(rgb(c));
-            return (Math.max(l, fill) + 0.05) / (Math.min(l, fill) + 0.05);
-          }),
-        );
+        const contrast = [stroke.borderTopColor, stroke.outlineColor].map((color) => {
+          const line = lum(rgb(color));
+          return (Math.max(line, fill) + 0.05) / (Math.min(line, fill) + 0.05);
+        });
+        return {
+          boxShadow: style.boxShadow,
+          border: `${stroke.borderTopWidth} ${stroke.borderTopStyle}`,
+          outline: `${stroke.outlineWidth} ${stroke.outlineStyle}`,
+          maxContrast: Math.max(...contrast),
+        };
       });
 
-    for (const theme of ["light", "dark"] as const) {
+    const checkIndicator = async (name: string, state: string) => {
+      const result = await indicator(name);
+      expect(result, `${state}: ${name}`).toMatchObject({
+        boxShadow: "none",
+        border: "2px solid",
+        outline: "1px solid",
+      });
+      expect(result.maxContrast, `${state}: ${name}`).toBeGreaterThanOrEqual(3);
+    };
+
+    const busy = "09/01/2026: 12 temuan";
+    const empty = "10/01/2026: 0 temuan";
+    const showDates = page.getByRole("switch", { name: "Tampilkan tanggal" });
+    await expect(calendar).toBeVisible();
+    for (const [theme, width] of [["light", 1440], ["dark", 375]] as const) {
+      await page.setViewportSize({ width, height: 900 });
       await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
-      for (const name of ["09/01/2026: 12 temuan", "10/01/2026: 0 temuan"]) {
-        await page.getByRole("button", { name }).click();
-        expect(await ringContrast(name), `${theme} ${name}`).toBeGreaterThanOrEqual(3);
+      for (const [selected, focused, arrow] of [[busy, empty, "ArrowDown"], [empty, busy, "ArrowUp"]]) {
+        await day(selected).click();
+        await showDates.focus();
+        await expect(day(selected)).not.toBeFocused();
+        await checkIndicator(selected, `${theme} terpilih`);
+        await page.keyboard.press("Tab");
+        await expect(day(selected)).toBeFocused();
+        await page.keyboard.press(arrow);
+        await expect(day(focused)).toBeFocused();
+        await checkIndicator(focused, `${theme} fokus keyboard`);
       }
+      await page.getByTestId("heatmap-calendar-scroller").screenshot({
+        path: testInfo.outputPath(`heatmap-indicator-${theme}.png`),
+      });
     }
   });
 

@@ -114,16 +114,6 @@ const LEVEL_TEXT: Record<IntensityBucket["level"], string> = {
 };
 
 /**
- * Ring pilihan/fokus dua warna di dalam kotak: 2px warna teks di luar, 1px
- * warna permukaan di dalamnya. Satu warna saja tenggelam di kotak tergelap
- * (tema terang) atau paling terang (tema gelap); pasangan ini selalu kontras.
- */
-const SELECTED_RING =
-  "[box-shadow:inset_0_0_0_2px_var(--color-foreground),inset_0_0_0_3px_var(--color-surface)]";
-const SELECTED_RING_FOCUS =
-  "focus-visible:[box-shadow:inset_0_0_0_2px_var(--color-foreground),inset_0_0_0_3px_var(--color-surface)]";
-
-/**
  * Mode forced colors (mis. Kontras Tinggi Windows) menghapus latar dan
  * bayangan. Warna intensitas adalah datanya, jadi kotak dan legenda keluar dari
  * penyesuaian; pilihan dan fokus diberi outline warna sistem di luar kotak.
@@ -132,7 +122,7 @@ const KEEP_DATA_COLORS = "forced-color-adjust-none";
 const FORCED_SELECTED_OUTLINE =
   "forced-colors:outline-2 forced-colors:outline-offset-1 forced-colors:outline-solid forced-colors:outline-[color:CanvasText]";
 const FORCED_FOCUS_OUTLINE =
-  "not-forced-colors:focus-visible:outline-none forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-offset-1 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[color:Highlight]";
+  "forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-offset-1 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[color:Highlight]";
 
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
@@ -466,7 +456,7 @@ export default function SidakHeatmapCalendar({
                       data-intensity={bucket.label}
                       data-date={iso}
                       style={{ gridRow: weekday + 2, gridColumn: column }}
-                      className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow ${KEEP_DATA_COLORS} ${FORCED_FOCUS_OUTLINE} ${SELECTED_RING_FOCUS} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? `${SELECTED_RING} ${FORCED_SELECTED_OUTLINE}` : ""}`}
+                      className={`sidak-heatmap-day relative flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums ${KEEP_DATA_COLORS} ${FORCED_FOCUS_OUTLINE} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? FORCED_SELECTED_OUTLINE : ""}`}
                     >
                       {/* Angka tanggal; jumlah temuan ada di label dan kartu terpilih. */}
                       {showDates && (

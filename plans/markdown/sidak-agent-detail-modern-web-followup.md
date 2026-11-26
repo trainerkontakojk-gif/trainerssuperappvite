@@ -47,3 +47,16 @@ Lane C: heading detail agen berurutan dengan tipografi konsisten. Dialog mengand
 - [x] Buktikan kegagalan heading, kelompok tanggal, status heatmap, dan tombol retry lewat Playwright lokal dengan API sintetis.
 - [x] E2E akhir: 11 tes detail agen dan layout, 5 tes modal, dan 3 tes pemakai token skor bersama lulus.
 - [x] Tinjau screenshot modal 375 px dan heatmap desktop, jalankan detektor Impeccable, typecheck, lint dan build web.
+
+## Requirement — penanda heatmap dan dokumentasi tema
+
+Lane C: penanda pilihan dan fokus pada kalender bersama tidak memakai `box-shadow` dan tetap terbaca di tema terang, gelap, dan forced colors. Dokumentasi menyebut ikut sistem sebagai default tanpa mengubah perilaku tema.
+
+## Design — penanda heatmap dan dokumentasi tema
+
+Pertahankan dua garis kontras di dalam kotak tanpa mengubah hit area, navigasi, atau warna intensitas. Gunakan border dan outline inset, serta pertahankan outline warna sistem dalam forced colors.
+
+## Tasklist — penanda heatmap dan dokumentasi tema
+
+- [x] Perbarui regresi kontras kalender: RED mendeteksi bayangan lama; GREEN memeriksa penanda fokus dan pilihan tanpa bayangan dengan kontras minimal 3:1.
+- [x] Selaraskan dokumentasi; 7 E2E fokus lulus termasuk forced colors, navigasi keyboard, pitch 24 px, dan alur heatmap detail agen. Screenshot terang desktop dan gelap 375 px ditinjau; detektor Impeccable, typecheck, lint, build, dan diff check lulus.

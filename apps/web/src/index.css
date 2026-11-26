@@ -300,6 +300,27 @@
   }
 }
 
+@layer components {
+  @media (forced-colors: none) {
+    .sidak-heatmap-day:focus-visible {
+      outline: none;
+    }
+
+    /* Inset two-tone indicator that does not change the grid cell size. */
+    .sidak-heatmap-day:focus-visible::after,
+    [aria-selected="true"] > .sidak-heatmap-day::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border: 2px solid var(--fg);
+      border-radius: inherit;
+      outline: 1px solid var(--surface);
+      outline-offset: -3px;
+    }
+  }
+}
+
 @layer base {
   * {
     border-color: var(--border);
