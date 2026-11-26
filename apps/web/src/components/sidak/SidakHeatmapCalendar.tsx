@@ -323,7 +323,7 @@ export default function SidakHeatmapCalendar({
             {grid.months.map((range, month) => (
               <span
                 key={MONTH_SHORT[month]}
-                className="truncate text-[11px] text-muted-foreground"
+                className="truncate text-xs text-muted-foreground"
                 style={{
                   gridRow: 1,
                   gridColumn: `${range.start} / ${range.end}`,
@@ -338,7 +338,7 @@ export default function SidakHeatmapCalendar({
               key={weekday}
               aria-hidden="true"
               // Menempel di kiri saat kisi digeser, supaya baris tetap terbaca.
-              className="sticky left-0 z-10 flex items-center self-stretch bg-surface text-[10.5px] leading-none text-muted-foreground"
+              className="sticky left-0 z-10 flex items-center self-stretch bg-surface text-xs leading-none text-muted-foreground"
               style={{ gridRow: weekday + 2, gridColumn: 1 }}
             >
               {label}
@@ -360,7 +360,7 @@ export default function SidakHeatmapCalendar({
                 data-intensity={bucket.label}
                 data-date={iso}
                 style={{ gridRow: weekday + 2, gridColumn: column }}
-                className={`flex aspect-square min-w-0 items-center justify-center text-[11px] font-medium tabular-nums transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? "ring-2 ring-inset ring-foreground" : ""}`}
+                className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-foreground ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? "ring-2 ring-inset ring-foreground" : ""}`}
               >
                 {/* Angka tanggal; jumlah temuan ada di label dan kartu terpilih. */}
                 {showDates && (

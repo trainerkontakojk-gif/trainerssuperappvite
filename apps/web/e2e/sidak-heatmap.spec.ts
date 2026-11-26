@@ -12,6 +12,7 @@ import { mockSupabaseAuth } from "./helpers/mockAuth";
 import { createResponseGate } from "./helpers/responseGate";
 import { pickSelect } from "./helpers/pickSelect";
 import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
+import { findTextBelowFloor } from "./helpers/typographyFloor";
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
@@ -274,6 +275,20 @@ test.describe("Halaman Heatmap", () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(pageOverflow).toBeLessThanOrEqual(1);
+  });
+
+  test("teks kalender tidak di bawah batas 12px di kedua tampilan", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
+    await open(page, "trainer");
+
+    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    await expect(calendar).toBeVisible();
+    // Label bulan dan hari (tampilan ringkas), lalu angka tanggal (tampilan lengkap).
+    const section = calendar.locator("xpath=ancestor::section[1]");
+    expect(await findTextBelowFloor(section)).toEqual([]);
+    await page.getByRole("switch", { name: "Tampilkan tanggal" }).click();
+    await expect(calendar.getByRole("button", { name: "05/01/2026: 3 temuan" })).toHaveText("5");
+    expect(await findTextBelowFloor(section)).toEqual([]);
   });
 
   test.describe("layar sentuh", () => {
