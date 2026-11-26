@@ -27,19 +27,8 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface TemuanItem {
-  id: string;
-  month: number;
-  year: number;
-  indicatorName: string;
-  category: string;
-  nilai: number;
-  ketidaksesuaian: string | null;
-  sebaiknya: string | null;
-  no_tiket: string | null;
-  tanggal_layanan?: string | null;
-  tanggal_sampel?: string | null;
-}
+import type { TemuanDisplayItem as TemuanItem } from "../../hooks/useAgentDetail";
+import { SidakTemuanTimeValue } from "./SidakTemuanTimeField";
 
 export interface PhantomSessionItem {
   id: string;
@@ -375,6 +364,9 @@ export default function AgentTemuanTab({
                                   ) : null}
                                 </div>
 
+                                <div className="text-xs text-muted-foreground empty:hidden">
+                                  <SidakTemuanTimeValue service={item.service_type} time={item} />
+                                </div>
                                 <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
                                   <div className="flex min-w-0 flex-col gap-2">
                                     <div className="flex items-center gap-2 text-muted-foreground">

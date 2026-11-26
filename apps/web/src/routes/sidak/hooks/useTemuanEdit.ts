@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QATemuan } from "@trainers/types";
+import type { TemuanItem } from "../../../components/sidak/TemuanGroupCard";
+import { parseTimeDraft, timeDraft } from "../../../lib/sidak-temuan-time";
 import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
 
 interface UseTemuanEditParams {
@@ -13,7 +15,7 @@ interface UseTemuanEditParams {
 }
 
 export function useTemuanEdit({
-  temuan: _temuan,
+  temuan,
   setTemuan,
   setErrorMsg,
   setSuccessMsg,
@@ -25,32 +27,30 @@ export function useTemuanEdit({
   const [editSebaiknya, setEditSebaiknya] = useState("");
   const [editTanggalLayanan, setEditTanggalLayanan] = useState("");
   const [editTanggalSampel, setEditTanggalSampel] = useState("");
+  const [editTime, setEditTime] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const startEdit = (item: {
-    id: string;
-    nilai: number;
-    ketidaksesuaian?: string | null;
-    sebaiknya?: string | null;
-    tanggal_layanan?: string | null;
-    tanggal_sampel?: string | null;
-  }) => {
+  const startEdit = (item: TemuanItem) => {
     setEditingId(item.id);
     setEditNilai(item.nilai);
     setEditKetidaksesuaian(item.ketidaksesuaian ?? "");
     setEditSebaiknya(item.sebaiknya ?? "");
     setEditTanggalLayanan(item.tanggal_layanan ?? "");
     setEditTanggalSampel(item.tanggal_sampel ?? "");
+    setEditTime(item.service_type ? timeDraft(item.service_type, item) : "");
     setDeletingId(null);
   };
 
   const cancelEdit = () => setEditingId(null);
 
   const handleSaveEdit = async (id: string) => {
+    const item = temuan.find((row) => row.id === id);
+    if (!item) return;
     setSavingEdit(true);
     setErrorMsg(null);
     try {
+      const time = parseTimeDraft(item.service_type, editTime);
       await unwrapResponse(
         await sidakClient.temuan[":id"].$put({
           param: { id },
@@ -62,6 +62,7 @@ export function useTemuanEdit({
             // mengubah tanggal parameter lain pada tiket yang sama.
             tanggal_layanan: editTanggalLayanan || null,
             tanggal_sampel: editTanggalSampel || null,
+            ...time,
           },
         }),
       );
@@ -75,6 +76,7 @@ export function useTemuanEdit({
                 sebaiknya: editSebaiknya,
                 tanggal_layanan: editTanggalLayanan || null,
                 tanggal_sampel: editTanggalSampel || null,
+                ...time,
               }
             : t,
         ),
@@ -126,6 +128,8 @@ export function useTemuanEdit({
     setEditTanggalLayanan,
     editTanggalSampel,
     setEditTanggalSampel,
+    editTime,
+    setEditTime,
     deletingId,
     setDeletingId,
     savingEdit,

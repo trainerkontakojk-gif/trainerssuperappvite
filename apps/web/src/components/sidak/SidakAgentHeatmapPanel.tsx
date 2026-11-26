@@ -14,6 +14,7 @@ import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "./SidakHeatmapCalendar";
 import SidakHeatmapInsights from "./SidakHeatmapInsights";
+import { SidakHeatmapTimeProfile } from "./SidakHeatmapTimeProfile";
 import { SidakWeekdayPattern } from "./SidakWeekdayBars";
 import {
   buildHeatmapInsights,
@@ -329,6 +330,9 @@ export default function SidakAgentHeatmapPanel({
             </aside>
           </div>
 
+          {!loading && (
+            <SidakHeatmapTimeProfile year={year} countBy={countBy} serviceType={resolvedService} agentId={agentId} />
+          )}
           <SidakHeatmapInsights days={data.days} headingLevel={3} />
         </div>
       )}

@@ -163,6 +163,14 @@ export default defineConfig({
       testMatch: "exposed-function-guard-api.spec.ts",
     },
     {
+      name: "sidak-time-real-backend",
+      testMatch: [
+        "sidak-temuan-time-db-guard.spec.ts",
+        "sidak-temuan-time-api-contract.spec.ts",
+        "sidak-heatmap-time-profile-api.spec.ts",
+      ],
+    },
+    {
       name: "sidak-temuan-dates",
       testMatch: "sidak-temuan-dates-api-*.spec.ts",
     },

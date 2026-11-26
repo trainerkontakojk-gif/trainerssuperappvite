@@ -38,6 +38,7 @@ const MOCKED_API: RegExp[] = [
   /^\/api\/v1\/sidak\/temuan\/batch\/preview$/,
   /^\/api\/v1\/sidak\/temuan\/[^/]+$/,
   /^\/api\/v1\/sidak\/heatmap$/,
+  /^\/api\/v1\/sidak\/heatmap\/time-profile$/,
 ];
 
 export type Audit = {
@@ -126,6 +127,8 @@ export type StoredTemuan = {
   sebaiknya: string | null;
   tanggal_layanan: string | null;
   tanggal_sampel: string | null;
+  jam_layanan?: string | null;
+  durasi_detik?: number | null;
   is_phantom_padding: boolean;
 };
 
@@ -403,6 +406,8 @@ export async function openInputAudit(
           // Persis seperti backend: tanggal disimpan per baris, `?? null`.
           tanggal_layanan: item.tanggal_layanan ?? null,
           tanggal_sampel: item.tanggal_sampel ?? null,
+          jam_layanan: item.jam_layanan ?? null,
+          durasi_detik: item.durasi_detik ?? null,
           is_phantom_padding: false,
         });
         inserted += 1;

@@ -15,6 +15,7 @@ import { mockTnaDueCount } from "./hermeticShell";
 import { type Page } from "@playwright/test";
 import { mockSupabaseAuth } from "./mockAuth";
 import { E2E_SUPABASE_URL } from "./e2eTargets";
+import { emptyTimeProfile } from "./sidakTimeProfileFixture";
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
@@ -38,6 +39,7 @@ const MOCKED_API: RegExp[] = [
   /^\/api\/v1\/sidak\/agents\/[^/]+\/quickview$/,
   /^\/api\/v1\/sidak\/temuan\/[^/]+$/,
   /^\/api\/v1\/sidak\/heatmap$/,
+  /^\/api\/v1\/sidak\/heatmap\/time-profile$/,
   // Agent self view: own participant ID for `/sidak/saya` and the guard.
   /^\/api\/v1\/profiler\/me$/,
 ];
@@ -354,6 +356,9 @@ export async function openAgentDetail(
   );
 
   // Heatmap per-agent (tab Heatmap). Kalender penuh satu tahun.
+  await page.route(`${APP_ORIGIN}/api/v1/sidak/heatmap/time-profile?*`, (route) =>
+    route.fulfill(toJson({ success: true, data: emptyTimeProfile(new URL(route.request().url()).searchParams) })),
+  );
   await page.route(`${APP_ORIGIN}/api/v1/sidak/heatmap?*`, async (route) => {
     audit.mockedApi.push("heatmap");
     const url = new URL(route.request().url());

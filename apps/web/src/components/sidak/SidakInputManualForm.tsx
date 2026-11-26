@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Check, Loader2, X, Trash2 } from "lucide-react";
 import IndicatorDropdown from "./IndicatorDropdown";
+import { SidakTemuanTimeField } from "./SidakTemuanTimeField";
 import type { QAIndicator, ScoringMode } from "@trainers/types";
 import { UNLINKED_INDICATOR_NOTE } from "../../lib/sidak-input-service";
 
@@ -52,6 +53,7 @@ interface Props {
   noTiket: string;
   tanggalLayanan: string;
   tanggalSampel: string;
+  serviceTime?: { value: string; onChange: (value: string) => void };
   onSetNoTiket: (v: string) => void;
   onSetTanggalLayanan: (v: string) => void;
   onSetTanggalSampel: (v: string) => void;
@@ -86,6 +88,7 @@ export default function SidakInputManualForm({
   noTiket,
   tanggalLayanan,
   tanggalSampel,
+  serviceTime,
   onSetNoTiket,
   onSetTanggalLayanan,
   onSetTanggalSampel,
@@ -173,6 +176,8 @@ export default function SidakInputManualForm({
           Keduanya boleh dikosongkan. Tanggal kosong berarti belum diisi — bukan
           berarti layanan tidak pernah terjadi.
         </p>
+
+        {serviceTime && <SidakTemuanTimeField service={serviceType} {...serviceTime} />}
 
         <div className="space-y-4">
           {entries.map((entry, idx) => (

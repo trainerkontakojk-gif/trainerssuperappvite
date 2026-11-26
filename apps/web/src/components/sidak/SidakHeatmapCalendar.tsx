@@ -27,7 +27,7 @@ type IntensityBucket = {
  * terbaca berapa pun volume temuannya. Ambang yang bertabrakan digabung supaya
  * tidak pernah muncul bucket kosong.
  */
-function buildIntensityBuckets(counts: readonly number[]): IntensityBucket[] {
+export function buildIntensityBuckets(counts: readonly number[]): IntensityBucket[] {
   const zero: IntensityBucket = { label: "0", min: 0, max: 0, level: 0 };
 
   const positive = counts.filter((count) => count > 0).sort((a, b) => a - b);
@@ -112,6 +112,11 @@ const LEVEL_TEXT: Record<IntensityBucket["level"], string> = {
   3: "text-[color:var(--sidak-heatmap-3-text)]",
   4: "text-[color:var(--sidak-heatmap-4-text)]",
 };
+
+export function heatmapIntensityClasses(count: number, buckets: readonly IntensityBucket[]) {
+  const { level } = bucketForCount(count, buckets);
+  return `${LEVEL_CLASS[level]} ${LEVEL_TEXT[level]}`;
+}
 
 /**
  * Mode forced colors (mis. Kontras Tinggi Windows) menghapus latar dan

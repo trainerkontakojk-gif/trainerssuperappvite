@@ -7,6 +7,7 @@ import SidakHeatmapCalendar, {
   type HeatmapDay,
 } from "../../components/sidak/SidakHeatmapCalendar";
 import SidakHeatmapInsights from "../../components/sidak/SidakHeatmapInsights";
+import { SidakHeatmapTimeProfile } from "../../components/sidak/SidakHeatmapTimeProfile";
 import { SidakWeekdayPattern } from "../../components/sidak/SidakWeekdayBars";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import { FilterSelect } from "../../components/sidak/FilterSelect";
@@ -243,6 +244,11 @@ export default function SidakHeatmap() {
             selectedDate={selected?.date ?? null}
             onSelectDay={setSelected}
           />
+          {mode === "agent" ? (
+            <SidakHeatmapTimeProfile year={year} countBy={countBy} serviceType={serviceType || undefined} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Jam hanya tersedia di mode Agent</p>
+          )}
           <SidakWeekdayPattern days={heatmap.days} year={heatmap.year} />
 
           <div className="grid gap-4 sm:grid-cols-3">

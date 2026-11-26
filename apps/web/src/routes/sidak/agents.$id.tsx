@@ -564,6 +564,7 @@ export default function SidakAgentDetailPage() {
         open={!!editingTemuan}
         indicatorName={editingTemuan?.indicatorName ?? ""}
         form={editForm}
+        serviceType={editingTemuan?.service_type}
         submitting={isSubmitting}
         onFormChange={(field, value) =>
           setEditForm((previous) => ({ ...previous, [field]: value }))

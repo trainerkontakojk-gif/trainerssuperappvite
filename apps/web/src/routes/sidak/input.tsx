@@ -688,6 +688,10 @@ export default function SidakInputPage() {
                       noTiket={formHook.noTiket}
                       tanggalLayanan={formHook.tanggalLayanan}
                       tanggalSampel={formHook.tanggalSampel}
+                      serviceTime={{
+                        value: formHook.serviceTime,
+                        onChange: formHook.setServiceTime,
+                      }}
                       onSetNoTiket={formHook.setNoTiket}
                       onSetTanggalLayanan={formHook.setTanggalLayanan}
                       onSetTanggalSampel={formHook.setTanggalSampel}
@@ -777,6 +781,10 @@ export default function SidakInputPage() {
                   editSebaiknya={editHook.editSebaiknya}
                   editTanggalLayanan={editHook.editTanggalLayanan}
                   editTanggalSampel={editHook.editTanggalSampel}
+                  editTime={{
+                    value: editHook.editTime,
+                    onChange: editHook.setEditTime,
+                  }}
                   deletingId={editHook.deletingId}
                   canEdit={role !== "leader"}
                   onStartEdit={editHook.startEdit}

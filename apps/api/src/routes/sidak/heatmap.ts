@@ -1,5 +1,7 @@
 import { ScopeUnavailableError } from "../../services/access/scope";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import type { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import { requireCapability } from "../../middleware/role";
 import { createUserClient, supabaseAdmin } from "../../lib/supabase";
@@ -8,12 +10,14 @@ import {
   resolveFolderFiltersByIds,
 } from "../../services/sidak/access-scope";
 import { fetchAllPages } from "../../lib/supabase-pagination";
-import { getSidakHeatmap } from "../../services/sidak/heatmap-service";
-import { normalizeRole, sidakHeatmapQuerySchema } from "@trainers/types";
+import { getSidakHeatmap, getSidakHeatmapTimeProfile } from "../../services/sidak/heatmap-service";
+import { normalizeRole, sidakHeatmapQuerySchema, sidakHeatmapTimeProfileQuerySchema } from "@trainers/types";
 
 type Variables = { user: User; profile: any; token: string };
 
-const sidakHeatmap = new Hono<{ Variables: Variables }>();
+type HeatmapEnv = { Variables: Variables };
+type HeatmapFilters = z.infer<typeof sidakHeatmapTimeProfileQuerySchema>;
+type HeatmapServiceArgs = Parameters<typeof getSidakHeatmapTimeProfile>[0];
 
 /**
  * Heatmap ketidaksesuaian.
@@ -31,26 +35,18 @@ const sidakHeatmap = new Hono<{ Variables: Variables }>();
  * Kegagalan query selalu menjadi error, bukan heatmap kosong.
  */
 const agentRead = requireCapability("sidak.agent.read");
-sidakHeatmap.get("/heatmap", agentRead, async (c) => {
-  const parsed = sidakHeatmapQuerySchema.safeParse({
-    mode: c.req.query("mode"),
-    year: c.req.query("year"),
-    service_type: c.req.query("service_type") ?? undefined,
-    count_by: c.req.query("count_by") ?? undefined,
-    agent_id: c.req.query("agent_id") ?? undefined,
-    folder_ids: c.req.query("folder_ids") ?? undefined,
-    start_month: c.req.query("start_month") ?? undefined,
-    end_month: c.req.query("end_month") ?? undefined,
-  });
-
-  if (!parsed.success) {
+function heatmapValidation(
+  result: { success: true } | { success: false; error: Pick<z.ZodError, "issues"> },
+  c: Context,
+) {
+  if (!result.success) {
     return c.json(
       {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
           message: "Parameter heatmap tidak valid",
-          details: parsed.error.issues.map((i) => ({
+          details: result.error.issues.map((i) => ({
             path: i.path.join("."),
             message: i.message,
           })),
@@ -59,9 +55,14 @@ sidakHeatmap.get("/heatmap", agentRead, async (c) => {
       400,
     );
   }
+}
 
+async function readHeatmap<T>(
+  c: Context<HeatmapEnv>,
+  filters: HeatmapFilters,
+  loadData: (args: HeatmapServiceArgs) => Promise<T>,
+) {
   const {
-    mode,
     year,
     service_type,
     count_by,
@@ -69,7 +70,7 @@ sidakHeatmap.get("/heatmap", agentRead, async (c) => {
     folder_ids,
     start_month,
     end_month,
-  } = parsed.data;
+  } = filters;
   const token = c.get("token");
   const user = c.get("user");
   const profile = c.get("profile");
@@ -167,9 +168,8 @@ sidakHeatmap.get("/heatmap", agentRead, async (c) => {
       };
     }
 
-    const data = await getSidakHeatmap({
+    const data = await loadData({
       supabase,
-      mode,
       year,
       startMonth: start_month,
       endMonth: end_month,
@@ -194,6 +194,17 @@ sidakHeatmap.get("/heatmap", agentRead, async (c) => {
       500,
     );
   }
-});
+}
 
-export { sidakHeatmap };
+export const sidakHeatmap = new Hono<HeatmapEnv>()
+  .get("/heatmap", agentRead,
+    zValidator("query", sidakHeatmapQuerySchema, heatmapValidation),
+    (c) => {
+      const filters = c.req.valid("query");
+      return readHeatmap(c, filters, (args) => getSidakHeatmap({ ...args, mode: filters.mode }));
+    },
+  )
+  .get("/heatmap/time-profile", agentRead,
+    zValidator("query", sidakHeatmapTimeProfileQuerySchema, heatmapValidation),
+    (c) => readHeatmap(c, c.req.valid("query"), getSidakHeatmapTimeProfile),
+  );

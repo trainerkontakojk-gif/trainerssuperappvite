@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { EfekTrainingEntry } from "./efek";
 import { getSidakCalendarMonth } from "./sidak-calendar";
+import { temuanWaktuSchema } from "./sidak-time";
+export * from "./sidak-time";
 
 export const serviceTypeSchema = z.enum([
   "call",
@@ -232,9 +234,7 @@ export const HEATMAP_DATE_COLUMN: Record<
   qa: "tanggal_sampel",
 };
 
-export const sidakHeatmapQuerySchema = z
-  .object({
-    mode: sidakHeatmapModeSchema,
+const heatmapFiltersSchema = z.object({
     year: z.coerce.number().int().min(2000).max(2100),
     service_type: serviceTypeSchema.optional(),
     count_by: sidakHeatmapCountBySchema.default("parameter"),
@@ -246,18 +246,23 @@ export const sidakHeatmapQuerySchema = z
       .optional(),
     start_month: z.coerce.number().int().min(1).max(12).optional(),
     end_month: z.coerce.number().int().min(1).max(12).optional(),
-  })
-  .refine(
-    ({ start_month, end_month }) =>
+  });
+
+const validHeatmapMonthRange = ({ start_month, end_month }: z.infer<typeof heatmapFiltersSchema>) =>
       (start_month === undefined && end_month === undefined) ||
       (start_month !== undefined &&
         end_month !== undefined &&
-        start_month <= end_month),
-    {
-      path: ["start_month"],
-      message: "Isi kedua bulan dengan rentang awal ≤ akhir.",
-    },
-  );
+        start_month <= end_month);
+const heatmapMonthRangeError = {
+  path: ["start_month"],
+  message: "Isi kedua bulan dengan rentang awal ≤ akhir.",
+};
+export const sidakHeatmapTimeProfileQuerySchema = heatmapFiltersSchema.refine(
+  validHeatmapMonthRange, heatmapMonthRangeError,
+);
+export const sidakHeatmapQuerySchema = heatmapFiltersSchema
+  .extend({ mode: sidakHeatmapModeSchema })
+  .refine(validHeatmapMonthRange, heatmapMonthRangeError);
 export type SidakHeatmapQuery = z.infer<typeof sidakHeatmapQuerySchema>;
 
 /** Tiket bertemuan pada satu tanggal heatmap agen, dengan bulan periode QA-nya. */
@@ -385,7 +390,8 @@ export const qaTemuanSchema = z
     qa_indicators: qaIndicatorSchema.partial().optional(),
     qa_periods: qaPeriodSchema.partial().optional(),
   })
-  .extend(temuanTanggalSchema.shape);
+  .extend(temuanTanggalSchema.shape)
+  .extend(temuanWaktuSchema.shape);
 export type QATemuan = z.infer<typeof qaTemuanSchema>;
 
 export const createTemuanBatchSchema = z.object({
@@ -403,7 +409,8 @@ export const createTemuanBatchSchema = z.object({
           sebaiknya: z.string().nullable().optional(),
           no_tiket: z.string().nullable().optional(),
         })
-        .extend(temuanTanggalSchema.shape),
+        .extend(temuanTanggalSchema.shape)
+        .extend(temuanWaktuSchema.shape),
     )
     .min(1),
 });
@@ -426,7 +433,8 @@ export const updateTemuanSchema = z
     ketidaksesuaian: z.string().nullable().optional(),
     sebaiknya: z.string().nullable().optional(),
   })
-  .extend(temuanTanggalSchema.shape);
+  .extend(temuanTanggalSchema.shape)
+  .extend(temuanWaktuSchema.shape);
 export type UpdateTemuan = z.infer<typeof updateTemuanSchema>;
 
 export const serviceWeightSchema = z.object({

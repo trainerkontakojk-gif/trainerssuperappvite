@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Hono } from "hono";
 import { seedSlikRuleFixture, type SlikRuleFixture } from "./sidakSlikFixture";
 import { createClient } from "@supabase/supabase-js";
+import { readLoopbackEnv } from "./sidakRealBackend";
 
 export const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -45,6 +46,7 @@ export const INTEGRATION_ENV_PATH = path.join(
 );
 
 export function readLocalEnv(): LocalEnv {
+  if (process.env.E2E_SUPABASE_WORKDIR) return readLoopbackEnv();
   if (!existsSync(INTEGRATION_ENV_PATH)) {
     throw new Error(
       "apps/api/.env.integration tidak ada. Jalankan:\n" +

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { sidakClient, unwrapResponse } from "../../../lib/api";
-import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
+import type { QAIndicator, QAPeriod, QATemuan, ServiceType, TemuanWaktu } from "@trainers/types";
+import { parseTimeDraft } from "../../../lib/sidak-temuan-time";
 import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
 import { unlinkedIndicatorError } from "../../../lib/sidak-input-service";
 
@@ -15,7 +16,7 @@ interface AgentEntry {
 interface UseTemuanFormParams {
   selectedAgent: AgentEntry | null;
   selectedPeriod: QAPeriod | null;
-  selectedService: string;
+  selectedService: ServiceType | "";
   activeIndicators: QAIndicator[];
   unlinkedIndicatorIds: Set<string>;
   temuan: QATemuan[];
@@ -65,6 +66,7 @@ export function useTemuanForm({
    */
   const [tanggalLayanan, setTanggalLayanan] = useState("");
   const [tanggalSampel, setTanggalSampel] = useState("");
+  const [serviceTime, setServiceTime] = useState("");
   const [entries, setEntries] = useState<FormEntry[]>([newEntry()]);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -80,6 +82,7 @@ export function useTemuanForm({
     setNoTiket("");
     setTanggalLayanan("");
     setTanggalSampel("");
+    setServiceTime("");
     setEntries([newEntry()]);
     setShowForm(false);
     setErrorMsg(null);
@@ -94,10 +97,18 @@ export function useTemuanForm({
   useEffect(() => {
     setTanggalLayanan("");
     setTanggalSampel("");
+    setServiceTime("");
   }, [selectedAgent?.id, selectedPeriod?.id, selectedService]);
 
   const handleSave = async () => {
-    if (!selectedAgent || !selectedPeriod) return;
+    if (!selectedAgent || !selectedPeriod || !selectedService) return;
+    let time: TemuanWaktu;
+    try {
+      time = parseTimeDraft(selectedService, serviceTime);
+    } catch (error) {
+      setErrorMsg((error as Error).message);
+      return;
+    }
     if (entries.some((e) => !e.indicator_id)) {
       setErrorMsg("Semua parameter wajib dipilih.");
       return;
@@ -154,6 +165,7 @@ export function useTemuanForm({
         sebaiknya: entry.sebaiknya || undefined,
         tanggal_layanan: tanggalLayananValue,
         tanggal_sampel: tanggalSampelValue,
+        ...time,
       }));
       const preview: any = await unwrapResponse(await sidakClient.temuan.batch.preview.$post({
         json: {
@@ -250,6 +262,8 @@ export function useTemuanForm({
     setTanggalLayanan,
     tanggalSampel,
     setTanggalSampel,
+    serviceTime,
+    setServiceTime,
     entries,
     setEntries,
     saving,

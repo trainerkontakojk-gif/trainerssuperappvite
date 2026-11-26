@@ -7,8 +7,10 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { NILAI_BADGE_COLORS } from "../../lib/scoring";
+import type { ServiceType, TemuanWaktu } from "@trainers/types";
+import { SidakTemuanTimeValue } from "./SidakTemuanTimeField";
 
-export interface ParsedImportRow {
+export interface ParsedImportRow extends TemuanWaktu {
   rowNum: number;
   no_tiket: string;
   paramName: string;
@@ -36,7 +38,7 @@ interface Props {
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onImportSave: () => void;
   disabled?: boolean;
-  serviceType?: string;
+  serviceType?: ServiceType;
 }
 
 export default function SidakInputImportPanel({
@@ -257,6 +259,11 @@ export default function SidakInputImportPanel({
                             {row.tanggal_layanan || "Belum diisi"} · Tanggal
                             sampel: {row.tanggal_sampel || "Belum diisi"}
                           </p>
+                          {serviceType && (
+                            <p className="text-xs text-muted-foreground empty:hidden">
+                              <SidakTemuanTimeValue service={serviceType} time={row} />
+                            </p>
+                          )}
                           {row.error && (
                             <p className="text-xs text-rose-700 dark:text-rose-400 mt-1">
                               {row.error}

@@ -21,9 +21,16 @@ import { applyPesertaScope, pesertaScopeFromIds } from "../access/scope";
 
 import {
   HEATMAP_DATE_COLUMN,
+  SIDAK_TIME_SOURCE,
+  SIDAK_DURASI_REVIEW_BELOW_SECONDS,
+  classifyDurasi,
+  classifyJam,
   type SidakHeatmapCountBy,
   type SidakHeatmapResponse,
+  type SidakHeatmapTimeProfileResponse,
   type SidakHeatmapTicketRef,
+  type SidakJamBuckets,
+  type SidakDurasiBuckets,
 } from "@trainers/types";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { countFindingTickets, hasTicketNumber } from "./shared-constants";
@@ -96,6 +103,14 @@ function applyScope<
   return q;
 }
 
+function dateRange(year: number, startMonth = 1, endMonth = 12) {
+  const month = (value: number) => String(value).padStart(2, "0");
+  return {
+    first: `${year}-${month(startMonth)}-01`,
+    last: `${year}-${month(endMonth)}-${new Date(Date.UTC(year, endMonth, 0)).getUTCDate()}`,
+  };
+}
+
 /**
  * Ambil seluruh baris countable untuk mode + tahun terpilih.
  *
@@ -123,6 +138,7 @@ async function fetchCountableRows(args: {
     endMonth = 12,
   } = args;
   const column = HEATMAP_DATE_COLUMN[mode];
+  const { first, last } = dateRange(year, startMonth, endMonth);
   // Heatmap satu agen ikut membaca bulan periode QA supaya tanggal bisa
   // membuka tiketnya di tab Temuan (dikelompokkan per periode).
   const periodJoin = agentId ? ", period:qa_periods(month, year)" : "";
@@ -135,11 +151,8 @@ async function fetchCountableRows(args: {
         // bergantung pada mode. PostgREST mengembalikan key sesuai nama kolom.
         .select(`${SELECT_COLUMNS}, tanggal:${column}${periodJoin}`)
         .eq("is_phantom_padding", false)
-        .gte(column, `${year}-${String(startMonth).padStart(2, "0")}-01`)
-        .lte(
-          column,
-          `${year}-${String(endMonth).padStart(2, "0")}-${new Date(Date.UTC(year, endMonth, 0)).getUTCDate()}`,
-        )
+        .gte(column, first)
+        .lte(column, last)
         .order("id", { ascending: true })
         .range(from, to);
       if (serviceType) query = query.eq("service_type", serviceType);
@@ -328,4 +341,118 @@ export async function getSidakHeatmap(args: {
     totalFindings: total,
     missingDateFindingsAllPeriods: countMissingByUnit(missingRows, countBy),
   };
+}
+
+type TimeRow = {
+  service_type: ServiceType;
+  tanggal_layanan: string;
+  jam_layanan: string | null;
+  durasi_detik: number | null;
+  no_tiket: string | null;
+};
+type HourCell = NonNullable<SidakHeatmapTimeProfileResponse["hours"]>["cells"][number];
+const weekdays = [7, 1, 2, 3, 4, 5, 6] as const;
+
+// Tiket deduplicates within each group, never across different cells/services.
+function countTimeRows(rows: TimeRow[], countBy: SidakHeatmapCountBy) {
+  return countBy === "tiket" ? countFindingTickets(rows) : rows.length;
+}
+
+function groupTimeRows<Key>(rows: TimeRow[], keyFor: (row: TimeRow) => Key) {
+  const groups = new Map<Key, TimeRow[]>();
+  for (const row of rows) {
+    const key = keyFor(row);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+  return groups;
+}
+
+function summarizeHours(rows: TimeRow[], label: string, countBy: SidakHeatmapCountBy) {
+  const buckets: SidakJamBuckets = { pagi: 0, siang: 0, sore: 0, luar: 0 };
+  const cells: HourCell[] = [];
+  let total = 0;
+  let missingTime = 0;
+  const groups = groupTimeRows(rows, ({ tanggal_layanan, jam_layanan }) => {
+    if (jam_layanan === null) return -1;
+    const weekday = weekdays[new Date(tanggal_layanan).getUTCDay()]!;
+    return weekday * 24 + Number(jam_layanan.slice(0, 2));
+  });
+  for (const [key, group] of groups) {
+    const count = countTimeRows(group, countBy);
+    if (key === -1) {
+      missingTime = count;
+      continue;
+    }
+    const weekday = Math.floor(key / 24) as HourCell["weekday"];
+    cells.push({ weekday, hour: key % 24, count });
+    buckets[classifyJam(group[0]!.jam_layanan!)] += count;
+    total += count;
+  }
+  cells.sort((a, b) => a.weekday - b.weekday || a.hour - b.hour);
+  return { label, cells, buckets, total, missingTime };
+}
+
+function summarizeDurations(rows: TimeRow[], countBy: SidakHeatmapCountBy) {
+  const buckets: SidakDurasiBuckets = { singkat: 0, sedang: 0, panjang: 0 };
+  const groups = groupTimeRows(rows, ({ durasi_detik }) =>
+    durasi_detik === null ? null : classifyDurasi(durasi_detik),
+  );
+  for (const [bucket, group] of groups) {
+    if (bucket !== null) buckets[bucket] = countTimeRows(group, countBy);
+  }
+  const reviewRows = rows.filter(({ durasi_detik }) =>
+    durasi_detik !== null && durasi_detik < SIDAK_DURASI_REVIEW_BELOW_SECONDS,
+  );
+  return {
+    buckets,
+    total: buckets.singkat + buckets.sedang + buckets.panjang,
+    missingDuration: countTimeRows(groups.get(null) ?? [], countBy),
+    reviewBelowOneMinute: countTimeRows(reviewRows, countBy),
+  };
+}
+
+export async function getSidakHeatmapTimeProfile({
+  supabase, year, startMonth, endMonth, serviceType, countBy = "parameter", agentId, scope,
+}: Omit<Parameters<typeof getSidakHeatmap>[0], "mode">): Promise<SidakHeatmapTimeProfileResponse> {
+  const { first, last } = dateRange(year, startMonth, endMonth);
+  const rows = scope?.agentIds?.length === 0 ? [] : await fetchAllPages<TimeRow>({
+    build: ({ from, to }) => {
+      let query = supabase.from("qa_temuan")
+        .select("service_type, tanggal_layanan, jam_layanan, durasi_detik, no_tiket")
+        .eq("is_phantom_padding", false)
+        .eq("is_countable", true)
+        .gte("tanggal_layanan", first)
+        .lte("tanggal_layanan", last)
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (serviceType) query = query.eq("service_type", serviceType);
+      return applyScope(query, agentId, scope);
+    },
+  });
+
+  const byService = groupTimeRows(rows, (row) => row.service_type);
+  const source = serviceType ? SIDAK_TIME_SOURCE[serviceType] : null;
+  const hours = source?.kind === "jam"
+    ? summarizeHours(rows, source.label, countBy)
+    : null;
+  const hoursByService = serviceType ? null : Object.entries(SIDAK_TIME_SOURCE)
+    .flatMap(([key, timeSource]) => {
+      const service = key as ServiceType;
+      if (timeSource.kind !== "jam") return [];
+      const { label, buckets, total, missingTime } = summarizeHours(byService.get(service) ?? [], timeSource.label, countBy);
+      return [{ serviceType: service, label, buckets, total, missingTime }];
+    });
+  const durations = !serviceType || source?.kind === "durasi"
+    ? summarizeDurations(byService.get("call") ?? [], countBy)
+    : null;
+  let notApplicable = 0;
+  for (const [service, group] of byService) {
+    if (SIDAK_TIME_SOURCE[service].kind !== "jam") {
+      notApplicable += countTimeRows(group, countBy);
+    }
+  }
+  return { year, serviceType: serviceType ?? null, countBy, agentId: agentId ?? null,
+    hours, hoursByService, durations, notApplicable };
 }

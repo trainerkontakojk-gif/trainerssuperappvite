@@ -8,11 +8,15 @@ import {
 import { sidakClient, unwrapResponse } from "../../../lib/api";
 import {
   formatQAIndicatorName,
+  SIDAK_TIME_SOURCE,
   tanggalSchema,
   type QAIndicator,
   type QAPeriod,
   type QATemuan,
+  type ServiceType,
+  type TemuanWaktu,
 } from "@trainers/types";
+import { parseTimeDraft, TEMUAN_JAM_HEADER, TEMUAN_DURASI_HEADER } from "../../../lib/sidak-temuan-time";
 import type { ParsedImportRow as ImportRowType } from "../../../components/sidak/SidakInputImportPanel";
 import type { ConfirmFn } from "../../../hooks/useConfirmRequest";
 import { unlinkedIndicatorError } from "../../../lib/sidak-input-service";
@@ -43,7 +47,7 @@ interface AgentEntry {
 interface UseTemuanImportParams {
   selectedAgent: AgentEntry | null;
   selectedPeriod: QAPeriod | null;
-  selectedService: string;
+  selectedService: ServiceType | "";
   activeIndicators: QAIndicator[];
   unlinkedIndicatorIds: Set<string>;
   temuan: QATemuan[];
@@ -204,6 +208,8 @@ export function useTemuanImport({
           width: 24,
         },
         { key: "tglSampel", header: "Tanggal Sampel (YYYY-MM-DD)", width: 24 },
+        { key: "jam", header: TEMUAN_JAM_HEADER, width: 24, style: { numFmt: "@" } },
+        { key: "durasi", header: TEMUAN_DURASI_HEADER, width: 20, style: { numFmt: "@" } },
       ];
       const headerRow = ws.getRow(1);
       headerRow.eachCell((cell: any) => {
@@ -227,7 +233,7 @@ export function useTemuanImport({
       // tidak kosong sebagai baris data, jadi catatan di sheet yang sama membuat
       // template hasil unduhan menghasilkan baris error "Parameter kosong" dan
       // alur kanonik download → isi → upload gagal. Sheet terpisah menjaga
-      // "Input Temuan" tetap kolom-eksak 7 kolom dan bebas baris non-data.
+      // "Input Temuan" tetap bebas baris non-data.
       const help = wb.addWorksheet("Petunjuk");
       help.getColumn(1).width = 96;
       help.getCell("A1").value =
@@ -236,6 +242,8 @@ export function useTemuanImport({
         "Kosong berarti tanggal belum diisi, bukan tidak berlaku. Format: YYYY-MM-DD.";
       help.getCell("A3").value =
         'Isi hanya baris pada sheet "Input Temuan". Baris contoh boleh diubah atau dihapus.';
+      help.getCell("A4").value =
+        "Jam (teks HH:MM, WIB) hanya untuk Chat, Pencatatan, dan SLIK. Durasi (teks mm:ss) hanya untuk Call. Keduanya OPSIONAL.";
       help.getCell("A1").font = { italic: true, size: 10 };
 
       const paramCount = activeIndicators.length;
@@ -274,7 +282,7 @@ export function useTemuanImport({
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || activeIndicators.length === 0 || saveInFlight.current) return;
+    if (!file || !selectedService || activeIndicators.length === 0 || saveInFlight.current) return;
     const request = ++generation.current;
     const scope = contextKey;
     dispatch({ type: "parse", file });
@@ -313,6 +321,9 @@ export function useTemuanImport({
       const colSbk = colOf("sebaiknya");
       const colTglLayanan = colOf("tanggal layanan (yyyy-mm-dd)");
       const colTglSampel = colOf("tanggal sampel (yyyy-mm-dd)");
+      const colJam = colOf(TEMUAN_JAM_HEADER.toLowerCase());
+      const colDurasi = colOf(TEMUAN_DURASI_HEADER.toLowerCase());
+      const timeSource = SIDAK_TIME_SOURCE[selectedService];
 
       const cellAt = (row: unknown[], index: number): unknown =>
         index >= 0 ? row[index] : undefined;
@@ -399,6 +410,21 @@ export function useTemuanImport({
           error = error || tglLayanan.error || tglSampel.error;
         }
 
+        const jam = String(cellAt(row, colJam) ?? "").trim();
+        const durasi = String(cellAt(row, colDurasi) ?? "").trim();
+        let time: TemuanWaktu = {};
+        if (jam && timeSource.kind !== "jam") {
+          error ||= "Kosongkan jam layanan untuk layanan ini.";
+        } else if (durasi && timeSource.kind !== "durasi") {
+          error ||= "Durasi hanya bisa diisi untuk layanan Call.";
+        } else {
+          try {
+            time = parseTimeDraft(selectedService, timeSource.kind === "jam" ? jam : durasi);
+          } catch (errorTime) {
+            error ||= (errorTime as Error).message;
+          }
+        }
+
         result.push({
           rowNum: i + 1,
           no_tiket,
@@ -409,6 +435,8 @@ export function useTemuanImport({
           sebaiknya,
           tanggal_layanan: tglLayanan.value,
           tanggal_sampel: tglSampel.value,
+          jam_layanan: time.jam_layanan ?? null,
+          durasi_detik: time.durasi_detik ?? null,
           error,
         });
       }
@@ -462,6 +490,8 @@ export function useTemuanImport({
         // tidak mengirim apa pun.
         tanggal_layanan: r.tanggal_layanan || null,
         tanggal_sampel: r.tanggal_sampel || null,
+        jam_layanan: r.jam_layanan,
+        durasi_detik: r.durasi_detik,
       }));
       const preview = (await unwrapResponse(
         await sidakClient.temuan.batch.preview.$post({

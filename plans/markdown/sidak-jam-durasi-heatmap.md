@@ -1,6 +1,6 @@
 # Jam Layanan & Durasi Call di Heatmap SIDAK — Rencana Implementasi
 
-- **Status:** rencana, belum dieksekusi. Dokumen ini bukan bukti implementasi atau hasil pengujian.
+- **Status:** implementasi lokal selesai (Fase 1–5 + gerbang lokal Fase 6), menunggu izin Fajar untuk migrasi prod sebelum push ke `main` dan Fase 7 Hermes di VPS.
 - **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM semua layanan, kecocokan tanggal–jam, tanpa AHT, jam operasional chat, dan email/CSO/BKO dikeluarkan dari analisa jam). **Baseline:** `03589fb2` (`main`).
 - **Risk lane:** Lane D — schema/migration, kontrak API publik, dan penulisan data prod oleh Hermes.
 - **Kontrak terkait:** `plans/markdown/sidak-heatmap.md` (tanggal bisnis), `plans/markdown/sidak-heatmap-insights-agent.md` (kontrak heatmap terbaru: leader scope, `count_by`, `agent_id`).
@@ -296,26 +296,26 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 
 ### Fase 0 — Persiapan (read-only)
 
-- [ ] Drift-check plan ini terhadap `main` (file dan skema di "Kondisi kode" masih sama).
-- [ ] Load `trainers-superapp-tdd`, `supabase-migration`; query Graphify untuk pemanggil `getSidakHeatmap`, `createTemuanBatch`, `updateTemuan`.
+- [x] Drift-check plan ini terhadap `main` (file dan skema di "Kondisi kode" masih sama).
+- [x] Load `trainers-superapp-tdd`, `supabase-migration`; query Graphify untuk pemanggil `getSidakHeatmap`, `createTemuanBatch`, `updateTemuan`.
 - [ ] Hermes: tulis parser `parse_jam`/`parse_durasi` sebagai modul terpisah + mode dry-run laporan saja (tanpa tulis DB). Jalankan untuk Jan–Nov; simpan laporan di `~/.hermes/cache/scratch/`. Kirim daftar sel tak terbaca ke Fajar.
 - [ ] Minta izin Fajar sebelum menambah/menjalankan unit test Python parser (aturan non-E2E AGENTS.md); bila disetujui, daftar semua failure mode dulu.
 
 ### Fase 1 — Schema & kontrak bersama
 
-- [ ] RED: E2E real-backend `sidak-temuan-time-db-guard.spec.ts` — insert langsung (jalur service-role seperti Hermes) dengan durasi pada chat, jam pada call/email/cso/bko, durasi negatif/≥86400 → ditolak; kombinasi valid → tersimpan.
-- [ ] Migration + rollback berpasangan; replay lokal bersih (`supabase db reset`) via skill `supabase-migration`.
-- [ ] `packages/types`: `jamSchema`, `durasiDetikSchema`, `temuanWaktuSchema`, `SIDAK_TIME_SOURCE`, bucket + `classifyJam`/`classifyDurasi`.
-- [ ] GREEN.
+- [x] RED: E2E real-backend `sidak-temuan-time-db-guard.spec.ts` — insert langsung (jalur service-role seperti Hermes) dengan durasi pada chat, jam pada call/email/cso/bko, durasi negatif/≥86400 → ditolak; kombinasi valid → tersimpan.
+- [x] Migration + rollback berpasangan; replay lokal bersih (`supabase db reset`) via skill `supabase-migration`.
+- [x] `packages/types`: `jamSchema`, `durasiDetikSchema`, `temuanWaktuSchema`, `SIDAK_TIME_SOURCE`, bucket + `classifyJam`/`classifyDurasi`.
+- [x] GREEN.
 
 ### Fase 2 — API CRUD
 
-- [ ] RED: `sidak-temuan-time-api-contract.spec.ts` — create/preview/update menerima & menyimpan jam/durasi; menolak `25:00`, `7.2`, `08:00 PM`, jam untuk call/email/cso/bko, durasi untuk non-call dengan pesan manusiawi; tanpa field → `NULL` (tidak ada default).
-- [ ] Mapping insert/update di `temuan-service.ts`; GREEN.
+- [x] RED: `sidak-temuan-time-api-contract.spec.ts` — create/preview/update menerima & menyimpan jam/durasi; menolak `25:00`, `7.2`, `08:00 PM`, jam untuk call/email/cso/bko, durasi untuk non-call dengan pesan manusiawi; tanpa field → `NULL` (tidak ada default).
+- [x] Mapping insert/update di `temuan-service.ts`; GREEN.
 
 ### Fase 3 — API time-profile
 
-- [ ] RED: `sidak-heatmap-time-profile-api.spec.ts`:
+- [x] RED: `sidak-heatmap-time-profile-api.spec.ts`:
   - Batas bucket: 06:59 luar, 07:00 pagi, 10:59 pagi, 11:00 siang, 13:59 siang, 14:00 sore, 16:59 sore, 17:00 luar.
   - Batas durasi: 59 detik singkat + review, 299 singkat, 300 sedang, 899 sedang, 900 panjang.
   - `service_type` kosong → `hours = null`, `hoursByService` per layanan; data pencatatan + chat di jam yang sama tidak pernah dijumlah ke satu sel; `hoursByService` tidak memuat email/CSO/BKO.
@@ -328,17 +328,17 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - Filter bulan/folder/agent.
   - Leader hanya melihat timnya.
   - Query gagal → error.
-- [ ] Service + route; GREEN.
+- [x] Service + route; GREEN.
 
 ### Fase 4 — UI input/edit
 
-- [ ] RED: `sidak-temuan-time.spec.ts` — manual, import (template baru + template lama), dan edit inline/modal menyimpan jam/durasi; field tampil/tersembunyi sesuai layanan.
-- [ ] Implementasi hooks + komponen input; GREEN.
+- [x] RED: `sidak-temuan-time.spec.ts` — manual, import (template baru + template lama), dan edit inline/modal menyimpan jam/durasi; field tampil/tersembunyi sesuai layanan.
+- [x] Implementasi hooks + komponen input; GREEN.
 
 ### Fase 5 — UI heatmap
 
-- [ ] `ui-ux-pro-max` untuk section jam & durasi (acceptance criteria, state kosong/NA/missing, mobile).
-- [ ] RED: `sidak-heatmap-time.spec.ts`:
+- [x] `ui-ux-pro-max` untuk section jam & durasi (acceptance criteria, state kosong/NA/missing, mobile).
+- [x] RED: `sidak-heatmap-time.spec.ts`:
   - Matriks + ringkasan persen tampil di mode Agent untuk satu layanan, dengan judul sesuai label layanan (chat: "Jam interaksi dimulai"; pencatatan: "Jam tiket dibuat").
   - "Semua layanan": tidak ada matriks; tabel kategori per layanan + ajakan memilih layanan.
   - Tersembunyi di mode QA.
@@ -346,13 +346,13 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - Status "analisa jam tidak dipakai" beserta alasannya untuk email, CSO, dan BKO.
   - Tab Heatmap detail agent ter-scope.
   - Kalimat batasan interpretasi ada.
-- [ ] Implementasi; GREEN; `impeccable` audit/polish; screenshot desktop + mobile, terang + gelap.
+- [x] Implementasi; GREEN; `impeccable` audit/polish; screenshot desktop + mobile, terang + gelap.
 
 ### Fase 6 — Integrasi & rilis
 
-- [ ] `thermo-nuclear` review; perbaiki temuan.
-- [ ] Root `pnpm typecheck`, `pnpm lint`, `pnpm build`; E2E fitur + regresi heatmap/tanggal yang ada (`sidak-heatmap*.spec.ts`, `sidak-temuan-dates*.spec.ts`, `sidak-temuan-import-dates.spec.ts`), satu run pada satu waktu.
-- [ ] Dokumentasi: kolom baru di `docs/database.md`, kontrak di `docs/modules.md`; entri `plans/README.md`.
+- [x] `thermo-nuclear` review; perbaiki temuan.
+- [x] Root `pnpm typecheck`, `pnpm lint`, `pnpm build`; E2E fitur + regresi heatmap/tanggal yang ada (`sidak-heatmap*.spec.ts`, `sidak-temuan-dates*.spec.ts`, `sidak-temuan-import-dates.spec.ts`), satu run pada satu waktu.
+- [x] Dokumentasi: kolom baru di `docs/database.md`, kontrak di `docs/modules.md`; entri `plans/README.md`.
 - [ ] **STOP —** minta izin Fajar → terapkan migration ke prod → verifikasi kolom/CHECK → baru push kode ke `main` (`push-ready`).
 
 ### Fase 7 — Hermes sync & backfill

@@ -12,21 +12,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-
-interface EditForm {
-  nilai: number;
-  ketidaksesuaian: string;
-  sebaiknya: string;
-  tanggal_layanan?: string;
-  tanggal_sampel?: string;
-}
+import type { ServiceType } from "@trainers/types";
+import type { EditFormState } from "../../hooks/useAgentDetail";
+import { SidakTemuanTimeField } from "./SidakTemuanTimeField";
 
 interface Props {
   open: boolean;
   indicatorName: string;
-  form: EditForm;
+  form: EditFormState;
+  serviceType?: ServiceType;
   submitting: boolean;
-  onFormChange: (field: keyof EditForm, value: any) => void;
+  onFormChange: <Field extends keyof EditFormState>(field: Field, value: EditFormState[Field]) => void;
   onSave: () => void;
   onClose: () => void;
 }
@@ -62,6 +58,7 @@ export default function EditTemuanModal({
   open,
   indicatorName,
   form,
+  serviceType,
   submitting,
   onFormChange,
   onSave,
@@ -188,6 +185,13 @@ export default function EditTemuanModal({
               })}
             </div>
           </fieldset>
+          {serviceType && (
+            <SidakTemuanTimeField
+              service={serviceType}
+              value={form.serviceTime}
+              onChange={(value) => onFormChange("serviceTime", value)}
+            />
+          )}
         </div>
 
         <DialogFooter className="mx-0 mb-0 rounded-none border-t border-border bg-muted/10 p-5">

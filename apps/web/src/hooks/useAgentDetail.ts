@@ -6,7 +6,9 @@ import type {
   AgentDetailData,
   ServiceType,
   RootCauseResult,
+  TemuanWaktu,
 } from "@trainers/types";
+import { parseTimeDraft, timeDraft } from "../lib/sidak-temuan-time";
 import { useAuthStore } from "../store/authStore";
 import { notify } from "../lib/toast";
 import {
@@ -34,8 +36,9 @@ interface TicketScore {
   isSamplingQa: boolean;
 }
 
-export interface TemuanDisplayItem {
+export interface TemuanDisplayItem extends TemuanWaktu {
   id: string;
+  service_type: ServiceType;
   month: number;
   year: number;
   indicatorName: string;
@@ -63,6 +66,7 @@ export interface EditFormState {
   sebaiknya: string;
   tanggal_layanan: string;
   tanggal_sampel: string;
+  serviceTime: string;
 }
 
 const MONTHS_FULL = [
@@ -151,6 +155,7 @@ export function useAgentDetail(
     sebaiknya: "",
     tanggal_layanan: "",
     tanggal_sampel: "",
+    serviceTime: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -261,6 +266,9 @@ export function useAgentDetail(
           no_tiket: t.no_tiket ?? null,
           tanggal_layanan: t.tanggal_layanan ?? null,
           tanggal_sampel: t.tanggal_sampel ?? null,
+          service_type: t.service_type,
+          jam_layanan: t.jam_layanan ?? null,
+          durasi_detik: t.durasi_detik ?? null,
         };
       })
       .filter((t) => t.month > 0);
@@ -666,6 +674,7 @@ export function useAgentDetail(
       sebaiknya: item.sebaiknya ?? "",
       tanggal_layanan: item.tanggal_layanan ?? "",
       tanggal_sampel: item.tanggal_sampel ?? "",
+      serviceTime: timeDraft(item.service_type, item),
     });
   }, []);
 
@@ -679,10 +688,12 @@ export function useAgentDetail(
        * dikirim sebagai `null` ("belum diisi"), sama seperti `useTemuanEdit`.
        * Tanpa ini, user yang sekadar menghapus tanggal mendapat error 400.
        */
+      const { serviceTime, ...fields } = editForm;
       const payload = {
-        ...editForm,
-        tanggal_layanan: editForm.tanggal_layanan || null,
-        tanggal_sampel: editForm.tanggal_sampel || null,
+        ...fields,
+        tanggal_layanan: fields.tanggal_layanan || null,
+        tanggal_sampel: fields.tanggal_sampel || null,
+        ...parseTimeDraft(editingTemuan.service_type, serviceTime),
       };
       await unwrapResponse(
         sidakClient.temuan[":id"].$put({
@@ -692,8 +703,8 @@ export function useAgentDetail(
       );
       setEditingTemuan(null);
       refetch();
-    } catch {
-      // silent
+    } catch (error) {
+      notify.error("Temuan belum diperbarui", error instanceof Error ? error.message : "Coba lagi sebentar.");
     } finally {
       setIsSubmitting(false);
     }

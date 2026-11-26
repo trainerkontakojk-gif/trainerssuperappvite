@@ -1,7 +1,10 @@
 import { Check, Pencil, Trash2 } from "lucide-react";
 import { NILAI_LABELS } from "../../lib/scoring";
+import type { ServiceType, TemuanWaktu } from "@trainers/types";
+import { SidakTemuanTimeField, SidakTemuanTimeValue } from "./SidakTemuanTimeField";
 
-export interface TemuanItem {
+export interface TemuanItem extends TemuanWaktu {
+  service_type?: ServiceType;
   id: string;
   indicator_id: string;
   nilai: number;
@@ -31,6 +34,7 @@ export interface TemuanGroupCardProps {
   editSebaiknya: string;
   editTanggalLayanan: string;
   editTanggalSampel: string;
+  editTime?: { value: string; onChange: (value: string) => void };
   deletingId: string | null;
   canEdit: boolean;
   onStartEdit: (item: TemuanItem) => void;
@@ -90,7 +94,7 @@ export default function TemuanGroupCard({
   deletingId, canEdit,
   onStartEdit, onCancelEdit, onSaveEdit, onDelete,
   setEditNilai, setEditKetidaksesuaian, setEditSebaiknya,
-  setEditTanggalLayanan, setEditTanggalSampel,
+  setEditTanggalLayanan, setEditTanggalSampel, editTime,
 }: TemuanGroupCardProps) {
   // Tanggal layanan tiket diambil dari temuan pertama yang mengisinya.
   const firstServiceDate = group.items.find(
@@ -205,6 +209,7 @@ export default function TemuanGroupCard({
                       />
                     </div>
                   </div>
+                  {item.service_type && editTime && <SidakTemuanTimeField service={item.service_type} {...editTime} />}
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
@@ -248,6 +253,11 @@ export default function TemuanGroupCard({
                     <p className="text-xs text-muted-foreground">
                       Tanggal sampel: {item.tanggal_sampel || "Belum diisi"}
                     </p>
+                    {item.service_type && (
+                      <div className="text-xs text-muted-foreground empty:hidden">
+                        <SidakTemuanTimeValue service={item.service_type} time={item} />
+                      </div>
+                    )}
                   </div>
                   <p className="min-w-0 text-sm text-muted-foreground">
                     <span className="font-medium text-foreground/70 md:sr-only">

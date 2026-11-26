@@ -196,6 +196,26 @@ Aturan yang berlaku:
 
 Migration: `20261001120000_add_temuan_business_dates.sql` (nullable `DATE`, idempotent). **Diterapkan ke target `ruosnjmtywcrghjgqugz` pada 2026-10-02** dan tercatat sebagai history `applied`; kolom `date NULL` + komentar terverifikasi, RLS/policy dan grant tidak berubah.
 
+### `qa_temuan` — jam layanan & durasi panggilan (opsional)
+
+| Kolom          | Tipe           | Arti                                                                                                                            |
+| -------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `jam_layanan`  | `time(0) NULL` | Jam dinding WIB peristiwa sisi layanan (`chat` = interaksi dimulai, `pencatatan` = tiket dibuat, `slik` = jam layanan).         |
+| `durasi_detik` | `integer NULL` | Durasi panggilan dalam detik; hanya untuk layanan `call` (`0 <= durasi_detik < 86400`).                                         |
+
+Aturan dan constraint yang berlaku:
+
+- **NULL berarti "belum diisi"**, tanpa DEFAULT dan tanpa backfill di migration; `created_at` tidak pernah dipakai sebagai pengganti.
+- **Layanan tanpa analisa jam (`email`, `cso`, `bko`)** tidak memakai kolom mana pun (`SIDAK_TIME_SOURCE` di `packages/types/src/sidak-time.ts`).
+- **Penjaga CHECK di database** (menjaga jalur tulis langsung seperti Hermes service-role):
+  - `qa_temuan_durasi_detik_range`: `durasi_detik IS NULL OR (durasi_detik >= 0 AND durasi_detik < 86400)`
+  - `qa_temuan_durasi_only_call`: `durasi_detik IS NULL OR service_type = 'call'`
+  - `qa_temuan_jam_layanan_allowed_service`: `jam_layanan IS NULL OR service_type IN ('chat', 'pencatatan', 'slik')`
+  - `qa_temuan_jam_layanan_clock_range`: `jam_layanan < TIME '24:00'`
+- **RLS/policy dan grant** tidak berubah; tidak ada index baru di MVP.
+
+Migration: `20261126120000_add_temuan_jam_durasi.sql` + rollback berpasangan `supabase/rollbacks/rollback_20261126120000_add_temuan_jam_durasi.sql`. Replay lokal bersih (`supabase db reset --local`) terverifikasi; **belum diterapkan ke target produksi `ruosnjmtywcrghjgqugz`**.
+
 **Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/`. Migration Phase 4 di bawah adalah artifact repository yang additive dan transactional; keberadaannya di tree tidak berarti sudah diterapkan ke database remote.
 
 **Core Migrations (000–017):**

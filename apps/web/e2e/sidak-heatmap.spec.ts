@@ -13,6 +13,7 @@ import { createResponseGate } from "./helpers/responseGate";
 import { pickSelect } from "./helpers/pickSelect";
 import { E2E_SUPABASE_URL } from "./helpers/e2eTargets";
 import { findTextBelowFloor } from "./helpers/typographyFloor";
+import { emptyTimeProfile } from "./helpers/sidakTimeProfileFixture";
 
 const APP_ORIGIN = process.env.E2E_APP_ORIGIN ?? "http://localhost:3005";
 const APP_URL = new URL(APP_ORIGIN);
@@ -22,6 +23,7 @@ const SUPABASE_ORIGIN = E2E_SUPABASE_URL;
 const MOCKED_API: RegExp[] = [
   /^\/api\/v1\/me\/access-status$/,
   /^\/api\/v1\/sidak\/heatmap$/,
+  /^\/api\/v1\/sidak\/heatmap\/time-profile$/,
 ];
 
 type Behavior =
@@ -153,6 +155,10 @@ async function installMocks(page: Page, role: string) {
     if (behaviour.kind === "held") await behaviour.until;
     await route.fulfill(toJson({ success: true, data: payload() }));
   });
+
+  await page.route(`${APP_ORIGIN}/api/v1/sidak/heatmap/time-profile?*`, (route) =>
+    route.fulfill(toJson({ success: true, data: emptyTimeProfile(new URL(route.request().url()).searchParams) })),
+  );
 
   // Guard fail-closed: hanya host dev + endpoint yang di-mock.
   await page.route("**/*", async (route) => {

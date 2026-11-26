@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { Hono } from "hono";
 import { createClient } from "@supabase/supabase-js";
+import { readLoopbackEnv } from "./helpers/sidakRealBackend";
 import {
   cleanupSlikRuleFixture,
   seedSlikRuleFixture,
@@ -50,6 +51,15 @@ function assertLoopback(host: string, label: string): void {
 }
 
 function localEnv(): Record<string, string> {
+  if (process.env.E2E_SUPABASE_WORKDIR) {
+    const env = readLoopbackEnv();
+    return {
+      SUPABASE_URL: env.apiUrl,
+      SUPABASE_DB_URL: env.dbUrl,
+      SUPABASE_ANON_KEY: env.anonKey,
+      SUPABASE_SERVICE_ROLE_KEY: env.serviceRoleKey,
+    };
+  }
   if (!existsSync(INTEGRATION_ENV)) {
     throw new Error("apps/api/.env.integration tidak ada");
   }

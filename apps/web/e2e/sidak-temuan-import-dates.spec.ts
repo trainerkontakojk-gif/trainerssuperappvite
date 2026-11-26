@@ -97,7 +97,7 @@ test.beforeEach(() => {
 });
 
 test.describe("Import batch dengan kolom tanggal", () => {
-  test("template yang diunduh punya tujuh kolom dan tanggal kosong", async ({
+  test("template mempertahankan kolom tanggal kosong sebelum kolom jam dan durasi", async ({
     page,
   }) => {
     // Unduh + tulis ulang .xlsx di disk; lambat setelah spec lain berjalan.
@@ -126,6 +126,8 @@ test.describe("Import batch dengan kolom tanggal", () => {
       ...HEADERS_LEGACY,
       HEADER_TGL_LAYANAN,
       HEADER_TGL_SAMPEL,
+      "Jam Layanan (HH:MM)",
+      "Durasi (mm:ss)",
     ]);
 
     // Baris contoh tidak boleh sudah terisi tanggal.

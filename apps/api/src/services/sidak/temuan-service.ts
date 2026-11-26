@@ -19,10 +19,12 @@ import {
 } from "./period-scoring-context";
 import {
   formatQAIndicatorName,
+  SIDAK_TIME_SOURCE,
   type CreateTemuanBatch,
   type QATemuan,
   type ServiceType,
   type ServiceWeight,
+  type TemuanWaktu,
   type UpdateTemuan,
 } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
@@ -206,6 +208,19 @@ export async function createPerfectScoreSession(
   return data ?? [];
 }
 
+function temuanTimeError(service: ServiceType, time: TemuanWaktu): string | null {
+  const source = SIDAK_TIME_SOURCE[service];
+  if (time.jam_layanan != null && source.kind !== "jam") {
+    return source.kind === "durasi"
+      ? "Layanan Call tidak memakai jam layanan; isi durasi."
+      : "Layanan ini tidak memakai jam layanan.";
+  }
+  if (time.durasi_detik != null && source.kind !== "durasi") {
+    return "Durasi hanya bisa diisi untuk layanan Call.";
+  }
+  return null;
+}
+
 export async function validateTemuanBatch(
   items: CreateTemuanBatch,
 ): Promise<PreviewResult> {
@@ -271,6 +286,11 @@ export async function validateTemuanBatch(
   const seenInBatch = new Set<string>();
 
   for (const item of items.items) {
+    const timeError = temuanTimeError(items.service_type, item);
+    if (timeError) {
+      invalid.push({ indicator_id: item.indicator_id, error: timeError });
+      continue;
+    }
     const ind = indicatorMap.get(item.indicator_id);
 
     if (!ind) {
@@ -408,6 +428,8 @@ export async function createTemuanBatch(
        */
       tanggal_layanan: item.tanggal_layanan ?? null,
       tanggal_sampel: item.tanggal_sampel ?? null,
+      jam_layanan: item.jam_layanan ?? null,
+      durasi_detik: item.durasi_detik ?? null,
     };
   });
 
@@ -686,6 +708,18 @@ export async function refreshDashboardSummary(
 }
 
 export async function updateTemuan(id: string, updates: UpdateTemuan) {
+  if (updates.jam_layanan != null || updates.durasi_detik != null) {
+    const { data: row, error } = await supabaseAdmin
+      .from("qa_temuan")
+      .select("service_type")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw new Error("Gagal membaca temuan. Coba lagi sebentar.");
+    if (!row) throw new Error("Temuan tidak ditemukan.");
+    const timeError = temuanTimeError(row.service_type, updates);
+    if (timeError) throw new Error(timeError);
+  }
+
   /**
    * Field yang tidak ada di payload dibuang, bukan dikirim sebagai `undefined`.
    * Pembedaan ini adalah kontrak update: "tidak dikirim" berarti PERTAHANKAN
