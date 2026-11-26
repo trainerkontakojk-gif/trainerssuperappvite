@@ -1,6 +1,6 @@
 # Jam Layanan & Durasi Call di Heatmap SIDAK — Rencana Implementasi
 
-- **Status:** Fase 1–6 selesai dan sudah di `main` (migration prod diterapkan 2026-11-26). Fase 7 Hermes: sync harian sudah membawa jam/durasi; Januari–November 2026 terisi (2026-11-26). Tersisa apply pencocokan per tiket (dry-run 268 usulan) dan cek tampilan di app.
+- **Status:** Fase 1–6 selesai dan sudah di `main` (migration prod diterapkan 2026-11-26). Fase 7 Hermes: sync harian sudah membawa jam/durasi; Januari–November 2026 terisi, termasuk 268 baris lewat pencocokan per tiket (2026-11-26). Tersisa keputusan QA atas 77 baris sheet yang tidak di-insert, dan cek tampilan di app.
 - **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM semua layanan, kecocokan tanggal–jam, tanpa AHT, jam operasional chat, dan email/CSO/BKO dikeluarkan dari analisa jam). **Baseline:** `03589fb2` (`main`).
 - **Risk lane:** Lane D — schema/migration, kontrak API publik, dan penulisan data prod oleh Hermes.
 - **Kontrak terkait:** `plans/markdown/sidak-heatmap.md` (tanggal bisnis), `plans/markdown/sidak-heatmap-insights-agent.md` (kontrak heatmap terbaru: leader scope, `count_by`, `agent_id`).
@@ -368,17 +368,26 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - Aturan ada di `parse_waktu.order_service_dates()` dan dipakai `batch_sync_sidak.py`: G > F dengan selisih ≤ 31 hari ditukar; selisih > 31 hari ditahan dan tanggal SIDAK dipertahankan. Semua baris dilaporkan di `date_report` plan.
   - November: 5 baris SIDAK ditukar.
   - Januari–Oktober (izin Fajar 2026-11-26): 216 baris SIDAK ditukar lewat `swap_service_dates.py` (plan di-pin, PATCH di-guard tanggal lama, read-back 0 mismatch, snapshot diff 10 periode bersih, dry-run ulang `swap 0`).
-  - 6 baris dengan selisih > 31 hari ditahan dan menunggu keputusan Fajar: 3 BKO Januari (tahun 2025 vs 2025-12) dan 3 Agustus (2026-04-08 vs 2026-10-08).
+  - 6 baris dengan selisih > 31 hari diperbaiki satu per satu atas keputusan Fajar (2026-11-26):
+    - 3 BKO Januari: tahun sampel 2025 → 2026.
+    - 3 Agustus: D/M terbalik ditambah urutan → sampel 2026-08-10, layanan 2026-08-04.
+  - Sesudahnya SQL prod menunjukkan 0 baris non-phantom dengan layanan > sampel.
   - `backfill-temuan-dates.py` belum memakai aturan ini.
 - [ ] Cek laporan dry-run: 20 tiket chat di luar 07:45–16:50 tercatat `NULL` + laporan sesuai aturan; Jul 106 (berisi tanggal) diteruskan ke QA untuk diisi jamnya. Keduanya tidak menahan `--apply`.
-- [ ] Backfill per bulan Jan–Nov (pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
+- [x] Backfill per bulan Jan–Nov (pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
   - November selesai.
   - Dry-run Jan–Okt 2026-11-26 (scoped `batch_sync_sidak.py`): 3.495 dari 3.912 baris SIDAK terisi; 70 NULL + laporan; 347 tidak cocok kunci plan, 181 di antaranya di Januari (ekor Desember dan anomali tahun). 1 id Januari menerima dua nilai, jadi ditahan.
   - Apply Jan–Okt (izin Fajar 2026-11-26), per bulan dengan gate penuh: 3.494 id terisi. Gate per bulan: plan di-pin ke dry-run yang disetujui, `--no-insert`, snapshot diff per id bersih (0 field non-waktu berubah), dry-run ulang `patch 0`, dan verifier `field mismatch 0`. Kunci Januari yang bernilai ganda kini ditahan otomatis oleh guard `time_conflict` di sync.
   - Verifier bulan 01–09 tetap `ADA TEMUAN` karena insert yang dilewati dan baris SIDAK-only lama; Oktober BERSIH penuh.
-- [ ] Pencocokan per tiket untuk 347 baris SIDAK yang tidak cocok kunci sync (dry-run 2026-11-26, `match_time_by_ticket.py`).
+- [x] Pencocokan per tiket untuk 347 baris SIDAK yang tidak cocok kunci sync (dry-run 2026-11-26, `match_time_by_ticket.py`).
   - Hasil: 268 usulan, 50 NULL karena aturan (call QADATA), 27 tiket tidak ada di sheet, 2 agent beda, 0 ambigu.
-  - Menunggu izin apply.
+  - Refactor pendukung: pembacaan sel sheet dipindah ke `sidak_rows.py`, dipakai bersama sync dan matcher. Plan dry-run Jan–Nov byte-identik dengan sebelum refactor.
+  - Apply (izin Fajar 2026-11-26) lewat `guarded_write.py`, bersama 6 perbaikan tanggal dan 8 insert. Satu plan ops dengan sha256 di-pin; PATCH di-guard nilai lama.
+  - Hasil apply: 272 patch + 8 insert, read-back 0 mismatch, snapshot diff 10 periode bersih (8.302 → 8.310 baris). Pasca-cek: matcher `proposed 0`, swap tanggal `0/0`, dry-run sync hanya 8 insert itu yang menjadi skip.
+- [x] Insert Januari–Juli yang dilewati sync (85 baris): hanya yang benar-benar baru yang masuk.
+  - Cek lintas periode (tiket + peserta) menyisakan 8 dari 11 kandidat; 3 lainnya ternyata sudah ada di SIDAK dengan indikator atau layanan lain.
+  - 77 baris tidak di-insert. Laporan pembandingnya (sheet vs SIDAK) ada di Hermes `fix-final/qa-report/`: 59 tiket sama dengan indikator/layanan beda (8 di antaranya satu baris sheet dengan 2+ indikator) dan 18 temuan sama di tiket lain.
+  - Koreksi indikator menunggu QA dan Fajar.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
 
 ## STOP conditions
