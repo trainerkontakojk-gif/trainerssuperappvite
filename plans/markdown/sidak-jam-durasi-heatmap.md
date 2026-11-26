@@ -1,6 +1,6 @@
 # Jam Layanan & Durasi Call di Heatmap SIDAK — Rencana Implementasi
 
-- **Status:** implementasi lokal selesai (Fase 1–5 + gerbang lokal Fase 6), menunggu izin Fajar untuk migrasi prod sebelum push ke `main` dan Fase 7 Hermes di VPS.
+- **Status:** Fase 1–6 selesai dan sudah di `main` (migration prod diterapkan 2026-11-26). Fase 7 Hermes: sync harian sudah membawa jam/durasi dan November 2026 sudah terisi (2026-11-26); backfill Jan–Okt belum.
 - **Tanggal rencana:** 2026-11-25; revisi 2026-11-26 (arti JAM semua layanan, kecocokan tanggal–jam, tanpa AHT, jam operasional chat, dan email/CSO/BKO dikeluarkan dari analisa jam). **Baseline:** `03589fb2` (`main`).
 - **Risk lane:** Lane D — schema/migration, kontrak API publik, dan penulisan data prod oleh Hermes.
 - **Kontrak terkait:** `plans/markdown/sidak-heatmap.md` (tanggal bisnis), `plans/markdown/sidak-heatmap-insights-agent.md` (kontrak heatmap terbaru: leader scope, `count_by`, `agent_id`).
@@ -298,7 +298,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 
 - [x] Drift-check plan ini terhadap `main` (file dan skema di "Kondisi kode" masih sama).
 - [x] Load `trainers-superapp-tdd`, `supabase-migration`; query Graphify untuk pemanggil `getSidakHeatmap`, `createTemuanBatch`, `updateTemuan`.
-- [ ] Hermes: tulis parser `parse_jam`/`parse_durasi` sebagai modul terpisah + mode dry-run laporan saja (tanpa tulis DB). Jalankan untuk Jan–Nov; simpan laporan di `~/.hermes/cache/scratch/`. Kirim daftar sel tak terbaca ke Fajar.
+- [x] Hermes: tulis parser `parse_jam`/`parse_durasi` sebagai modul terpisah + mode dry-run laporan saja (tanpa tulis DB). Jalankan untuk Jan–Nov; simpan laporan di `~/.hermes/cache/scratch/`. Kirim daftar sel tak terbaca ke Fajar. (2026-11-26: `parse_waktu.py` + `jam_durasi_dryrun.py`; laporan `jam-durasi-dryrun-20261126T160455+0800.{json,md}`.)
 - [ ] Minta izin Fajar sebelum menambah/menjalankan unit test Python parser (aturan non-E2E AGENTS.md); bila disetujui, daftar semua failure mode dulu.
 
 ### Fase 1 — Schema & kontrak bersama
@@ -357,7 +357,12 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 
 ### Fase 7 — Hermes sync & backfill
 
-- [ ] Sync harian: tambah field, read-back; satu run dry-run lalu run nyata (izin Fajar).
+- [x] Sync harian: tambah field, read-back; satu run dry-run lalu run nyata (izin Fajar).
+  - 2026-11-26: `batch_sync_sidak.py` memakai `parse_waktu.decide_time()`; `jam_layanan,durasi_detik` masuk field default; extract tanpa `h_cell` ditolak fail-closed; NULL dari sheet tidak pernah menimpa nilai SIDAK.
+  - Run nyata November 2026 dibatasi `--fields jam_layanan,durasi_detik --no-insert`: 451 patch.
+  - Snapshot diff per id bersih (hanya dua kolom itu yang berubah), dry-run ulang `patch 0`, verifier jam/durasi `field mismatch 0`.
+  - Sisa `GS-only 10` adalah insert chat yang sengaja ditahan.
+  - Dokumentasi skill Hermes: `references/jam-durasi-kolom-h.md`.
 - [ ] Cek laporan dry-run: 20 tiket chat di luar 07:45–16:50 tercatat `NULL` + laporan sesuai aturan; Jul 106 (berisi tanggal) diteruskan ke QA untuk diisi jamnya. Keduanya tidak menahan `--apply`.
 - [ ] Backfill per bulan Jan–Nov (pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
