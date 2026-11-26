@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- docs(sidak): stop treating the 20 off-hours chat tickets as a backfill blocker in the heatmap time plan, since their NULL-and-report rule is already set, and leave only the date-only JAM cell for QA
 - docs(sidak): drop email, CSO, and BKO from the heatmap time analysis plan and limit stored service time to chat, pencatatan, and SLIK with a database CHECK
 - docs(sidak): record that email JAM meaning differs per QA officer rather than by date, store no email time for existing data, and enable it only once QA standardizes on reply time in the heatmap time plan
 - docs(sidak): record in the heatmap time plan that email JAM switched from distribution time to reply time, and use only reply time from a validFrom date (provisionally 2026-09-01) so the two meanings never mix

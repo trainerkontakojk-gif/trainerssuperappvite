@@ -61,8 +61,8 @@ Sheet DIGITAL CHAT Jan–Nov, dicek 2026-11-26 (read-only lewat Google Sheets). 
 - **Penanda balasan komentar = format tiket.** Tidak ada kolom kanal. Tiket `L` + 10 digit tidak pernah memuat template komentar. Semua tiket 13 digit (`26MMDD` + 7 digit urutan) memuat template balasan komentar/DM di kolom KETIDAKSESUAIAN/SEBAIKNYA. Prefix NO TEMUAN tidak membedakan kanal. Keyakinan: sedang (penandanya baru terlihat di 10 baris, tapi tiap baris punya dua tanda yang sama-sama mengarah ke komentar).
 - **Di luar 07:45–16:50 ada 27 baris chat:**
   - 6 bertiket 13 digit (Mar 73, Mar 114, Apr 82, Mei 35, Mei 60, Jul 10) → balasan komentar; jam disimpan.
-  - 20 bertiket `L` atau berisi nomor HP, tanpa penanda komentar → ditahan untuk dicek. Rinciannya: 14 di malam hari (10 di Januari, hampir semua `11:xx PM` / `12:xx AM`, pola khas AM/PM tertukar), 5 pagi 07:15–07:41 (semua Maret), dan Jan 124 (kolom E berisi nomor HP).
-  - 1 tidak terbaca (Jul 106 berisi tanggal, bukan jam).
+  - 20 bertiket `L` atau berisi nomor HP, tanpa penanda komentar → jam disimpan `NULL` + masuk laporan (aturan Hermes, sudah ditetapkan; tidak menahan backfill). Rinciannya: 14 di malam hari (10 di Januari, hampir semua `11:xx PM` / `12:xx AM`, pola khas AM/PM tertukar), 5 pagi 07:15–07:41 (semua Maret), dan Jan 124 (kolom E berisi nomor HP).
+  - 1 tidak terbaca (Jul 106 berisi tanggal, bukan jam) → `NULL` + laporan; satu-satunya sel yang perlu diisi jamnya oleh QA di sheet, juga tidak menahan backfill.
 - Tidak ada chat live yang tercatat antara 16:51 dan 17:59.
 
 ### Kategori
@@ -358,7 +358,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 ### Fase 7 — Hermes sync & backfill
 
 - [ ] Sync harian: tambah field, read-back; satu run dry-run lalu run nyata (izin Fajar).
-- [ ] Pastikan 20 tiket chat di luar 07:45–16:50 (daftar di laporan dry-run) sudah dibetulkan di sheet atau dikonfirmasi benar.
+- [ ] Cek laporan dry-run: 20 tiket chat di luar 07:45–16:50 tercatat `NULL` + laporan sesuai aturan; Jul 106 (berisi tanggal) diteruskan ke QA untuk diisi jamnya. Keduanya tidak menahan `--apply`.
 - [ ] Backfill per bulan Jan–Nov (pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
 
