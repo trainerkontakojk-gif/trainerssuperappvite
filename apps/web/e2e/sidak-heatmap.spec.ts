@@ -211,10 +211,21 @@ test.describe("Halaman Heatmap", () => {
     expect(tue.y).toBeGreaterThan(mon.y);
     expect(Math.abs(nextMon.y - mon.y)).toBeLessThan(1);
     expect(nextMon.x).toBeGreaterThan(mon.x);
-    // Antarbulan ada jeda: 31 Jan (Sabtu) dan 1 Feb (Minggu) tidak berdempet.
+    // Default ringkas: minggu menyambung tanpa jeda bulan dan tanpa angka
+    // tanggal, jadi 31 Jan (Sabtu) dan 1 Feb (Minggu) satu kolom.
+    const toggle = page.getByRole("switch", { name: "Tampilkan tanggal" });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
     const jan31 = await box("31/01/2026: 0 temuan");
     const feb1 = await box("01/02/2026: 0 temuan");
-    expect(feb1.x - (jan31.x + jan31.width)).toBeGreaterThanOrEqual(12);
+    expect(Math.abs(feb1.x - jan31.x)).toBeLessThan(1);
+    await expect(calendar.getByRole("button", { name: "05/01/2026: 3 temuan" })).toHaveText("");
+    // Tampilan lengkap: tiap bulan dipisah jeda dan kotak menulis tanggalnya.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(calendar.getByRole("button", { name: "05/01/2026: 3 temuan" })).toHaveText("5");
+    const jan31Full = await box("31/01/2026: 0 temuan");
+    const feb1Full = await box("01/02/2026: 0 temuan");
+    expect(feb1Full.x - (jan31Full.x + jan31Full.width)).toBeGreaterThanOrEqual(12);
     const months = calendar.getByTestId("heatmap-month-labels");
     await expect(months).toContainText("Jan");
     await expect(months).toContainText("Des");
@@ -231,25 +242,30 @@ test.describe("Halaman Heatmap", () => {
     await expect(missingCard).toContainText("tidak tampil di kalender");
   });
 
-  test("tiap kotak menulis angka tanggal; di HP kisi dibuka di temuan terakhir", async ({ page }) => {
+  test("tampilan tanggal menulis angka di kotak; di HP kisi dibuka di temuan terakhir", async ({ page }) => {
     behaviour = { kind: "data", counts: { "2026-01-05": 3, "2026-10-06": 14 } };
     await page.setViewportSize({ width: 390, height: 900 });
     await open(page, "trainer");
 
     const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
     await expect(calendar).toBeVisible();
-    // Angka tanggal tampil di kotak, bukan hanya di tooltip.
-    await expect(calendar.getByRole("button", { name: "06/10/2026: 14 temuan" })).toHaveText("6");
-    await expect(calendar.getByRole("button", { name: "31/12/2026: 0 temuan" })).toHaveText("31");
-    const cell = await calendar.getByRole("button", { name: "06/10/2026: 14 temuan" }).boundingBox();
-    expect(cell!.width).toBeGreaterThanOrEqual(21.5);
-
-    // Layar sempit: kisi bisa digeser dan dibuka di hari bertemuan terakhir.
     const scroller = page.getByTestId("heatmap-calendar-scroller");
+    const last = calendar.getByRole("button", { name: "06/10/2026: 14 temuan" });
+
+    // Layar sempit, tampilan ringkas: kisi digeser ke hari bertemuan terakhir.
     await expect
       .poll(() => scroller.evaluate((el) => el.scrollLeft))
       .toBeGreaterThan(0);
-    await expect(calendar.getByRole("button", { name: "06/10/2026: 14 temuan" })).toBeInViewport();
+    await expect(last).toBeInViewport();
+
+    // Angka tanggal tampil di kotak setelah sakelar dinyalakan.
+    await page.getByRole("switch", { name: "Tampilkan tanggal" }).click();
+    await expect(last).toHaveText("6");
+    await expect(calendar.getByRole("button", { name: "31/12/2026: 0 temuan" })).toHaveText("31");
+    const cell = await last.boundingBox();
+    expect(cell!.width).toBeGreaterThanOrEqual(21.5);
+    // Kisi yang melebar tetap dibuka di hari bertemuan terakhir.
+    await expect(last).toBeInViewport();
     // Label hari menempel di kiri, jadi tetap terlihat setelah digeser.
     await expect(calendar.getByText("Sen", { exact: true })).toBeInViewport();
     // Halaman sendiri tidak ikut melebar.
