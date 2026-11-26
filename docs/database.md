@@ -198,10 +198,10 @@ Migration: `20261001120000_add_temuan_business_dates.sql` (nullable `DATE`, idem
 
 ### `qa_temuan` — jam layanan & durasi panggilan (opsional)
 
-| Kolom          | Tipe           | Arti                                                                                                                            |
-| -------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `jam_layanan`  | `time(0) NULL` | Jam dinding WIB peristiwa sisi layanan (`chat` = interaksi dimulai, `pencatatan` = tiket dibuat, `slik` = jam layanan).         |
-| `durasi_detik` | `integer NULL` | Durasi panggilan dalam detik; hanya untuk layanan `call` (`0 <= durasi_detik < 86400`).                                         |
+| Kolom          | Tipe           | Arti                                                                                                                    |
+| -------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `jam_layanan`  | `time(0) NULL` | Jam dinding WIB peristiwa sisi layanan (`chat` = interaksi dimulai, `pencatatan` = tiket dibuat, `slik` = jam layanan). |
+| `durasi_detik` | `integer NULL` | Durasi panggilan dalam detik; hanya untuk layanan `call` (`0 <= durasi_detik < 86400`).                                 |
 
 Aturan dan constraint yang berlaku:
 
@@ -214,7 +214,7 @@ Aturan dan constraint yang berlaku:
   - `qa_temuan_jam_layanan_clock_range`: `jam_layanan < TIME '24:00'`
 - **RLS/policy dan grant** tidak berubah; tidak ada index baru di MVP.
 
-Migration: `20261126120000_add_temuan_jam_durasi.sql` + rollback berpasangan `supabase/rollbacks/rollback_20261126120000_add_temuan_jam_durasi.sql`. Replay lokal bersih (`supabase db reset --local`) terverifikasi; **belum diterapkan ke target produksi `ruosnjmtywcrghjgqugz`**.
+Migration: `20261126120000_add_temuan_jam_durasi.sql` + rollback berpasangan `supabase/rollbacks/rollback_20261126120000_add_temuan_jam_durasi.sql`. Replay lokal bersih (`supabase db reset --local`) terverifikasi. **Diterapkan ke produksi `ruosnjmtywcrghjgqugz` pada 2026-11-26** dengan izin Fajar: `supabase db push --linked --dry-run` mencantumkan tepat file ini, lalu `supabase db push --linked --yes` menerapkannya dan mencatat versi `20261126120000` / `add_temuan_jam_durasi`. Verifikasi hanya-baca pasca-apply: kedua kolom (`integer`, `time(0)`), keempat CHECK di atas, versi tercatat, dan 0 baris berisi nilai jam/durasi.
 
 **Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/`. Migration Phase 4 di bawah adalah artifact repository yang additive dan transactional; keberadaannya di tree tidak berarti sudah diterapkan ke database remote.
 

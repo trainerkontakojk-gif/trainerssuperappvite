@@ -353,7 +353,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 - [x] `thermo-nuclear` review; perbaiki temuan.
 - [x] Root `pnpm typecheck`, `pnpm lint`, `pnpm build`; E2E fitur + regresi heatmap/tanggal yang ada (`sidak-heatmap*.spec.ts`, `sidak-temuan-dates*.spec.ts`, `sidak-temuan-import-dates.spec.ts`), satu run pada satu waktu.
 - [x] Dokumentasi: kolom baru di `docs/database.md`, kontrak di `docs/modules.md`; entri `plans/README.md`.
-- [ ] **STOP —** minta izin Fajar → terapkan migration ke prod → verifikasi kolom/CHECK → baru push kode ke `main` (`push-ready`).
+- [x] **STOP —** minta izin Fajar → terapkan migration ke prod → verifikasi kolom/CHECK → baru push kode ke `main` (`push-ready`).
 
 ### Fase 7 — Hermes sync & backfill
 
