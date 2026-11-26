@@ -21,35 +21,32 @@ Sheet "Rekap Ketidaksesuaian QA 2026" (sumber sync Hermes di `vps-fajar`) punya 
 
 ### Keputusan yang sudah dikonfirmasi Fajar
 
-| Aspek            | Ketentuan                                                                                                                                    | Dikonfirmasi |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| Digital chat     | JAM = saat interaksi layanan **dimulai**                                                                                                     | 2026-11-25   |
-| Email            | JAM = saat email **didistribusikan dari leader ke agent** (bukan saat dibalas, bukan saat QA sampling)                                       | 2026-11-26   |
-| CSO & pencatatan | JAM = saat **tiket layanan dibuat** (bukan saat layanan diterima, bukan saat QA sampling)                                                    | 2026-11-26   |
-| Call             | DURASI **disimpan**; call tidak punya jam                                                                                                    | 2026-11-25   |
-| BKO              | Tidak punya jam maupun durasi                                                                                                                | 2026-11-25   |
-| Pencatatan       | Punya JAM (di sheet EMAIL & MIX)                                                                                                             | 2026-11-25   |
-| Data lama        | Di-backfill dari sheet oleh Hermes; tanpa sumber jujur tetap `NULL`                                                                          | 2026-11-25   |
-| SLIK             | JAM = jam layanan                                                                                                                            | 2026-11-26   |
-| Tanggal & jam    | Tanggal kolom G dan JAM kolom H = hari dan peristiwa yang sama (email wajib selesai di hari distribusi)                                      | 2026-11-26   |
-| Ambang durasi    | Tidak ada target AHT; ambang diambil dari sebaran data (lihat Kategori)                                                                      | 2026-11-26   |
-| Jam chat         | Chat live tidak 24 jam. JAM chat di luar jam operasional bisa salah AM/PM saat input, atau balasan komentar IG (asinkron, sah di malam hari) | 2026-11-26   |
+| Aspek            | Ketentuan                                                                                                                                                                           | Dikonfirmasi |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Digital chat     | JAM = saat interaksi layanan **dimulai**                                                                                                                                            | 2026-11-25   |
+| Email            | JAM = saat email **didistribusikan dari leader ke agent** (bukan saat dibalas, bukan saat QA sampling)                                                                              | 2026-11-26   |
+| CSO & pencatatan | JAM = saat **tiket layanan dibuat** (bukan saat layanan diterima, bukan saat QA sampling)                                                                                           | 2026-11-26   |
+| Call             | DURASI **disimpan**; call tidak punya jam                                                                                                                                           | 2026-11-25   |
+| BKO              | Tidak punya jam maupun durasi                                                                                                                                                       | 2026-11-25   |
+| Pencatatan       | Punya JAM (di sheet EMAIL & MIX)                                                                                                                                                    | 2026-11-25   |
+| Data lama        | Di-backfill dari sheet oleh Hermes; tanpa sumber jujur tetap `NULL`                                                                                                                 | 2026-11-25   |
+| SLIK             | JAM = jam layanan                                                                                                                                                                   | 2026-11-26   |
+| Tanggal & jam    | Tanggal kolom G dan JAM kolom H = hari dan peristiwa yang sama (email wajib selesai di hari distribusi)                                                                             | 2026-11-26   |
+| Ambang durasi    | Tidak ada target AHT; ambang diambil dari sebaran data (lihat Kategori)                                                                                                             | 2026-11-26   |
+| Jam chat         | Chat live beroperasi **07:45–16:50**. JAM chat di luar itu bisa human error (mis. AM/PM tertukar), chat yang masuk sebelum agent sempat logout, atau balasan komentar IG (asinkron) | 2026-11-26   |
 
 Semua JAM adalah **peristiwa di sisi agent/layanan**, bukan jam kerja QA. Karena itu semuanya disimpan di satu kolom `jam_layanan` (sama seperti `tanggal_layanan` yang juga sudah berbeda makna per layanan), dengan arti per layanan dicatat di satu peta (`SIDAK_TIME_SOURCE`) dan di `COMMENT` kolom. Tidak perlu kolom `jam_sampel`.
 
-### Yang masih perlu dipastikan
+### Cek jam chat di luar jam operasional
 
-| ID  | Hal                               | Sampai dipastikan                                                                                             |
-| --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| C1  | Rentang jam operasional chat live | Data menunjukkan 07:00–16:59 (nol baris di jam 17 dan 02–06). Hermes memakai 07:00–16:59 sampai dikonfirmasi. |
+Sheet DIGITAL CHAT Jan–Nov, dicek 2026-11-26 (read-only lewat Google Sheets). Dari 1.661 baris ber-JAM, 1.580 baris berprefix chat (QADC/RECDC/OADC/REDC); sisanya (QADATA, RECEMAIL) ikut layanan hasil routing-nya, bukan aturan chat.
 
-Cek sheet DIGITAL CHAT Jan–Nov (2026-11-26, read-only lewat Google Sheets; 1.661 baris ber-JAM):
-
-- 20 baris di luar 07:00–16:59 atau tidak terbaca (Jan 11, Feb 2, Mar 3, Apr 2, Mei 1, Jul 1; Jun dan Agu–Nov nol).
-- **Penanda balasan komentar = format tiket.** Tidak ada kolom kanal. Tiket `L` + 10 digit (1.649 baris) tidak pernah memuat template komentar. Semua 9 tiket 13 digit (pola `26MMDD` + urutan) dan 1 tiket huruf_huruf memuat template balasan komentar/DM di kolom KETIDAKSESUAIAN/SEBAIKNYA. Prefix NO TEMUAN (QADC/RECDC) tidak membedakan kanal.
-- 4 dari 20 baris janggal bertiket 13 digit (Mar 73, Mar 114, Apr 82, Mei 35) → kemungkinan balasan komentar, jam malamnya wajar.
-- 15 baris janggal bertiket `L` (atau kolom E berisi nomor HP) tanpa penanda komentar; 11 di Januari, hampir semua `11:xx PM` / `12:xx AM` → pola khas AM/PM tertukar saat input. Satu baris (Jul 106) berisi tanggal, bukan jam.
-- Keyakinan pembeda: sedang — hanya 10 baris bertanda komentar, tapi tiap barisnya punya dua tanda yang sama-sama mengarah ke komentar.
+- **Penanda balasan komentar = format tiket.** Tidak ada kolom kanal. Tiket `L` + 10 digit tidak pernah memuat template komentar. Semua tiket 13 digit (`26MMDD` + 7 digit urutan) memuat template balasan komentar/DM di kolom KETIDAKSESUAIAN/SEBAIKNYA. Prefix NO TEMUAN tidak membedakan kanal. Keyakinan: sedang (penandanya baru terlihat di 10 baris, tapi tiap baris punya dua tanda yang sama-sama mengarah ke komentar).
+- **Di luar 07:45–16:50 ada 27 baris chat:**
+  - 6 bertiket 13 digit (Mar 73, Mar 114, Apr 82, Mei 35, Mei 60, Jul 10) → balasan komentar; jam disimpan.
+  - 20 bertiket `L` atau berisi nomor HP, tanpa penanda komentar → ditahan untuk dicek. Rinciannya: 14 di malam hari (10 di Januari, hampir semua `11:xx PM` / `12:xx AM`, pola khas AM/PM tertukar), 5 pagi 07:15–07:41 (semua Maret), dan Jan 124 (kolom E berisi nomor HP).
+  - 1 tidak terbaca (Jul 106 berisi tanggal, bukan jam).
+- Tidak ada chat live yang tercatat antara 16:51 dan 17:59.
 
 ### Kategori
 
@@ -246,9 +243,10 @@ Perubahan dikerjakan di `~/.hermes/skills/productivity/qa-rekap-md/scripts/`, de
 - **Baca sel mentah XLSX + format angkanya (numFmt)**, bukan teks gviz.
 - **Semantik kolom H ditentukan layanan baris** (hasil routing prefix), bukan nama sheet. Contoh: baris QADATA di sheet CALL berisi jam (`0.6118` = 14:41), bukan durasi.
 - Email, CSO, pencatatan, chat, SLIK → `jam_layanan`; call → `durasi_detik`.
-- **Chat di luar jam operasional** (sementara 07:00–16:59, lihat C1), dibedakan menurut format tiket:
-  - Tiket **bukan** `L` + 10 digit (13 digit / lainnya) → dianggap balasan komentar; jam disimpan apa adanya dan masuk kategori "Di luar jam". Tidak dilaporkan sebagai salah.
-  - Tiket `L` + 10 digit atau tidak terbaca formatnya → bisa salah AM/PM, bisa komentar; tidak bisa dibedakan dari nilainya. Disimpan `NULL` + masuk laporan. **Tidak dikoreksi otomatis** (tidak menebak AM/PM).
+- **Chat di luar jam operasional 07:45–16:50** (batas inklusif, konstanta di skrip Hermes), dibedakan menurut format tiket:
+  - Tiket 13 digit `26\d{11}` → balasan komentar; jam disimpan apa adanya. Tidak dilaporkan sebagai salah.
+  - Tiket lain (`L` + 10 digit, nomor HP, format lain) → bisa human error, chat masuk sebelum agent sempat logout, atau komentar. Tidak bisa dibedakan dari nilainya. Disimpan `NULL` + masuk laporan. **Tidak dikoreksi otomatis** (tidak menebak AM/PM).
+  - Aturan ini hanya untuk baris yang di-routing ke layanan chat. Baris QADATA/RECEMAIL di sheet DIGITAL CHAT ikut layanan masing-masing.
   - Jalan keluar laporan: tim QA membetulkan jam di sheet (sync berikutnya mengisinya), atau Fajar menyatakan jamnya benar. Pernyataan "jam benar" disimpan Hermes di daftar `NO TEMUAN` yang dikonfirmasi (file di folder skrip, bukan tebakan), lalu jamnya ditulis apa adanya.
 - **Aturan parse jam (fail closed — tidak cocok → `NULL` + masuk laporan):**
   - Serial waktu (pecahan hari) bila format selnya format waktu.
@@ -339,7 +337,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 ### Fase 7 — Hermes sync & backfill
 
 - [ ] Sync harian: tambah field, read-back; satu run dry-run lalu run nyata (izin Fajar).
-- [ ] Pastikan C1 (rentang jam operasional chat live) dan 15 tiket chat `L` di luar jam sudah dibetulkan di sheet atau dikonfirmasi benar.
+- [ ] Pastikan 20 tiket chat di luar 07:45–16:50 (daftar di laporan dry-run) sudah dibetulkan di sheet atau dikonfirmasi benar.
 - [ ] Backfill per bulan Jan–Nov (email, CSO, pencatatan, chat, SLIK, call): dry-run → laporan (tingkat terbaca, sel ditolak) → `--apply` dengan izin per run → read-back penuh.
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
 
