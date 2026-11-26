@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { SettingsSwitch } from "../settings/SettingsSwitch";
+import { WEEKDAY_FULL } from "./heatmap-insights";
 
 export type HeatmapDay = { date: string; count: number };
 
@@ -135,8 +136,6 @@ const FORCED_SELECTED_OUTLINE =
 const FORCED_FOCUS_OUTLINE =
   "not-forced-colors:focus-visible:outline-none forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-offset-1 forced-colors:focus-visible:outline-solid forced-colors:focus-visible:outline-[color:Highlight]";
 
-/** Label baris: Senin di atas, hanya baris ganjil yang diberi teks. */
-const WEEKDAY_LABELS = ["Sen", "", "Rab", "", "Jum", "", "Min"];
 const MONTH_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
   "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
@@ -160,12 +159,8 @@ const LABEL_COLUMN = "28px";
 const MONTH_GAP = "10px";
 /** Lebar minimal satu kotak hari (cukup untuk angka dua digit). */
 const CELL = "minmax(22px, 1fr)";
-/**
- * Lebar minimal satu kotak hari tanpa angka tanggal, dari `--heatmap-cell` di
- * kisi: 12px untuk mouse, 21px untuk layar sentuh (21px + celah 3px = target
- * sentuh 24px).
- */
-const COMPACT_CELL = "minmax(var(--heatmap-cell), 1fr)";
+/** Lebar minimal kotak ringkas: 21px + celah 3px = jarak antar-pusat 24px. */
+const COMPACT_CELL = "minmax(21px, 1fr)";
 
 /**
  * Tujuan tombol panah dari hari ke-`index` (urutan tanggal setahun), atau
@@ -274,8 +269,10 @@ function buildSplitYearGrid(year: number): YearGrid {
  * tiap bulan dengan jeda dan menulis angka tanggal di kotak (minimal 22px).
  * Setiap hari tetap `<button>` dengan `aria-label` tanggal dan jumlah temuan,
  * jadi jumlahnya terbaca lewat fokus, hover (`title`), dan pembaca layar,
- * tidak hanya warna. Di layar sempit kisi digeser ke samping dan dibuka di
- * tanggal terpilih atau temuan terakhir.
+ * tidak hanya warna. Kotak minimal 21px (jarak antar-pusat 24px) di semua
+ * perangkat; bila kisi tidak muat, ia digeser ke samping dan dibuka di
+ * tanggal terpilih atau temuan terakhir. Kisi ber-role `grid`: satu baris per
+ * hari dalam minggu, tiap tombol hari di dalam `gridcell` ber-`aria-selected`.
  */
 export default function SidakHeatmapCalendar({
   year,
@@ -301,6 +298,13 @@ export default function SidakHeatmapCalendar({
   const grid = useMemo(
     () => (showDates ? buildSplitYearGrid(year) : buildCompactYearGrid(year)),
     [year, showDates],
+  );
+  const daysByWeekday = useMemo(
+    () =>
+      WEEKDAY_FULL.map((_, weekday) =>
+        grid.days.filter((day) => day.weekday === weekday),
+      ),
+    [grid.days],
   );
 
   // Satu tab stop untuk seluruh kalender (roving tabindex): hari yang terakhir
@@ -345,7 +349,7 @@ export default function SidakHeatmapCalendar({
     const scroller = scrollerRef.current;
     if (!scroller || scroller.scrollWidth <= scroller.clientWidth) return;
     const cell =
-      scroller.querySelector<HTMLElement>('[aria-current="date"]') ??
+      scroller.querySelector<HTMLElement>('[aria-selected="true"] [data-date]') ??
       (lastFindingIso
         ? scroller.querySelector<HTMLElement>(`[data-date="${lastFindingIso}"]`)
         : null);
@@ -403,11 +407,11 @@ export default function SidakHeatmapCalendar({
         className="relative min-w-0 scroll-pl-8 overflow-x-auto pb-1 forced-colors:p-1"
       >
         <div
-          role="group"
+          role="grid"
           aria-label={`Kalender temuan ${year}`}
           aria-describedby={hintId}
           onKeyDown={moveFocus}
-          className="grid w-full min-w-max gap-[3px] [--heatmap-cell:12px] pointer-coarse:[--heatmap-cell:21px]"
+          className="grid w-full min-w-max gap-[3px]"
           style={{ gridTemplateColumns: grid.columns }}
         >
           <div
@@ -428,52 +432,62 @@ export default function SidakHeatmapCalendar({
               </span>
             ))}
           </div>
-          {WEEKDAY_LABELS.map((label, weekday) => (
-            <span
-              key={weekday}
-              aria-hidden="true"
-              // Menempel di kiri saat kisi digeser, supaya baris tetap terbaca.
-              className="sticky left-0 z-10 flex items-center self-stretch bg-surface text-xs leading-none text-muted-foreground"
-              style={{ gridRow: weekday + 2, gridColumn: 1 }}
-            >
-              {label}
-            </span>
-          ))}
-          {grid.days.map(({ iso, column, weekday }) => {
-            const count = countByDate.get(iso) ?? 0;
-            const bucket = bucketForCount(count, buckets);
-            const isSelected = selectedDate === iso;
-            const label = `${formatTanggal(iso)}: ${count} temuan`;
-            return (
-              <button
-                key={iso}
-                type="button"
-                tabIndex={iso === tabStopIso ? 0 : -1}
-                onFocus={() => setFocusedIso(iso)}
-                onClick={() => onSelectDay?.({ date: iso, count })}
-                aria-label={label}
-                title={label}
-                aria-current={isSelected ? "date" : undefined}
-                data-intensity={bucket.label}
-                data-date={iso}
-                style={{ gridRow: weekday + 2, gridColumn: column }}
-                className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow ${KEEP_DATA_COLORS} ${FORCED_FOCUS_OUTLINE} ${SELECTED_RING_FOCUS} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? `${SELECTED_RING} ${FORCED_SELECTED_OUTLINE}` : ""}`}
+          {WEEKDAY_FULL.map((name, weekday) => (
+            <div key={name} role="row" className="contents">
+              <span
+                role="rowheader"
+                aria-label={name}
+                // Menempel di kiri saat kisi digeser, supaya baris tetap terbaca.
+                className="sticky left-0 z-10 flex items-center self-stretch bg-surface text-xs leading-none text-muted-foreground"
+                style={{ gridRow: weekday + 2, gridColumn: 1 }}
               >
-                {/* Angka tanggal; jumlah temuan ada di label dan kartu terpilih. */}
-                {showDates && (
-                  <span aria-hidden="true">{Number(iso.slice(8))}</span>
-                )}
-              </button>
-            );
-          })}
+                {/* Senin di atas, hanya baris ganjil yang diberi teks. */}
+                <span aria-hidden="true">
+                  {weekday % 2 === 0 && name.slice(0, 3)}
+                </span>
+              </span>
+              {daysByWeekday[weekday].map(({ iso, column }) => {
+                const count = countByDate.get(iso) ?? 0;
+                const bucket = bucketForCount(count, buckets);
+                const isSelected = selectedDate === iso;
+                const label = `${formatTanggal(iso)}: ${count} temuan`;
+                return (
+                  <div
+                    key={iso}
+                    role="gridcell"
+                    aria-selected={isSelected}
+                    className="contents"
+                  >
+                    <button
+                      type="button"
+                      tabIndex={iso === tabStopIso ? 0 : -1}
+                      onFocus={() => setFocusedIso(iso)}
+                      onClick={() => onSelectDay?.({ date: iso, count })}
+                      aria-label={label}
+                      title={label}
+                      data-intensity={bucket.label}
+                      data-date={iso}
+                      style={{ gridRow: weekday + 2, gridColumn: column }}
+                      className={`flex aspect-square min-w-0 items-center justify-center text-xs font-medium tabular-nums transition-shadow ${KEEP_DATA_COLORS} ${FORCED_FOCUS_OUTLINE} ${SELECTED_RING_FOCUS} ${showDates ? "rounded-[3px]" : "rounded-[2px]"} ${LEVEL_CLASS[bucket.level]} ${LEVEL_TEXT[bucket.level]} ${isSelected ? `${SELECTED_RING} ${FORCED_SELECTED_OUTLINE}` : ""}`}
+                    >
+                      {/* Angka tanggal; jumlah temuan ada di label dan kartu terpilih. */}
+                      {showDates && (
+                        <span aria-hidden="true">{Number(iso.slice(8))}</span>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 
       <p id={hintId} className="text-xs text-muted-foreground">
         Kotak abu-abu berarti 0 temuan. Warna dibagi per kuartil hari
         bertemuan tahun ini; pilih tanggal untuk melihat jumlahnya. Nyalakan
-        Tampilkan tanggal untuk angka tanggal dan jeda per bulan. Di layar
-        sempit, geser ke samping untuk bulan lain. Dengan keyboard, gunakan
+        Tampilkan tanggal untuk angka tanggal dan jeda per bulan. Bila
+        kalender tidak muat, geser ke samping untuk bulan lain. Dengan keyboard, gunakan
         tombol panah untuk berpindah tanggal dan Enter untuk memilih.
       </p>
     </section>

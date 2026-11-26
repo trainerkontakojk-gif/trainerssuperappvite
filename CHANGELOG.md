@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-26
 
+- fix(sidak): give heatmap calendar cells a 24px target pitch on every pointer and expose the calendar as an ARIA grid with weekday rows and aria-selected day cells
 - fix(sidak): make the heatmap calendar one tab stop with arrow-key, Home, and End navigation, and keep its intensity colors, selection, and focus visible in forced-colors mode
 - fix(sidak): keep the heatmap 0-finding cells visible against the card in the dark theme
 - fix(sidak): give the heatmap selected and focused day a two-tone ring that keeps 3:1 contrast on the darkest and lightest cells in both themes

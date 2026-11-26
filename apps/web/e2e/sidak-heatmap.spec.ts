@@ -196,7 +196,7 @@ test.describe("Halaman Heatmap", () => {
 
     await expect(page.getByRole("heading", { level: 1, name: "Heatmap", exact: true })).toBeVisible();
     // Satu kisi setahun: kolom = minggu (Senin di atas), baris = hari.
-    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     await expect(calendar).toBeVisible();
     await expect(page.getByRole("heading", { name: "Kalender 2026" })).toBeVisible();
     await expect(calendar.getByRole("button", { name: "31/12/2026: 0 temuan" })).toBeVisible();
@@ -249,7 +249,7 @@ test.describe("Halaman Heatmap", () => {
     await page.setViewportSize({ width: 390, height: 900 });
     await open(page, "trainer");
 
-    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     await expect(calendar).toBeVisible();
     const scroller = page.getByTestId("heatmap-calendar-scroller");
     const last = calendar.getByRole("button", { name: "06/10/2026: 14 temuan" });
@@ -360,7 +360,7 @@ test.describe("Halaman Heatmap", () => {
     behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
     await open(page, "trainer");
 
-    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     await expect(calendar).toBeVisible();
     // Label bulan dan hari (tampilan ringkas), lalu angka tanggal (tampilan lengkap).
     const section = calendar.locator("xpath=ancestor::section[1]");
@@ -370,6 +370,34 @@ test.describe("Halaman Heatmap", () => {
     expect(await findTextBelowFloor(section)).toEqual([]);
   });
 
+  test("kotak ringkas selebar target 24px juga di desktop", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3, "2026-10-06": 14 } };
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await open(page, "trainer");
+
+    const scroller = page.getByTestId("heatmap-calendar-scroller");
+    const day = (name: string) => scroller.getByRole("button", { name });
+    await expect(page.getByRole("switch", { name: "Tampilkan tanggal" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+
+    const mon = await day("05/01/2026: 3 temuan").boundingBox();
+    const tue = await day("06/01/2026: 0 temuan").boundingBox();
+    const nextMon = await day("12/01/2026: 0 temuan").boundingBox();
+    if (!mon || !tue || !nextMon) throw new Error("Kotak tanggal tidak ter-render");
+
+    expect(nextMon.x - mon.x).toBeGreaterThanOrEqual(24);
+    expect(tue.y - mon.y).toBeGreaterThanOrEqual(24);
+    expect(mon.width).toBeGreaterThanOrEqual(21);
+    const pageOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(pageOverflow).toBeLessThanOrEqual(1);
+    await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+    await expect(day("06/10/2026: 14 temuan")).toBeInViewport({ ratio: 1 });
+  });
+
   test.describe("layar sentuh", () => {
     test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 900 } });
 
@@ -377,7 +405,7 @@ test.describe("Halaman Heatmap", () => {
       behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
       await open(page, "trainer");
 
-      const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+      const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
       await expect(calendar).toBeVisible();
       await expect(page.getByRole("switch", { name: "Tampilkan tanggal" })).toHaveAttribute(
         "aria-checked",
@@ -397,7 +425,7 @@ test.describe("Halaman Heatmap", () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await open(page, "trainer");
 
-    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     await expect(calendar).toBeVisible();
     const bars = page.getByRole("region", { name: "Temuan per hari dalam minggu" });
     await expect(bars).toBeVisible();
@@ -502,11 +530,32 @@ test.describe("Halaman Heatmap", () => {
     ).toBeVisible();
   });
 
+  test("kalender terbaca sebagai grid dengan baris hari", async ({ page }) => {
+    behaviour = { kind: "data", counts: { "2026-01-05": 3 } };
+    await open(page, "trainer");
+
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
+    const rows = calendar.getByRole("row");
+    await expect(rows).toHaveCount(7);
+    const weekdays = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+    for (const [index, weekday] of weekdays.entries()) {
+      await expect(rows.nth(index).getByRole("rowheader")).toHaveAccessibleName(weekday);
+    }
+
+    const day = page.getByRole("button", { name: "05/01/2026: 3 temuan" });
+    const cell = rows.first().getByRole("gridcell").filter({ has: day });
+    await expect(cell).toHaveAttribute("aria-selected", "false");
+    await cell.getByRole("button", { name: "05/01/2026: 3 temuan" }).click();
+    await expect(cell).toHaveAttribute("aria-selected", "true");
+    await expect(calendar.getByRole("gridcell", { selected: true })).toHaveCount(1);
+    await expect(calendar.locator("[aria-current]")).toHaveCount(0);
+  });
+
   test("kalender satu tab stop dan dijelajahi dengan tombol panah", async ({ page }) => {
     behaviour = { kind: "data", counts: { "2026-01-05": 3, "2026-03-10": 2 } };
     await open(page, "trainer");
 
-    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     const day = (name: string) => calendar.getByRole("button", { name });
     await expect(calendar).toBeVisible();
     await expect(calendar).toHaveAccessibleDescription(/tombol panah/);
@@ -554,7 +603,7 @@ test.describe("Halaman Heatmap", () => {
     await page.emulateMedia({ forcedColors: "active" });
     await open(page, "trainer");
 
-    const calendar = page.getByRole("group", { name: "Kalender temuan 2026" });
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     const bg = (name: string) =>
       calendar.getByRole("button", { name }).evaluate((el) => getComputedStyle(el).backgroundColor);
     await expect(calendar).toBeVisible();

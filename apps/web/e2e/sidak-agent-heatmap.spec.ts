@@ -58,7 +58,7 @@ test.describe("Heatmap di detail agent", () => {
     const a = await openHeatmapTab(page, { counts: { "2026-01-05": 4 } });
 
     await expect(
-      page.getByRole("group", { name: "Kalender temuan 2026" }),
+      page.getByRole("grid", { name: "Kalender temuan 2026" }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "05/01/2026: 4 temuan" }),
@@ -76,7 +76,7 @@ test.describe("Heatmap di detail agent", () => {
   }) => {
     await openHeatmapTab(page, { role: "leader", sidakAccess: "approved" });
     await expect(
-      page.getByRole("group", { name: "Kalender temuan 2026" }),
+      page.getByRole("grid", { name: "Kalender temuan 2026" }),
     ).toBeVisible();
   });
 

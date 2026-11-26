@@ -183,7 +183,7 @@ test.describe("Tab detail agen sesuai mockup (hermetic)", () => {
   }) => {
     await open(page);
     await page.getByRole("tab", { name: "Heatmap" }).click();
-    const calendar = page.getByLabel(/Kalender temuan 2026/);
+    const calendar = page.getByRole("grid", { name: "Kalender temuan 2026" });
     await expect(calendar).toBeVisible();
 
     const aside = page.getByRole("complementary", {
