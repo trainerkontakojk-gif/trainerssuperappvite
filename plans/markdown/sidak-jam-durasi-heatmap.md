@@ -299,7 +299,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 - [x] Drift-check plan ini terhadap `main` (file dan skema di "Kondisi kode" masih sama).
 - [x] Load `trainers-superapp-tdd`, `supabase-migration`; query Graphify untuk pemanggil `getSidakHeatmap`, `createTemuanBatch`, `updateTemuan`.
 - [x] Hermes: tulis parser `parse_jam`/`parse_durasi` sebagai modul terpisah + mode dry-run laporan saja (tanpa tulis DB). Jalankan untuk Jan–Nov; simpan laporan di `~/.hermes/cache/scratch/`. Kirim daftar sel tak terbaca ke Fajar. (2026-11-26: `parse_waktu.py` + `jam_durasi_dryrun.py`; laporan `jam-durasi-dryrun-20261126T160455+0800.{json,md}`.)
-- [ ] Minta izin Fajar sebelum menambah/menjalankan unit test Python parser (aturan non-E2E AGENTS.md); bila disetujui, daftar semua failure mode dulu.
+- [x] Minta izin Fajar sebelum menambah/menjalankan unit test Python parser (aturan non-E2E AGENTS.md); bila disetujui, daftar semua failure mode dulu. (2026-11-26: Fajar mengizinkan. Failure mode didaftar dulu, lalu `scripts/test_parse_waktu.py` dan `scripts/test_sidak_rows.py` di Hermes: 57 test OK. Test menemukan bug `parse_dt`: `"32 Okt 2026"` menjadi `2026-10-32` dan angka besar membuat `OverflowError`. Diperbaiki atas izin Fajar menjadi fail closed (`None`). Test baru gagal di kode lama dan lulus di kode baru; dry-run sync Jan–Nov identik per bulan dengan pasca-cek final, jadi data prod tidak terdampak. Cara menjalankan dan risiko `date_key` yang tersisa dicatat di runbook Hermes `jam-durasi-kolom-h.md`.)
 
 ### Fase 1 — Schema & kontrak bersama
 
