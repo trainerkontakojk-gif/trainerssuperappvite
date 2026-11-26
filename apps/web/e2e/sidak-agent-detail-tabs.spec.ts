@@ -137,6 +137,7 @@ const cellsOf = (page: Page, tableName: string) =>
 async function expectKeyboardScrollable(wrapper: Locator, tableName: string) {
   await expect(wrapper).toBeFocused();
   const table = wrapper.getByRole("table", { name: tableName });
+  await expect.soft(table.locator("caption")).toHaveText(tableName);
   await expect(table.locator('thead th:not([scope="col"])')).toHaveCount(0);
   const start = await wrapper.evaluate((element) => element.scrollLeft);
   await wrapper.press("ArrowRight");
@@ -176,6 +177,49 @@ test.describe("Aksesibilitas detail agen", () => {
     await page.keyboard.press("Space");
     await expect(page).toHaveURL(/tab=simulations/);
     await expect(page.getByRole("tabpanel", { name: "Simulasi" })).toBeVisible();
+  });
+
+  test("Tab keluar dari daftar dan Shift+Tab kembali ke tab aktif", async ({ page }) => {
+    await open(page);
+    const list = page.getByRole("tablist", { name: "Bagian profil agen" });
+    const summary = list.getByRole("tab", { name: "Ringkasan" });
+    const trend = list.getByRole("tab", { name: "Tren" });
+    const auditYear = page.getByRole("combobox", { name: "Tahun audit" });
+
+    await summary.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(trend).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(auditYear).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(summary).toBeFocused();
+
+    await trend.click();
+    await page.keyboard.press("ArrowLeft");
+    await expect(summary).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(auditYear).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(trend).toBeFocused();
+    await expect(page).toHaveURL(/tab=trend/);
+  });
+
+  test("tab aktif tetap punya garis bawah yang terlihat dalam forced colors", async ({ page }) => {
+    await page.emulateMedia({ forcedColors: "active" });
+    await open(page);
+    const active = page.getByRole("tab", { selected: true });
+    const inactive = page.getByRole("tab", { name: "Tren" });
+    const underline = await active.evaluate((tab) => {
+      const style = getComputedStyle(tab, "::after");
+      return {
+        width: parseFloat(style.borderBottomWidth),
+        style: style.borderBottomStyle,
+        opacity: style.opacity,
+      };
+    });
+    expect(underline).toMatchObject({ style: "solid", opacity: "1" });
+    expect(underline.width).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => inactive.evaluate((tab) => getComputedStyle(tab, "::after").opacity)).toBe("0");
   });
 
   test("setiap tab menunjuk panel yang ada, termasuk panel yang belum dibuka", async ({ page }) => {

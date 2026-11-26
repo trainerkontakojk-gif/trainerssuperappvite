@@ -275,10 +275,8 @@ function ParameterTable({
         tabIndex={0}
         className="min-w-0 overflow-x-auto rounded-xl border border-border focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
-        <table
-          aria-labelledby="agent-parameter-table-title"
-          className="w-full border-collapse text-left text-sm"
-        >
+        <table className="w-full border-collapse text-left text-sm">
+          <caption className="sr-only">Temuan per parameter</caption>
           <thead>
             <tr className="border-b border-border">
               <th scope="col" className="px-3 py-2 text-xs font-semibold text-muted-foreground">

@@ -26,6 +26,7 @@ export default function SidakAgentDetailTabs({
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false });
+  const [focusWithinList, setFocusWithinList] = useState(false);
 
   useLayoutEffect(() => {
     const strip = scrollRef.current;
@@ -76,19 +77,27 @@ export default function SidakAgentDetailTabs({
         <div
           ref={scrollRef}
           data-scroll-x="agent-tabs"
-          className="overflow-x-auto overscroll-x-contain scroll-px-4 px-4 not-forced-colors:[scrollbar-width:none] sm:px-0"
+          className="overflow-x-auto overscroll-x-contain scroll-px-4 px-4 sm:px-0"
         >
           <TabsList
             variant="line"
             activateOnFocus={false}
             aria-label="Bagian profil agen"
+            onFocus={() => setFocusWithinList(true)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                setFocusWithinList(false);
+              }
+            }}
             className="flex h-auto w-max min-w-0 justify-start gap-6 p-0 any-pointer-coarse:gap-3"
           >
             {SIDAK_AGENT_DETAIL_TABS.map((tab) => (
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="h-11 flex-none shrink-0 rounded-none px-0 text-sm font-medium text-muted-foreground after:!bottom-0 hover:text-foreground focus-visible:ring-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring data-active:text-foreground motion-reduce:transition-none any-pointer-coarse:min-h-[44px] any-pointer-coarse:min-w-[44px] any-pointer-coarse:px-2"
+                // Base UI owns roving focus inside the list. Re-enter on selection.
+                {...(!focusWithinList && { tabIndex: tab.id === activeTab ? 0 : -1 })}
+                className="h-11 flex-none shrink-0 rounded-none px-0 text-sm font-medium text-muted-foreground after:!bottom-0 after:bg-transparent after:border-b-2 after:border-solid after:border-foreground hover:text-foreground focus-visible:ring-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring data-active:text-foreground motion-reduce:transition-none any-pointer-coarse:min-h-[44px] any-pointer-coarse:min-w-[44px] any-pointer-coarse:px-2"
               >
                 {tab.label}
                 {counts?.[tab.id] !== undefined ? (

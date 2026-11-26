@@ -119,6 +119,21 @@ test.describe("Detail agen dengan sentuhan", () => {
     await expect(tickets).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("MonthRail yang overflow dapat digulir dengan keyboard pada perangkat sentuh", async ({ page }) => {
+    await openRichDetail(page, { width: 375, height: 812 });
+    const rail = page.getByRole("region", { name: "Gulir grafik skor per bulan" });
+    const firstMonth = rail.getByRole("button", { name: /^Pilih bulan Jan/ });
+    await firstMonth.focus();
+    await page.keyboard.press("Shift+Tab");
+    await expect(rail).toBeFocused();
+    const before = await rail.evaluate((el) => el.scrollLeft);
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => rail.evaluate((el) => el.scrollLeft)).toBeGreaterThan(before);
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await expect(rail).not.toHaveAttribute("tabindex", "0");
+  });
+
   test("strip tab: fade mengikuti overflow, swipe tidak memilih, dan tautan menampilkan tab aktif", async ({ page }) => {
     await openRichDetail(page, { width: 375, height: 812 }, "?tab=simulations");
     const strip = page.locator('[data-scroll-x="agent-tabs"]');
@@ -142,6 +157,7 @@ test.describe("Detail agen dengan sentuhan", () => {
     await expect(summary).toHaveAttribute("aria-selected", "true");
     await expect(endFade).toBeVisible();
     await expect(startFade).toBeHidden();
+    await expect.soft(strip).toHaveCSS("scrollbar-width", "auto");
     expect(await isFullyInStrip()).toBe(false);
     await strip.locator("..").screenshot({ path: test.info().outputPath("tab-strip-start-375.png") });
     await strip.scrollIntoViewIfNeeded();

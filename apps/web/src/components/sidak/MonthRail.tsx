@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   SIDAK_QA_TARGET,
   SIDAK_SCORE_FILL,
@@ -41,7 +42,23 @@ export default function MonthRail({
   selectedMonth,
   onMonthSelect,
 }: Props) {
-  if (summaries.length === 0) return null;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const hasMonths = summaries.length > 0;
+  const [isScrollable, setIsScrollable] = useState(false);
+
+  useLayoutEffect(() => {
+    const rail = scrollRef.current;
+    if (!hasMonths || !rail || !rail.firstElementChild) return;
+
+    const measure = () => setIsScrollable(rail.scrollWidth > rail.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(rail);
+    observer.observe(rail.firstElementChild);
+    return () => observer.disconnect();
+  }, [hasMonths]);
+
+  if (!hasMonths) return null;
 
   const byMonth = new Map(summaries.map((summary) => [summary.month, summary]));
   const year = summaries[0]!.year;
@@ -74,8 +91,12 @@ export default function MonthRail({
       </div>
 
       <div
+        ref={scrollRef}
+        role="region"
+        aria-label="Gulir grafik skor per bulan"
+        tabIndex={isScrollable ? 0 : undefined}
         data-scroll-x="agent-months"
-        className="any-pointer-coarse:overflow-x-auto any-pointer-coarse:overscroll-x-contain"
+        className="focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring any-pointer-coarse:overflow-x-auto any-pointer-coarse:overscroll-x-contain"
       >
         <div className="relative grid grid-cols-12 gap-1 sm:gap-2 any-pointer-coarse:w-max any-pointer-coarse:min-w-full any-pointer-coarse:grid-cols-[repeat(12,minmax(44px,1fr))]">
           <div

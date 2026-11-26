@@ -248,10 +248,8 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
                 tabIndex={0}
                 className="min-w-0 overflow-x-auto rounded-xl border border-border focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
               >
-                <table
-                  aria-label="Riwayat simulasi"
-                  className="w-full border-collapse text-left text-sm"
-                >
+                <table className="w-full border-collapse text-left text-sm">
+                  <caption className="sr-only">Riwayat simulasi</caption>
                   <thead>
                     <tr className="border-b border-border">
                       {["Modul", "Skenario", "Tanggal", "Telaah"].map((label) => (
