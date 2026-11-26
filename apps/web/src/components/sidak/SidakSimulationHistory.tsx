@@ -242,7 +242,12 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
 
           {items.length > 0 ? (
             <>
-              <div className="min-w-0 overflow-x-auto rounded-xl border border-border">
+              <div
+                role="region"
+                aria-label="Gulir tabel riwayat simulasi"
+                tabIndex={0}
+                className="min-w-0 overflow-x-auto rounded-xl border border-border focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+              >
                 <table
                   aria-label="Riwayat simulasi"
                   className="w-full border-collapse text-left text-sm"
@@ -252,15 +257,16 @@ export default function SidakSimulationHistory({ agentId }: { agentId: string })
                       {["Modul", "Skenario", "Tanggal", "Telaah"].map((label) => (
                         <th
                           key={label}
+                          scope="col"
                           className="px-3 py-2 text-xs font-semibold text-muted-foreground"
                         >
                           {label}
                         </th>
                       ))}
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
+                      <th scope="col" className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
                         Skor
                       </th>
-                      <th className="px-3 py-2">
+                      <th scope="col" className="px-3 py-2">
                         <span className="sr-only">Aksi</span>
                       </th>
                     </tr>

@@ -30,6 +30,8 @@ interface Props {
   colorMap?: Record<string, string>;
   forecastResult?: SidakForecastSeries | null;
   forecastResults?: SidakForecastSeries[];
+  /** Use image semantics when the surrounding view provides the data in text. */
+  accessibleSummary?: { label: string; descriptionId: string };
 }
 
 const VALUE_FORMAT = new Intl.NumberFormat("id-ID", {
@@ -111,6 +113,7 @@ export default function ParamTrendChart({
   colorMap,
   forecastResult,
   forecastResults,
+  accessibleSummary,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
@@ -268,7 +271,14 @@ export default function ParamTrendChart({
         minHeight={0}
         initialDimension={{ width: 1, height: 1 }}
       >
-        <AreaChart data={chartData} margin={{ top: 24, right: 16, left: -20, bottom: 0 }}>
+        <AreaChart
+          data={chartData}
+          margin={{ top: 24, right: 16, left: -20, bottom: 0 }}
+          accessibilityLayer={!accessibleSummary}
+          role={accessibleSummary ? "img" : undefined}
+          aria-label={accessibleSummary?.label}
+          aria-describedby={accessibleSummary?.descriptionId}
+        >
           {projectionRange ? (
             <ReferenceArea
               x1={projectionRange.from}

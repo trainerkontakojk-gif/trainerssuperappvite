@@ -5,7 +5,7 @@
  * di-mock di spec ini. Plan: plans/markdown/sidak-redesign.md.
  */
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   AGENT_ID,
   openAgentDetail,
@@ -133,6 +133,110 @@ const cellsOf = (page: Page, tableName: string) =>
         ),
       ),
     );
+
+async function expectKeyboardScrollable(wrapper: Locator, tableName: string) {
+  await expect(wrapper).toBeFocused();
+  const table = wrapper.getByRole("table", { name: tableName });
+  await expect(table.locator('thead th:not([scope="col"])')).toHaveCount(0);
+  const start = await wrapper.evaluate((element) => element.scrollLeft);
+  await wrapper.press("ArrowRight");
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(start);
+}
+
+test.describe("Aksesibilitas detail agen", () => {
+  test("panah memindahkan fokus; Enter dan Spasi memilih tab dan memperbarui URL", async ({
+    page,
+  }) => {
+    const { simulationQueries } = await open(page);
+    const list = page.getByRole("tablist", { name: "Bagian profil agen" });
+    const summary = list.getByRole("tab", { name: "Ringkasan" });
+    const trend = list.getByRole("tab", { name: "Tren" });
+    const simulation = list.getByRole("tab", { name: "Simulasi" });
+    const initialUrl = page.url();
+
+    await summary.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(trend).toBeFocused();
+    await expect(trend).toHaveAttribute("aria-selected", "false");
+    await expect(page.getByRole("tabpanel", { name: "Ringkasan" })).toBeVisible();
+    await expect(page).toHaveURL(initialUrl);
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/tab=trend/);
+    await expect(page.getByRole("tabpanel", { name: "Tren" })).toBeVisible();
+
+    await page.keyboard.press("End");
+    await expect(simulation).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(summary).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(simulation).toBeFocused();
+    await expect(page).toHaveURL(/tab=trend/);
+    expect(simulationQueries).toEqual([]);
+    await page.keyboard.press("Space");
+    await expect(page).toHaveURL(/tab=simulations/);
+    await expect(page.getByRole("tabpanel", { name: "Simulasi" })).toBeVisible();
+  });
+
+  test("setiap tab menunjuk panel yang ada, termasuk panel yang belum dibuka", async ({ page }) => {
+    await open(page);
+    const tabs = page.getByRole("tablist", { name: "Bagian profil agen" }).getByRole("tab");
+    await expect(tabs).toHaveCount(5);
+    for (const tab of await tabs.all()) {
+      await expect(tab).toHaveAttribute("aria-controls", /.+/);
+      const id = await tab.getAttribute("aria-controls");
+      const panel = page.locator(`[id="${id}"]`);
+      await expect(panel).toHaveAttribute("role", "tabpanel");
+      await expect(panel).toHaveAttribute("aria-labelledby", (await tab.getAttribute("id"))!);
+      await expect(panel.and(page.locator("[aria-label]"))).toHaveCount(0);
+      if ((await tab.getAttribute("aria-selected")) === "false") {
+        await expect(panel).toBeHidden();
+      }
+    }
+    await expect(page.locator('[aria-label="Peringkat dan forecast"]:not([role])')).toHaveCount(0);
+  });
+
+  test("grafik Tren memiliki nama dan alternatif data tanpa role application", async ({ page }) => {
+    await open(page);
+    await page.getByRole("tab", { name: "Tren" }).click();
+    const panel = page.getByRole("tabpanel", { name: "Tren" });
+    const chart = panel.getByRole("img", {
+      name: "Grafik tren temuan per bulan: Total dan parameter",
+    });
+    const monthlyTotals = /Total temuan: Jun 2, Jul 2, Agu 4, Sep 3, Okt 6/;
+    await expect(chart).toHaveAccessibleDescription(monthlyTotals);
+    await expect(panel.getByText(monthlyTotals)).toBeVisible();
+    await expect(panel.locator('svg[role="application"]')).toHaveCount(0);
+
+    await panel.getByRole("button", { name: "Verifikasi data" }).click();
+    await expect(panel.getByRole("img", {
+      name: "Grafik tren temuan per bulan: Verifikasi data",
+    })).toHaveAccessibleDescription(/Temuan per parameter/);
+  });
+
+  test("tabel Tren dan Simulasi dapat dicapai dengan Tab dan digulir dengan panah", async ({ page }) => {
+    await open(page);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByRole("tab", { name: "Tren" }).click();
+    const series = page.getByRole("group", { name: "Filter seri grafik" });
+    await series.getByRole("button").last().focus();
+    await page.keyboard.press("Tab");
+    await expectKeyboardScrollable(
+      page.getByRole("region", { name: "Gulir tabel temuan per parameter" }),
+      "Temuan per parameter",
+    );
+
+    await page.getByRole("tab", { name: "Simulasi" }).click();
+    await expect(page.getByRole("table", { name: "Riwayat simulasi" })).toBeVisible();
+    const modules = page.getByRole("group", { name: "Filter modul riwayat simulasi" });
+    await modules.getByRole("button", { name: "Telefun" }).focus();
+    await page.keyboard.press("Tab");
+    await expectKeyboardScrollable(
+      page.getByRole("region", { name: "Gulir tabel riwayat simulasi" }),
+      "Riwayat simulasi",
+    );
+  });
+});
 
 test.describe("Tab detail agen sesuai mockup (hermetic)", () => {
   test.slow();

@@ -204,7 +204,8 @@ Kartu per entitas diperbolehkan ketika setiap kartu adalah target navigasi yang 
 
 ### Detail Agen (SIDAK)
 
-- Navigasi `Ringkasan`, `Tren`, `Temuan`, dan `Simulasi` harus tampak sebagai kontrol interaktif, bukan teks navigasi biasa: tampilkan state aktif yang jelas serta state hover dan focus yang terlihat.
+- Navigasi `Ringkasan`, `Tren`, `Temuan`, `Heatmap`, dan `Simulasi` harus tampak sebagai kontrol interaktif, bukan teks navigasi biasa: tampilkan state aktif yang jelas serta state hover dan focus yang terlihat. Panah kiri/kanan dan Home/End memindahkan fokus; Enter/Spasi memilih tab dan memperbarui alamat.
+- Pada tab Tren dan Simulasi, area gulir tabel dapat dicapai dengan Tab dan digulir dengan panah. Grafik Tren punya nama dan deskripsi total bulanan untuk pembaca layar; rincian parameter tersedia di tabel.
 - Pertahankan lebar tiap tab sesuai labelnya. Pada layar sempit, izinkan grup tab digulir horizontal tanpa memotong label atau target interaksi.
 - Susun Ringkasan dengan hierarki eksplisit: judul dan deskripsi, Quickview performa, lalu nilai skor per bulan. Gunakan divider dan jarak section untuk mengelompokkan konten; hindari badge dekoratif atau kartu tambahan yang tidak menambah makna.
 - Jelaskan fungsi pemilih bulan, lalu tampilkan detail skor, tiket pengurang, dan akar masalah untuk bulan yang dipilih.

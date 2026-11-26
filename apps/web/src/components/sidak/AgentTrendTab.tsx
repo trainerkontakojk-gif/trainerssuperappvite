@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { AgentComparisonTable } from "@trainers/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,6 +44,7 @@ export default function AgentTrendTab({
   comparisonTable,
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const chartDescriptionId = useId();
 
   const trendRangeLabel =
     labels.length > 0 ? `${labels[0]}–${labels[labels.length - 1]}` : "";
@@ -98,6 +99,14 @@ export default function AgentTrendTab({
     : new Set<string>();
 
   const showTotal = !isFiltered;
+  const totalDataset = showTotal ? datasets.find((ds) => ds.isTotal) : undefined;
+  const totalDescription = totalDataset
+    ? `Total temuan: ${labels.map((label, i) => `${label} ${totalDataset.data[i] ?? 0}`).join(", ")}.`
+    : "";
+  const hasParameterDescription = !isTotalOnly && paramDatasets.length > 0;
+  const chartSeriesLabel = isTotalOnly
+    ? "Total saja"
+    : (activeFilter ?? "Total dan parameter");
 
   return (
     <Card className="gap-0 border-border bg-surface py-0 ring-0">
@@ -192,8 +201,24 @@ export default function AgentTrendTab({
             filterLabel={activeFilter || undefined}
             isFiltered={isFiltered}
             colorMap={colorMap}
+            accessibleSummary={{
+              label: `Grafik tren temuan per bulan: ${chartSeriesLabel}`,
+              descriptionId: chartDescriptionId,
+            }}
           />
         </div>
+
+        <p
+          id={chartDescriptionId}
+          className={totalDescription ? "mt-2 text-sm text-fg2" : "sr-only"}
+        >
+          {totalDescription}
+          {hasParameterDescription ? (
+            <span className="sr-only">
+              {" "}Rincian bulanan ada di tabel Temuan per parameter.
+            </span>
+          ) : null}
+        </p>
 
         {paramDatasets.length > 0 ? (
           <ParameterTable labels={labels} datasets={paramDatasets} />
@@ -244,28 +269,34 @@ function ParameterTable({
       >
         Temuan per parameter
       </h3>
-      <div className="min-w-0 overflow-x-auto rounded-xl border border-border">
+      <div
+        role="region"
+        aria-label="Gulir tabel temuan per parameter"
+        tabIndex={0}
+        className="min-w-0 overflow-x-auto rounded-xl border border-border focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+      >
         <table
           aria-labelledby="agent-parameter-table-title"
           className="w-full border-collapse text-left text-sm"
         >
           <thead>
             <tr className="border-b border-border">
-              <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <th scope="col" className="px-3 py-2 text-xs font-semibold text-muted-foreground">
                 Parameter
               </th>
               {labels.map((label) => (
                 <th
                   key={label}
+                  scope="col"
                   className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground"
                 >
                   {label}
                 </th>
               ))}
-              <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
+              <th scope="col" className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
                 Total
               </th>
-              <th className="px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <th scope="col" className="px-3 py-2 text-xs font-semibold text-muted-foreground">
                 Arah
               </th>
             </tr>

@@ -216,7 +216,7 @@ export default function AgentPerformanceQuickview({
       aria-label={scopeLabel ? `Performa ${scopeLabel}` : "Performa agen"}
       className="flex min-w-0 flex-col"
     >
-      <div aria-label="Peringkat dan forecast" className="flex flex-col">
+      <div className="flex flex-col">
         <RankMetric
           label="Tim Gabungan"
           rowLabel="Peringkat tim gabungan"
