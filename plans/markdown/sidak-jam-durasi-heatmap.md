@@ -402,6 +402,8 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 - [ ] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
   - Cek data 2026-11-26 (baca prod lewat API Hermes, belum lewat UI): 2.333 nilai jam (chat + pencatatan + SLIK) dengan sebaran pagi 38,36% / siang 31,80% / sore 29,19% / luar jam 0,64%, selisih ≤ 0,81 poin dari sheet setelah aturan. Durasi call 1.748 nilai, median 9:15 (singkat 11,96%, sedang 69,62%, panjang 18,42%).
   - Masih terbuka: angka profiling awal (2.561 jam, 1.379 durasi) tidak bisa direproduksi; profil ulang workbook memberi 2.958 dan 1.348. Ada baris sheet tanpa pasangan SIDAK (11 chat, 33 SLIK, 54 call) dan bobot call beda (1.276 baris sheet = 1.838 temuan prod). 3f328335 durasinya tetap NULL karena dua nilai sumber bertentangan. Tampilan UI per role belum dicek; E2E tidak boleh diarahkan ke prod.
+  - Cek UI 2026-11-26 (akun admin Fajar, `/sidak/heatmap`, Semua layanan, 2026, dibuka lewat browser T3): setiap sel "Jam temuan per layanan" dan "Durasi panggilan" sama persis dengan hitungan ulang read-only dari prod memakai filter yang sama dengan endpoint (non-phantom, `is_countable`, `tanggal_layanan` 2026). Chat 719/646/562/4 (37 kosong), pencatatan 35/16/40/6 (1), SLIK 140/80/79/5 (1); call singkat 209, sedang 1.222, panjang 322, < 1 menit 8, kosong 99; total 5.381.
+  - Role lain (leader/agent) belum dicek karena hanya akun admin yang tersedia di browser.
 
 ## STOP conditions
 
