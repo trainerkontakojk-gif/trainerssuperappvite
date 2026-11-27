@@ -172,6 +172,91 @@ test.describe("Landing publik — split-flap", () => {
     expectHermetic(audit);
   });
 
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`panggung KETIK menampilkan umpan balik utuh di ${viewport.width}×${viewport.height} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const audit = await openGuestLanding(page, "reduce");
+      await page.evaluate(() => document.fonts.ready);
+      const scene = page.locator('.scene.is-on[data-scene="ketik"]');
+      await scene.evaluate((element) =>
+        element.closest(".stage")!.scrollIntoView({ block: "center" }),
+      );
+      const layout = await scene.evaluate((element) => {
+        const stage = element.closest(".stage")!.getBoundingClientRect();
+        const feedback = element
+          .querySelector(".feedback")!
+          .getBoundingClientRect();
+        return {
+          previewBottom: stage.bottom,
+          feedbackBottom: feedback.bottom,
+          viewportBottom: innerHeight,
+        };
+      });
+
+      expect(layout.feedbackBottom).toBeLessThanOrEqual(layout.previewBottom);
+      expect(layout.feedbackBottom).toBeLessThanOrEqual(layout.viewportBottom);
+      expectHermetic(audit);
+    });
+  }
+
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+    { width: 667, height: 375 },
+  ]) {
+    test(`tautan footer menampilkan judul modul di ${viewport.width}×${viewport.height} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const audit = await openGuestLanding(page, "reduce");
+      const footer = page.getByRole("navigation", { name: "Navigasi footer" });
+      await footer.getByRole("link", { name: "TELEFUN", exact: true }).click();
+      await expect(page).toHaveURL(/#modul-telefun$/);
+
+      const heading = page.locator("#modul-telefun h3");
+      const headingVisible = await heading.evaluate((element) => {
+        const { left, top, width, height, bottom } =
+          element.getBoundingClientRect();
+        const front = document.elementFromPoint(
+          left + width / 2,
+          top + height / 2,
+        );
+        return top >= 0 && bottom <= innerHeight && element.contains(front);
+      });
+
+      expect(headingVisible).toBe(true);
+      expectHermetic(audit);
+    });
+  }
+
+  for (const motion of ["reduce", "no-preference"] as const) {
+    test(`timer contoh Telefun berhenti dalam lima detik (${motion})`, async ({
+      page,
+    }) => {
+      await page.clock.install();
+      const audit = await openGuestLanding(page, motion);
+      await activateStep(page, "telefun");
+      const clock = page.locator(
+        '.scene[data-scene="telefun"] .call-time span',
+      );
+      const start = await clock.innerText();
+
+      await page.clock.runFor(5000);
+      const settled = await clock.innerText();
+      await page.clock.runFor(6000);
+      await expect(clock).toHaveText(settled);
+
+      if (motion === "reduce") expect(settled).toBe(start);
+      else expect(settled).not.toBe(start);
+      expectHermetic(audit);
+    });
+  }
+
   test("tombol tamu membuka AuthModal mode masuk dan ajukan akses", async ({
     page,
   }) => {

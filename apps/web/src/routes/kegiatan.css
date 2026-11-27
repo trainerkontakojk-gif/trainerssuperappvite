@@ -35,6 +35,7 @@
 
 .kegiatan-shell .kegiatan-controls {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   margin-bottom: 24px;
 }
@@ -53,8 +54,9 @@
   gap: 8px;
   overflow-x: auto;
   padding: 2px 2px 8px;
+  scroll-padding-inline: 4px;
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--fg3) transparent;
 }
 
 .kegiatan-shell .kegiatan-year-button,
@@ -259,9 +261,7 @@
 }
 
 .kegiatan-shell .kegiatan-card-image {
-  position: relative;
   display: block;
-  overflow: hidden;
   aspect-ratio: 4 / 5;
   background: var(--surface-sunken);
 }
@@ -270,43 +270,20 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transition: transform 220ms ease-out;
-}
-
-.kegiatan-shell .kegiatan-card:hover .kegiatan-card-image img,
-.kegiatan-shell .kegiatan-card:focus-visible .kegiatan-card-image img {
-  transform: scale(1.025);
+  object-fit: contain;
 }
 
 .kegiatan-shell .kegiatan-card-open {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--inv-bg);
-  color: var(--inv-fg);
+  color: var(--fg2);
   font-size: 12px;
   font-weight: 600;
-  opacity: 0;
-  transform: translateY(4px);
-  transition:
-    opacity 160ms ease-out,
-    transform 160ms ease-out;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .kegiatan-shell .kegiatan-card:hover .kegiatan-card-open,
 .kegiatan-shell .kegiatan-card:focus-visible .kegiatan-card-open {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@media (hover: none) {
-  .kegiatan-shell .kegiatan-card-open {
-    opacity: 1;
-    transform: none;
-  }
+  color: var(--fg);
 }
 
 .kegiatan-shell .kegiatan-card-copy {
@@ -436,8 +413,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .kegiatan-shell .kegiatan-card,
-  .kegiatan-shell .kegiatan-card-image img,
-  .kegiatan-shell .kegiatan-card-open,
   .kegiatan-shell .kegiatan-year-button,
   .kegiatan-shell .kegiatan-program-button {
     transition-duration: 0.01ms;

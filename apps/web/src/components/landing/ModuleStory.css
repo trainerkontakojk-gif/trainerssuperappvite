@@ -131,7 +131,6 @@
   align-self: start;
 }
 .landing-wrapper .stage {
-  --channel: var(--ketik);
   display: flex;
   flex-direction: column;
   height: 520px;
@@ -140,31 +139,18 @@
   border-radius: 20px;
   background: var(--surface);
 }
-.landing-wrapper .stage[data-active="pdkt"] {
-  --channel: var(--pdkt);
-}
-.landing-wrapper .stage[data-active="telefun"] {
-  --channel: var(--telefun);
-}
-.landing-wrapper .stage[data-active="ktp"] {
-  --channel: var(--ktp);
-}
-.landing-wrapper .stage[data-active="sidak"] {
-  --channel: var(--sidak);
-}
-.landing-wrapper .stage[data-active="tna"] {
-  --channel: var(--tna);
-}
 .landing-wrapper .stage-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px 16px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--border);
 }
 .landing-wrapper .stage-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   font-family: var(--font-display);
@@ -175,12 +161,12 @@
 .landing-wrapper .stage-name .dot {
   width: 10px;
   height: 10px;
+  flex: none;
   border-radius: 50%;
   background: var(--channel);
   transition: background-color 400ms ease-out;
 }
 .landing-wrapper .stage-name small {
-  white-space: nowrap;
   color: var(--fg3);
   font-family: var(--font-body);
   font-size: 12px;
@@ -198,10 +184,10 @@
 .landing-wrapper .rail {
   flex: none;
   display: flex;
-  gap: 4px;
+  gap: clamp(2px, 1vw, 4px);
 }
 .landing-wrapper .rail i {
-  width: 14px;
+  inline-size: clamp(6px, 2vw, 14px);
   height: 4px;
   border-radius: 2px;
   background: var(--border);
@@ -314,13 +300,15 @@
   height: 7px;
   border-radius: 50%;
   background: var(--reply-fg);
-  animation: lp-typing-dot 900ms ease-in-out infinite;
 }
-.landing-wrapper .typing i:nth-child(2) {
-  animation-delay: 150ms;
+.landing-wrapper .is-on .typing i {
+  animation: lp-typing-dot 600ms ease-in-out 900ms 2;
 }
-.landing-wrapper .typing i:nth-child(3) {
-  animation-delay: 300ms;
+.landing-wrapper .is-on .typing i:nth-child(2) {
+  animation-delay: 1000ms;
+}
+.landing-wrapper .is-on .typing i:nth-child(3) {
+  animation-delay: 1100ms;
 }
 @keyframes lp-typing-dot {
   50% {
@@ -445,12 +433,14 @@
   border-radius: 50%;
   opacity: 0;
 }
-.landing-wrapper .is-on .call-avatar::before,
-.landing-wrapper .is-on .call-avatar::after {
-  animation: lp-ring 2400ms ease-out 2;
-}
-.landing-wrapper .is-on .call-avatar::after {
-  animation-delay: 1200ms;
+@media (prefers-reduced-motion: no-preference) {
+  .landing-wrapper .is-on .call-avatar::before,
+  .landing-wrapper .is-on .call-avatar::after {
+    animation: lp-ring 1800ms ease-out 2;
+  }
+  .landing-wrapper .is-on .call-avatar::after {
+    animation-delay: 1200ms;
+  }
 }
 @keyframes lp-ring {
   from {
@@ -488,8 +478,10 @@
   background: var(--channel);
   transform-origin: center;
 }
-.landing-wrapper .is-on .wave i {
-  animation: lp-eq var(--t) ease-in-out 10 alternate;
+@media (prefers-reduced-motion: no-preference) {
+  .landing-wrapper .is-on .wave i {
+    animation: lp-eq var(--t) ease-in-out 8 alternate;
+  }
 }
 @keyframes lp-eq {
   from {
@@ -780,6 +772,7 @@
 }
 @media (max-width: 900px) {
   .landing-wrapper .story {
+    --mobile-stage-height: 400px;
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     padding-top: 32px;
@@ -792,8 +785,11 @@
     background: var(--bg);
   }
   .landing-wrapper .stage {
-    height: min(372px, 48svh);
+    height: var(--mobile-stage-height);
     border-radius: 16px;
+  }
+  .landing-wrapper .stage-head {
+    padding-block: 12px;
   }
   .landing-wrapper .scene {
     gap: 10px;
@@ -803,6 +799,12 @@
     min-height: 48svh;
     justify-content: flex-start;
     padding-block: 32px;
+  }
+  .landing-wrapper .story:not(.story-inline) .step {
+    /* The jump clears both the site header and the padded sticky stage. */
+    scroll-margin-top: calc(
+      var(--header-h) + var(--mobile-stage-height) + 40px
+    );
   }
   .landing-wrapper .score-value {
     font-size: 48px;
@@ -866,4 +868,33 @@
     font-size: 13px;
     padding-top: 10px;
   }
+}
+
+.landing-wrapper .story-inline {
+  grid-template-columns: minmax(0, 1fr);
+}
+.landing-wrapper .story-inline .steps {
+  padding-block-end: 0;
+}
+.landing-wrapper .story-inline .step {
+  min-height: auto;
+  padding-block: 24px;
+}
+.landing-wrapper .story-inline .stage {
+  height: auto;
+  margin-block-start: 8px;
+}
+.landing-wrapper .stage-inline .scene {
+  position: relative;
+}
+.landing-wrapper .stage-inline .chart {
+  block-size: 8rem;
+  flex: none;
+  gap: 8px;
+}
+/* Each inline preview shows the completed illustration as part of the step. */
+.landing-wrapper .story.story-inline .stage :where(*),
+.landing-wrapper .story.story-inline .stage :where(*)::before,
+.landing-wrapper .story.story-inline .stage :where(*)::after {
+  animation: none;
 }

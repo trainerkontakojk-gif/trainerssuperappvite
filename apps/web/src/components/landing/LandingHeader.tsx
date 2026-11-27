@@ -139,7 +139,11 @@ export function LandingHeader() {
         aria-label="Navigasi mobile"
         hidden={!menuOpen}
       >
-        <Link to="/kegiatan" onClick={closeMenu}>
+        <Link
+          to="/kegiatan"
+          aria-current={isKegiatan ? "page" : undefined}
+          onClick={closeMenu}
+        >
           Kegiatan Trainers
         </Link>
         {isCheckingAuth ? null : isLoggedIn ? (

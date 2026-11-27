@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, Mic, Phone, Send, User } from "lucide-react";
 import { prefersReducedMotion } from "./reducedMotion";
 import { SplitFlapBoard } from "./SplitFlapBoard";
@@ -7,39 +7,58 @@ import {
   LANDING_MODULES,
   channelStyle,
   cssVars,
+  type LandingModule,
   type LandingModuleId,
 } from "./landingModules";
 
+const INLINE_PREVIEWS_QUERY =
+  "(max-height: 620px), (max-width: 900px) and (max-height: 740px), (max-width: 360px)";
+const CALL_DEMO_SECONDS = 5;
 const SIDAK_SCORE = 92.4;
 const formatScore = (value: number) => value.toFixed(1).replace(".", ",");
 
+function inlinePreviewsMatch() {
+  return window.matchMedia(INLINE_PREVIEWS_QUERY).matches;
+}
+
+function subscribeToInlinePreviews(onChange: () => void) {
+  const media = window.matchMedia(INLINE_PREVIEWS_QUERY);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
+
 /**
- * Active step = the last step whose centre has reached the middle of the area
- * left visible beside (desktop) or below (mobile, sticky stage on top) the
- * stage.
+ * Activate a step at its centre beside the stage, or when its heading reaches
+ * the reading area below the stage on narrower screens.
  */
 function useActiveStep(
   stepsRef: React.RefObject<HTMLOListElement | null>,
   stageRef: React.RefObject<HTMLDivElement | null>,
+  inlinePreviews: boolean,
 ) {
   const [active, setActive] = useState<LandingModuleId>("ketik");
 
   useEffect(() => {
+    const stage = stageRef.current;
+    const steps =
+      stepsRef.current?.querySelectorAll<HTMLElement>("[data-step]");
+    if (inlinePreviews || !steps?.length || !stage) return;
+
     const narrow = window.matchMedia("(max-width: 900px)");
+    const targets = Array.from(steps, (step) => ({
+      step,
+      heading: step.querySelector("h3") ?? step,
+    }));
     let frame = 0;
     const update = () => {
       frame = 0;
-      const steps =
-        stepsRef.current?.querySelectorAll<HTMLElement>("[data-step]");
-      const stage = stageRef.current;
-      if (!steps?.length || !stage) return;
       const stageBottom = narrow.matches
         ? stage.getBoundingClientRect().bottom
         : 0;
       const line = stageBottom + (window.innerHeight - stageBottom) / 2;
       let next = steps[0].dataset.step as LandingModuleId;
-      for (const step of steps) {
-        const box = step.getBoundingClientRect();
+      for (const { step, heading } of targets) {
+        const box = (narrow.matches ? heading : step).getBoundingClientRect();
         if (box.top + box.height / 2 <= line + 1)
           next = step.dataset.step as LandingModuleId;
       }
@@ -56,25 +75,46 @@ function useActiveStep(
       window.removeEventListener("scroll", queue);
       window.removeEventListener("resize", queue);
     };
-  }, [stepsRef, stageRef]);
+  }, [stepsRef, stageRef, inlinePreviews]);
 
   return active;
 }
 
-function CallClock({ running }: { running: boolean }) {
-  const [seconds, setSeconds] = useState(0);
+function CallClock({ playing }: { playing: boolean }) {
+  const [seconds, setSeconds] = useState(CALL_DEMO_SECONDS);
   useEffect(() => {
-    if (!running) return;
-    setSeconds(0);
-    const id = window.setInterval(() => setSeconds((value) => value + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [running]);
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return (
-    <span>
-      {pad(Math.floor(seconds / 60))}:{pad(seconds % 60)}
-    </span>
-  );
+    if (!playing) return;
+
+    const motion = window.matchMedia("(prefers-reduced-motion: no-preference)");
+    let timer: number | undefined;
+    const syncMotion = () => {
+      window.clearInterval(timer);
+      if (!motion.matches) {
+        setSeconds(CALL_DEMO_SECONDS);
+        return;
+      }
+
+      setSeconds(0);
+      const startedAt = performance.now();
+      timer = window.setInterval(() => {
+        const elapsed = Math.min(
+          CALL_DEMO_SECONDS,
+          Math.floor((performance.now() - startedAt) / 1000),
+        );
+        setSeconds(elapsed);
+        if (elapsed === CALL_DEMO_SECONDS) window.clearInterval(timer);
+      }, 1000);
+    };
+
+    syncMotion();
+    motion.addEventListener("change", syncMotion);
+    return () => {
+      window.clearInterval(timer);
+      motion.removeEventListener("change", syncMotion);
+    };
+  }, [playing]);
+
+  return <span>00:{String(seconds).padStart(2, "0")}</span>;
 }
 
 function ScoreValue({ running }: { running: boolean }) {
@@ -148,193 +188,269 @@ const PLAN = [
   ],
 ] as const;
 
-/** Illustrative scenes; the stage is decorative and hidden from AT. */
-function StageScenes({ active }: { active: LandingModuleId }) {
-  const scene = (id: LandingModuleId, extra = "") =>
-    `scene${extra ? ` ${extra}` : ""}${active === id ? " is-on" : ""}`;
+function KetikScene() {
   return (
-    <div className="stage-body">
-      <div className={scene("ketik")} data-scene="ketik">
-        <div className="scene-meta a-in">
-          <span className="avatar">
-            <User className="icon" />
-          </span>
-          <div>
-            <strong>Konsumen</strong>
-            <small>Simulasi chat · data ilustrasi</small>
-          </div>
-        </div>
-        <p className="bubble a-in" style={cssVars({ "--d": "250ms" })}>
-          Selamat siang, saya ingin melaporkan petugas penagih yang mengancam
-          saya.
-        </p>
-        <span className="typing">
-          <i />
-          <i />
-          <i />
-        </span>
-        <p className="bubble reply a-in" style={cssVars({ "--d": "2200ms" })}>
-          Baik, Bapak/Ibu. Saya memahami kekhawatirannya. Bisa diceritakan
-          kronologinya?
-        </p>
-        <div className="feedback a-in" style={cssVars({ "--d": "3000ms" })}>
-          <Check className="icon" />
-          <span>
-            <strong>Umpan balik:</strong> tanggapan mengakui kekhawatiran
-            sebelum menggali kronologi.
-          </span>
-        </div>
-      </div>
-
-      <div className={scene("pdkt")} data-scene="pdkt">
-        <div className="email-meta a-in">
-          <span>Kepada</span>
-          <strong>Konsumen · contoh penerima</strong>
-        </div>
-        <div className="email-meta a-in" style={cssVars({ "--d": "120ms" })}>
-          <span>Subjek</span>
-          <strong>Tindak lanjut pengaduan konsumen</strong>
-        </div>
-        <div className="email-copy">
-          <p className="wipe" style={cssVars({ "--d": "400ms" })}>
-            Yth. Bapak/Ibu Konsumen,
-          </p>
-          <p className="wipe" style={cssVars({ "--d": "900ms" })}>
-            Terima kasih telah menyampaikan pengaduan. Kami memahami
-            kekhawatiran Bapak/Ibu dan akan membantu menjelaskan langkah tindak
-            lanjutnya.
-          </p>
-          <p className="wipe" style={cssVars({ "--d": "1700ms" })}>
-            Hormat kami, Tim Layanan
-          </p>
-        </div>
-        <div className="email-foot">
-          <span className="sent a-in" style={cssVars({ "--d": "2900ms" })}>
-            <Check className="icon" />
-            Draf terkirim
-          </span>
-          <span className="send">
-            <Send className="icon" />
-            Kirim
-          </span>
-        </div>
-      </div>
-
-      <div className={scene("telefun", "call")} data-scene="telefun">
-        <span className="call-avatar a-in">
+    <>
+      <div className="scene-meta a-in">
+        <span className="avatar">
           <User className="icon" />
         </span>
-        <h4 className="a-in" style={cssVars({ "--d": "150ms" })}>
-          Konsumen
-        </h4>
-        <p className="call-time a-in" style={cssVars({ "--d": "200ms" })}>
-          <CallClock running={active === "telefun"} /> · Berlangsung
+        <div>
+          <strong>Konsumen</strong>
+          <small>Simulasi chat · data ilustrasi</small>
+        </div>
+      </div>
+      <p className="bubble a-in" style={cssVars({ "--d": "250ms" })}>
+        Selamat siang, saya ingin melaporkan petugas penagih yang mengancam
+        saya.
+      </p>
+      <span className="typing">
+        <i />
+        <i />
+        <i />
+      </span>
+      <p className="bubble reply a-in" style={cssVars({ "--d": "2200ms" })}>
+        Baik, Bapak/Ibu. Saya memahami kekhawatirannya. Bisa diceritakan
+        kronologinya?
+      </p>
+      <div className="feedback a-in" style={cssVars({ "--d": "3000ms" })}>
+        <Check className="icon" />
+        <span>
+          <strong>Umpan balik:</strong> tanggapan mengakui kekhawatiran sebelum
+          menggali kronologi.
+        </span>
+      </div>
+    </>
+  );
+}
+
+function PdktScene() {
+  return (
+    <>
+      <div className="email-meta a-in">
+        <span>Kepada</span>
+        <strong>Konsumen · contoh penerima</strong>
+      </div>
+      <div className="email-meta a-in" style={cssVars({ "--d": "120ms" })}>
+        <span>Subjek</span>
+        <strong>Tindak lanjut pengaduan konsumen</strong>
+      </div>
+      <div className="email-copy">
+        <p className="wipe" style={cssVars({ "--d": "400ms" })}>
+          Yth. Bapak/Ibu Konsumen,
         </p>
-        <div className="wave">
-          {WAVE.map(([height, duration], index) => (
-            <i
-              key={index}
-              style={cssVars({ "--h": `${height}px`, "--t": `${duration}ms` })}
-            />
-          ))}
+        <p className="wipe" style={cssVars({ "--d": "900ms" })}>
+          Terima kasih telah menyampaikan pengaduan. Kami memahami kekhawatiran
+          Bapak/Ibu dan akan membantu menjelaskan langkah tindak lanjutnya.
+        </p>
+        <p className="wipe" style={cssVars({ "--d": "1700ms" })}>
+          Hormat kami, Tim Layanan
+        </p>
+      </div>
+      <div className="email-foot">
+        <span className="sent a-in" style={cssVars({ "--d": "2900ms" })}>
+          <Check className="icon" />
+          Draf terkirim
+        </span>
+        <span className="send">
+          <Send className="icon" />
+          Kirim
+        </span>
+      </div>
+    </>
+  );
+}
+
+function TelefunScene({ playing }: { playing: boolean }) {
+  return (
+    <>
+      <span className="call-avatar a-in">
+        <User className="icon" />
+      </span>
+      <h4 className="a-in" style={cssVars({ "--d": "150ms" })}>
+        Konsumen
+      </h4>
+      <p className="call-time a-in" style={cssVars({ "--d": "200ms" })}>
+        <CallClock playing={playing} /> · Berlangsung
+      </p>
+      <div className="wave">
+        {WAVE.map(([height, duration], index) => (
+          <i
+            key={index}
+            style={cssVars({ "--h": `${height}px`, "--t": `${duration}ms` })}
+          />
+        ))}
+      </div>
+      <div className="call-actions a-in" style={cssVars({ "--d": "300ms" })}>
+        <span>
+          <Mic className="icon" />
+        </span>
+        <span className="end">
+          <Phone className="icon" />
+        </span>
+      </div>
+    </>
+  );
+}
+
+function KtpScene() {
+  return (
+    <>
+      <div className="roster-head a-in">
+        <strong>Peserta · Batch contoh</strong>
+        <span>Data ilustrasi</span>
+      </div>
+      <ul className="roster">
+        {ROSTER.map(([initial, team, delay], index) => (
+          <li
+            key={initial}
+            className={index === 1 ? "pick" : undefined}
+            style={cssVars({ "--d": delay })}
+          >
+            <span className="initial">{initial}</span>
+            <span>
+              Peserta {initial}
+              <small>{team}</small>
+            </span>
+            <span className="state">Aktif</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function SidakScene({ playing }: { playing: boolean }) {
+  return (
+    <>
+      <div className="score-row a-in">
+        <div>
+          <span className="score-label">Skor audit · contoh agen</span>
+          <ScoreValue running={playing} />
         </div>
-        <div className="call-actions a-in" style={cssVars({ "--d": "300ms" })}>
-          <span>
-            <Mic className="icon" />
-          </span>
-          <span className="end">
-            <Phone className="icon" />
-          </span>
+        <div className="score-status">
+          <strong>Di bawah target</strong>
+          <span>Target 95</span>
         </div>
       </div>
-
-      <div className={scene("ktp")} data-scene="ktp">
-        <div className="roster-head a-in">
-          <strong>Peserta · Batch contoh</strong>
-          <span>Data ilustrasi</span>
+      <div className="chart">
+        <div className="target">
+          <span>95</span>
         </div>
-        <ul className="roster">
-          {ROSTER.map(([initial, team, delay], index) => (
-            <li
-              key={initial}
-              className={index === 1 ? "pick" : undefined}
-              style={cssVars({ "--d": delay })}
-            >
-              <span className="initial">{initial}</span>
-              <span>
-                Peserta {initial}
-                <small>{team}</small>
-              </span>
-              <span className="state">Aktif</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className={scene("sidak")} data-scene="sidak">
-        <div className="score-row a-in">
-          <div>
-            <span className="score-label">Skor audit · contoh agen</span>
-            <ScoreValue running={active === "sidak"} />
-          </div>
-          <div className="score-status">
-            <strong>Di bawah target</strong>
-            <span>Target 95</span>
-          </div>
-        </div>
-        <div className="chart">
-          <div className="target">
-            <span>95</span>
-          </div>
-          {BARS.map(([month, value], index) => (
-            <div
-              key={month}
-              className={index === BARS.length - 1 ? "bar now" : "bar"}
-              style={cssVars({ "--v": value, "--d": `${100 + index * 80}ms` })}
-            >
-              <i />
-              <small>{month}</small>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className={scene("tna")} data-scene="tna">
-        <h4 className="plan-title a-in">Rencana pelatihan · contoh</h4>
-        <ul className="plan">
-          {PLAN.map(([title, note, rowDelay, checkDelay]) => (
-            <li
-              key={title}
-              className="a-in"
-              style={cssVars({ "--d": rowDelay })}
-            >
-              <span className="box" style={cssVars({ "--d": checkDelay })}>
-                <Check className="icon" />
-              </span>
-              <span>
-                {title}
-                <small>{note}</small>
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="progress a-in" style={cssVars({ "--d": "200ms" })}>
-          <span>3 dari 3 langkah</span>
-          <span className="progress-track">
+        {BARS.map(([month, value], index) => (
+          <div
+            key={month}
+            className={index === BARS.length - 1 ? "bar now" : "bar"}
+            style={cssVars({ "--v": value, "--d": `${100 + index * 80}ms` })}
+          >
             <i />
+            <small>{month}</small>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function TnaScene() {
+  return (
+    <>
+      <h4 className="plan-title a-in">Rencana pelatihan · contoh</h4>
+      <ul className="plan">
+        {PLAN.map(([title, note, rowDelay, checkDelay]) => (
+          <li key={title} className="a-in" style={cssVars({ "--d": rowDelay })}>
+            <span className="box" style={cssVars({ "--d": checkDelay })}>
+              <Check className="icon" />
+            </span>
+            <span>
+              {title}
+              <small>{note}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="progress a-in" style={cssVars({ "--d": "200ms" })}>
+        <span>3 dari 3 langkah</span>
+        <span className="progress-track">
+          <i />
+        </span>
+      </div>
+    </>
+  );
+}
+
+const SCENE_CONTENT = {
+  ketik: KetikScene,
+  pdkt: PdktScene,
+  telefun: TelefunScene,
+  ktp: KtpScene,
+  sidak: SidakScene,
+  tna: TnaScene,
+} satisfies Record<LandingModuleId, React.ComponentType<{ playing: boolean }>>;
+
+/** Illustrations use the module copy outside the stage as their text equivalent. */
+function ModuleStage({
+  module,
+  inline = false,
+  stageRef,
+}: {
+  module: LandingModule;
+  inline?: boolean;
+  stageRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const scenes = inline ? [module] : LANDING_MODULES;
+
+  return (
+    <div
+      ref={stageRef}
+      className={inline ? "stage stage-inline" : "stage"}
+      style={channelStyle(module.id)}
+      data-active={module.id}
+      aria-hidden="true"
+    >
+      <div className="stage-head">
+        <span className="stage-name">
+          <i className="dot" />
+          <span key={module.id} className="stage-label swap">
+            {module.code}
           </span>
-        </div>
+          <small>Contoh tampilan</small>
+        </span>
+        <span className="rail">
+          {LANDING_MODULES.map(({ id }) => (
+            <i key={id} className={id === module.id ? "on" : undefined} />
+          ))}
+        </span>
+      </div>
+      <div className="stage-body">
+        {scenes.map(({ id }) => {
+          const Content = SCENE_CONTENT[id];
+          const selected = id === module.id;
+          return (
+            <div
+              key={id}
+              className={`scene${id === "telefun" ? " call" : ""}${selected ? " is-on" : ""}`}
+              data-scene={id}
+            >
+              <Content playing={selected && !inline} />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-/** "Enam modul" section: departure board, scroll-driven steps, sticky stage. */
 export function ModuleStory() {
   const stepsRef = useRef<HTMLOListElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const active = useActiveStep(stepsRef, stageRef);
-  const activeIndex = LANDING_MODULES.findIndex((item) => item.id === active);
+  const inlinePreviews = useSyncExternalStore(
+    subscribeToInlinePreviews,
+    inlinePreviewsMatch,
+  );
+  const active = useActiveStep(stepsRef, stageRef, inlinePreviews);
+  const activeModule =
+    LANDING_MODULES.find((item) => item.id === active) ?? LANDING_MODULES[0];
   const total = String(LANDING_MODULES.length).padStart(2, "0");
 
   return (
@@ -380,14 +496,18 @@ export function ModuleStory() {
         </ol>
       </div>
 
-      <div className="story">
+      <div className={inlinePreviews ? "story story-inline" : "story"}>
         <ol className="steps" ref={stepsRef}>
           {LANDING_MODULES.map((item, index) => (
             <li
               key={item.id}
               id={`modul-${item.id}`}
               data-step={item.id}
-              className={active === item.id ? "step is-active" : "step"}
+              className={
+                !inlinePreviews && active === item.id
+                  ? "step is-active"
+                  : "step"
+              }
               style={channelStyle(item.id)}
             >
               <span className="step-index">
@@ -396,37 +516,16 @@ export function ModuleStory() {
               <h3>{item.code}</h3>
               <p className="step-full">{item.fullName}</p>
               <p className="step-desc">{item.description}</p>
+              {inlinePreviews && <ModuleStage module={item} inline />}
             </li>
           ))}
         </ol>
 
-        <div className="stage-col">
-          <div
-            ref={stageRef}
-            className="stage"
-            data-active={active}
-            aria-hidden="true"
-          >
-            <div className="stage-head">
-              <span className="stage-name">
-                <i className="dot" />
-                <span key={active} className="stage-label swap">
-                  {LANDING_MODULES[activeIndex].code}
-                </span>
-                <small>Contoh tampilan</small>
-              </span>
-              <span className="rail">
-                {LANDING_MODULES.map((item, index) => (
-                  <i
-                    key={item.id}
-                    className={index === activeIndex ? "on" : undefined}
-                  />
-                ))}
-              </span>
-            </div>
-            <StageScenes active={active} />
+        {!inlinePreviews && (
+          <div className="stage-col">
+            <ModuleStage module={activeModule} stageRef={stageRef} />
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

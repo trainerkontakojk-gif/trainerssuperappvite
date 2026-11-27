@@ -34,15 +34,12 @@ function programName(value: TrainerActivityProgram) {
   return PROGRAM_BY_VALUE.get(value)!;
 }
 
-/** Roughly the first row on wide screens; these sit above the fold. */
-const EAGER_IMAGE_COUNT = 4;
-
 function ActivityCard({
   item,
-  eager,
+  prioritizeImage,
 }: {
   item: PublicTrainerActivity;
-  eager: boolean;
+  prioritizeImage: boolean;
 }) {
   const program = programName(item.program);
   const formattedDate = displayDate(item.event_date);
@@ -62,18 +59,18 @@ function ActivityCard({
           width={800}
           height={1000}
           decoding="async"
-          loading={eager ? "eager" : "lazy"}
-          fetchPriority={eager ? "high" : undefined}
+          loading={prioritizeImage ? "eager" : "lazy"}
+          fetchPriority={prioritizeImage ? "high" : undefined}
         />
-        <span className="kegiatan-card-open" aria-hidden="true">
-          Buka di Drive
-        </span>
       </span>
       <span className="kegiatan-card-copy">
         <span className="kegiatan-card-title">{item.title}</span>
         {formattedDate ? (
           <span className="kegiatan-card-date">{formattedDate}</span>
         ) : null}
+        <span className="kegiatan-card-open" aria-hidden="true">
+          Buka di Drive
+        </span>
       </span>
     </a>
   );
@@ -133,16 +130,7 @@ function KegiatanContent() {
       })).filter(({ items }) => items.length > 0),
     [filteredItems],
   );
-  const eagerIds = useMemo(
-    () =>
-      new Set(
-        grouped
-          .flatMap(({ items }) => items)
-          .slice(0, EAGER_IMAGE_COUNT)
-          .map((item) => item.id),
-      ),
-    [grouped],
-  );
+  const firstImageId = grouped[0]?.items[0]?.id;
 
   const selectYear = (year: number) => {
     void navigate({ search: (previous) => ({ ...previous, tahun: year }) });
@@ -175,7 +163,11 @@ function KegiatanContent() {
           <section className="kegiatan-controls" aria-label="Filter kegiatan">
             <div className="kegiatan-filter-block">
               <h2>Tahun</h2>
-              <div className="kegiatan-year-list" aria-label="Pilih tahun">
+              <div
+                className="kegiatan-year-list"
+                role="group"
+                aria-label="Pilih tahun"
+              >
                 {response.years.map((year) => (
                   <button
                     key={year}
@@ -192,7 +184,11 @@ function KegiatanContent() {
 
             <div className="kegiatan-filter-block">
               <h2>Program</h2>
-              <div className="kegiatan-program-list" aria-label="Pilih program">
+              <div
+                className="kegiatan-program-list"
+                role="group"
+                aria-label="Pilih program"
+              >
                 <button
                   type="button"
                   className="kegiatan-program-button"
@@ -277,7 +273,7 @@ function KegiatanContent() {
                     <ActivityCard
                       key={item.id}
                       item={item}
-                      eager={eagerIds.has(item.id)}
+                      prioritizeImage={item.id === firstImageId}
                     />
                   ))}
                 </div>

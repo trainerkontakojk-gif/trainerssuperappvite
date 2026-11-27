@@ -80,7 +80,8 @@
 html:has(.landing-wrapper) {
   scroll-behavior: smooth;
 }
-.landing-wrapper :is(#modul, #alur-kerja, .step) {
+.landing-wrapper :is(#modul, #alur-kerja),
+.landing-wrapper .step {
   scroll-margin-top: calc(var(--header-h) + 16px);
 }
 .landing-wrapper .icon {
@@ -652,44 +653,43 @@ html:has(.landing-wrapper) {
 }
 
 /* ═══ AUTH MODAL ═══ */
-.auth-modal-wrapper {
-  background: var(--bg);
-  color: var(--fg);
-  font-family:
-    "Inter",
-    -apple-system,
-    sans-serif;
-}
-.am-overlay {
+.am-card::backdrop {
   background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 .am-card {
-  background: var(--bg);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   border-radius: 16px;
-  width: 100%;
-  max-width: 440px;
-  padding: 40px;
-  position: relative;
+  width: min(440px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  max-height: min(calc(100% - 32px), calc(100dvh - 32px));
+  margin: auto;
+  padding: 0;
   overflow: hidden;
 }
-.dark .am-card {
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+.am-card[open] {
+  display: flex;
+  flex-direction: column;
+}
+.am-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(20px, 6vw, 40px);
 }
 .am-close {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 32px;
-  height: 32px;
+  z-index: 1;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: var(--bg);
   border: 1px solid transparent;
   color: var(--fg3);
   cursor: pointer;
@@ -699,6 +699,10 @@ html:has(.landing-wrapper) {
   background: var(--surface);
   color: var(--fg);
 }
+.am-card :is(button, a):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 .am-title {
   font-family: "Outfit", sans-serif;
   font-size: 32px;
@@ -706,6 +710,7 @@ html:has(.landing-wrapper) {
   letter-spacing: -0.03em;
   color: var(--fg);
   margin-bottom: 8px;
+  padding-inline-end: 44px;
   line-height: 1.1;
 }
 .am-desc {
@@ -737,9 +742,20 @@ html:has(.landing-wrapper) {
   transition: all 0.2s;
 }
 .am-input:focus {
-  outline: none;
+  outline: 2px solid var(--fg);
+  outline-offset: 1px;
   border-color: var(--fg);
   background: var(--bg);
+}
+.am-input,
+.am-btn-google,
+.am-btn-primary {
+  min-height: 44px;
+}
+@media (max-width: 600px) {
+  .am-input {
+    font-size: 16px;
+  }
 }
 .am-input::placeholder {
   color: var(--fg3);

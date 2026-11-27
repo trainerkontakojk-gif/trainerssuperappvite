@@ -237,10 +237,14 @@ test.describe("Kegiatan Trainers", () => {
     await expect(card).toHaveAttribute("target", "_blank");
     await expect(card).toHaveAttribute("rel", /noopener/);
     await expect(card).toHaveAttribute("rel", /noreferrer/);
+    await expect(card.getByRole("img")).toHaveCSS("object-fit", "contain");
+    const image = await card.getByRole("img").boundingBox();
+    const action = await card.getByText("Buka di Drive").boundingBox();
+    expect(action!.y).toBeGreaterThanOrEqual(image!.y + image!.height);
     expectHermetic(audit);
   });
 
-  test("empat gambar kartu pertama dimuat langsung, sisanya lazy, semuanya berukuran", async ({
+  test("hanya gambar kartu pertama diprioritaskan dan semua gambar berukuran", async ({
     page,
   }) => {
     const items = (["sobat", "ketik"] as const).flatMap((program) =>
@@ -262,7 +266,7 @@ test.describe("Kegiatan Trainers", () => {
       const image = images.nth(index);
       await expect(image).toHaveAttribute("width", "800");
       await expect(image).toHaveAttribute("height", "1000");
-      if (index < 4) {
+      if (index === 0) {
         await expect(image).toHaveAttribute("loading", "eager");
         await expect(image).toHaveAttribute("fetchpriority", "high");
       } else {
@@ -271,6 +275,76 @@ test.describe("Kegiatan Trainers", () => {
       }
     }
     await expect(images.nth(3)).toHaveAttribute("alt", "Kegiatan ketik 0");
+    expectHermetic(audit);
+  });
+
+  test("mobile bisa menggulir sampai filter New Hire lalu memilihnya", async ({
+    page,
+  }, testInfo) => {
+    for (const width of [320, 390, 768]) {
+      await page.setViewportSize({ width, height: 800 });
+      const audit = await openPublic(page, "/kegiatan?tahun=2026", [
+        publicResponse(2026, [
+          PUBLIC_ITEM,
+          {
+            ...PUBLIC_ITEM,
+            id: "new-hire",
+            program: "new_hire",
+            title: "Orientasi Agen",
+          },
+        ]),
+      ]);
+      const list = page.locator(".kegiatan-program-list");
+      const last = list.getByRole("button", { name: "New Hire" });
+      await expect(last).toHaveCount(1);
+      const box = await list.boundingBox();
+      await page.mouse.move(box!.x + 20, box!.y + 20);
+      await page.mouse.wheel(1200, 0);
+      await expect
+        .poll(() =>
+          last.evaluate((button) => {
+            const rect = button.getBoundingClientRect();
+            return button.contains(
+              document.elementFromPoint(
+                rect.left + rect.width / 2,
+                rect.top + rect.height / 2,
+              ),
+            );
+          }),
+        )
+        .toBe(true);
+      await last.click();
+      await expect(page).toHaveURL(/tahun=2026.*program=new_hire/);
+      await expect(page.getByText("Orientasi Agen")).toBeVisible();
+      await expect(page.getByText(PUBLIC_ITEM.title)).toHaveCount(0);
+      if (width === 390 && process.env.E2E_SCREENSHOT === "on") {
+        await page.screenshot({
+          animations: "disabled",
+          path: testInfo.outputPath("filter-mobile.png"),
+        });
+      }
+      expectHermetic(audit);
+    }
+  });
+
+  test("menutup dialog Masuk tidak menghapus tahun atau program yang dipilih", async ({
+    page,
+  }) => {
+    const path = "/kegiatan?tahun=2026&program=sobat";
+    const audit = await openPublic(page, path, [
+      publicResponse(2026, [PUBLIC_ITEM]),
+    ]);
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: "Masuk", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Tutup", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(path);
+    await expect(page.getByRole("button", { name: "SOBAT" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expectHermetic(audit);
   });
 
