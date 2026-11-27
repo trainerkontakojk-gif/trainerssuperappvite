@@ -126,7 +126,7 @@ G1 selesai seluruhnya; tidak ada `jam_sampel`. Fase 6–7 tinggal menunggu izin 
 - `apps/api/src/services/sidak/heatmap-service.ts` + `apps/api/src/routes/sidak/heatmap.ts`: agregasi per tanggal, `is_countable`, phantom dikeluarkan, leader = service-role + scope app-side.
 - Web input: `SidakInputManualForm.tsx`, `SidakInputImportPanel.tsx`, `EditTemuanModal.tsx`, `TemuanGroupCard.tsx`, `AgentTemuanTab.tsx`, hooks `useTemuanForm.ts` / `useTemuanImport.ts` / `useTemuanEdit.ts`.
 - Web heatmap: `routes/sidak/heatmap.tsx`, `SidakHeatmapCalendar.tsx`, `SidakWeekdayBars.tsx`, `SidakHeatmapInsights.tsx`, `SidakAgentHeatmapPanel.tsx`, `lib/sidak-heatmap-client.ts`.
-- Hermes (VPS, di luar repo): `~/.hermes/skills/productivity/qa-rekap-md/scripts/{gs-to-md.py,batch_sync_sidak.py,backfill-temuan-dates.py}`; menulis langsung ke PostgREST dengan service-role, jadi **validasi API tidak melindungi jalur ini** — penjaganya tipe kolom + CHECK di database.
+- Hermes (VPS, di luar repo): `~/.hermes/skills/productivity/qa-rekap-md/scripts/{gs-to-md.py,batch_sync_sidak.py,backfill-temuan-dates.py}` (`backfill-temuan-dates.py` adalah backfill tanggal lama dan tidak dipakai untuk plan ini); menulis langsung ke PostgREST dengan service-role, jadi **validasi API tidak melindungi jalur ini** — penjaganya tipe kolom + CHECK di database.
 
 ### Penyimpanan
 
@@ -279,7 +279,7 @@ Perubahan dikerjakan di `~/.hermes/skills/productivity/qa-rekap-md/scripts/`, de
   - Teks `h.mm.ss` (`01.20.07` → 4.807 detik).
   - Detik ≥ 60 (`6.9`) atau `-` → `NULL` + laporan.
 - **Sync harian:** `batch_sync_sidak.py` menambah `jam_layanan,durasi_detik` ke field default dan read-back.
-- **Backfill Jan–Nov:** perluas `backfill-temuan-dates.py`, dengan kunci dan resolusi yang sama: `(service_type, no_tiket)`, kemiripan teks bila kandidat > 1, fail closed.
+- **Backfill Jan–Nov:** rencana awal memperluas `backfill-temuan-dates.py`. Yang dijalankan (2026-11-26): `batch_sync_sidak.py` dibatasi ke field jam/durasi (`--fields jam_layanan,durasi_detik --no-insert`) per bulan, lalu sisa baris yang tidak cocok kunci sync dicocokkan per tiket dengan `match_time_by_ticket.py` (kunci `(service_type, no_tiket)`, kemiripan teks bila kandidat > 1, fail closed) dan ditulis lewat `guarded_write.py`.
 - **Laporan dry-run per bulan** berisi tingkat terbaca per layanan dan daftar sel yang tidak terbaca. Dari profiling: ±247 chat berformat `PM`, 16 chat di 00:xx/23:xx, beberapa `-`, `15.40,40`, `6.9`, `01.20.07`. Daftar ini bisa diperbaiki di sheet oleh tim QA sebelum `--apply`.
 
 ### Urutan rilis
@@ -398,7 +398,9 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - `batch_sync_sidak.py` menahan kunci yang diklaim 2+ baris sheet berbeda isi (`key_conflict` di plan, tidak ditulis). Beda jam/durasi saja tetap ditangani `time_conflict`.
   - Bukti dua perubahan ini: dry-run Jan–Nov lama vs baru per entri tidak menunjukkan perbedaan selain yang diharapkan. Satu efek baru: baris SIDAK Juli d12f05c4 bertiket placeholder `QADC30062026I` (izin Fajar) dipatch ke tiket sheet `2606300000001`, BERSIH.
   - Pasca-cek final Jan–Nov: patch 1 (RECCSO09032026A, sengaja), key_conflict 2, dan insert 9. Kesembilan insert itu adalah baris sheet tanpa tiket yang temuannya sudah ada di SIDAK dengan tiket asli.
-  - Sisa catatan: `backfill-temuan-dates.py` tetap memakai parser sendiri (perilakunya beda). Sync memilih rule version terbaru per layanan, bukan per periode.
+  - Sisa catatan: `backfill-temuan-dates.py` tetap memakai parser sendiri (perilakunya beda) dan tidak dipakai di plan ini.
+  - 2026-11-27 (permintaan Fajar): sync memilih versi aturan per periode dengan aturan yang sama dengan `rule-version-resolver.ts` (call Jan–Apr `ff056d56`, Mei dst. `e52ffb06`; dulu selalu `e52ffb06`). Script berhenti bila periode tidak tepat satu (fallback ke Oktober dihapus), dan baris tanpa versi/indikator aturan ditahan, bukan di-insert dengan rule id kosong. Bukti: 67 test Hermes OK. Dry-run Jan–Nov vs pasca-cek final: Mei–Nov identik, Jan–Apr hanya rv/ri baris call yang berubah, tanpa perubahan aksi atau unresolved. rv+ri plan sama 100% dengan baris SIDAK Jan–Apr dan Jun–Nov.
+  - Temuan data (belum ditulis, perlu izin): 215 baris Mei tanpa `rule_indicator_id`, 14 call di antaranya masih `ff056d56`. Skor tidak terdampak karena app memakai versi periode dan jatuh ke `indicator_id`.
 - [x] Verifikasi di app: profil jam per layanan cocok dengan profiling awal (selisih hanya dari sel yang ditolak/diperbaiki).
   - Ditutup 2026-11-26 atas keputusan Fajar: acuan diganti ke profil sheet setelah aturan jam (angka profiling awal tidak bisa direproduksi), dan cek role selain admin dilewati.
   - Cek data 2026-11-26 (baca prod lewat API Hermes, belum lewat UI): 2.333 nilai jam (chat + pencatatan + SLIK) dengan sebaran pagi 38,36% / siang 31,80% / sore 29,19% / luar jam 0,64%, selisih ≤ 0,81 poin dari sheet setelah aturan. Durasi call 1.748 nilai, median 9:15 (singkat 11,96%, sedang 69,62%, panjang 18,42%).
