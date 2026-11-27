@@ -4,6 +4,10 @@ Every commit that changes the repository adds one entry here, in the same commit
 
 Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scope): summary` bullet per commit. Entries before 2026-10-17 were backfilled from `git log` and carry the short commit hash.
 
+## 2026-11-27
+
+- docs(sidak): record Fajar's decision that the Phase 3 audit-coverage target is 5 sessions per agent for every service
+
 ## 2026-11-26
 
 - docs(sidak): record the approved Hermes parser unit tests and the fail-closed parse_dt fix, with proof that the January–November sync dry-runs are unchanged, in the heatmap time plan
