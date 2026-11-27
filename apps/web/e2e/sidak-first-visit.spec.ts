@@ -118,7 +118,9 @@ test.describe("Kunjungan pertama SIDAK (hermetic)", () => {
     const audit = await openHermeticShell(page, {
       path: "/sidak/dashboard",
       apiMocks: [
-        foldersMock([{ id: "team-wa", name: "Tim Whatsapp", parent_id: null }]),
+        foldersMock([
+          { id: "team-chat", name: "Tim Digital Chat", parent_id: null },
+        ]),
         ...homeMocks(),
       ],
     });

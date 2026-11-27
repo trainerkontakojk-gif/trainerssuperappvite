@@ -390,7 +390,7 @@ export async function getAccessScopeOptions(): Promise<AccessScopeOptions> {
   ];
   const SERVICE_LABELS: Record<string, string> = {
     call: "Call/Voice",
-    chat: "Chat/WhatsApp",
+    chat: "Digital Chat",
     email: "Email/Laporan",
     cso: "CSO/Walk-In",
     pencatatan: "Pencatatan Mandiri",

@@ -43,7 +43,7 @@ Trainers SuperApp keeps practice and real quality evidence in one place for the 
 ## Operating Context
 
 - Internal tool for the trainer and QA team of the Kontak OJK 157 consumer service contact center.
-- Agents are trained and audited per service channel: Call, Chat (WhatsApp), Email, CSO, Pencatatan, BKO, and SLIK.
+- Agents are trained and audited per service channel: Call, Digital Chat, Email, CSO, Pencatatan, BKO, and SLIK.
 - KETIK, PDKT, and Telefun simulate consumers contacting OJK; SIDAK records monthly QA periods and findings per agent and channel.
 - Used mainly on office laptops and desktops; phones are a secondary, quick-check context.
 

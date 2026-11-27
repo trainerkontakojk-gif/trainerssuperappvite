@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-27
 
+- fix(sidak): pair the chat service with the renamed "Tim Digital Chat" folder
 - docs(sidak): record the phantom-row rule version and rule indicator repair in the heatmap time plan
 - feat(sidak): report monthly audit coverage in management Excel and PDF exports
 - docs(sidak): record the May 2026 rule version and rule indicator repair and the open phantom-row gap in the heatmap time plan

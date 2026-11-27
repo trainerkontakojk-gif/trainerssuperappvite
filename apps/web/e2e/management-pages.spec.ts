@@ -455,7 +455,10 @@ test.describe("Management pages (hermetic)", () => {
   }) => {
     const scope = {
       teams: ["Tim Alpha", "Tim Beta"],
-      services: [{ value: "call", label: "Call/Voice" }],
+      services: [
+        { value: "call", label: "Call/Voice" },
+        { value: "chat", label: "Digital Chat" },
+      ],
       agentsByTeam: {
         "Tim Alpha": [
           {
@@ -539,6 +542,15 @@ test.describe("Management pages (hermetic)", () => {
     await expect(
       agent.getByRole("option", { name: /Agent Alpha/ }),
     ).toHaveCount(0);
+
+    await form
+      .getByRole("combobox", { name: "Jenis" })
+      .selectOption("service_type");
+    await expect(
+      form
+        .getByRole("combobox", { name: "Layanan" })
+        .getByRole("option", { name: "Digital Chat", exact: true }),
+    ).toHaveAttribute("value", "chat");
 
     expectHermetic(audit);
   });

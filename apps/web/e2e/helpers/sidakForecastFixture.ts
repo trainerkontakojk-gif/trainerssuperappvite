@@ -29,7 +29,7 @@ export function dashboardData(overrides: Record<string, unknown> = {}) {
     folders: [
       { id: "folder-call", name: "Tim Call", parent_id: null },
       { id: "folder-call-qa", name: "Tim Call - QA", parent_id: "folder-call" },
-      { id: "folder-chat", name: "Tim Whatsapp", parent_id: null },
+      { id: "folder-chat", name: "Tim Digital Chat", parent_id: null },
     ],
     summary: null,
     serviceData: [],

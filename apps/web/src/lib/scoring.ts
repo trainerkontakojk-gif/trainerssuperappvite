@@ -62,7 +62,7 @@ export const SERVICE_LABELS: Record<ServiceType, string> = {
 
 export const DEFAULT_SERVICE_FOLDER_MAP: Record<string, string> = {
   call: "Tim Call",
-  chat: "Tim Whatsapp",
+  chat: "Tim Digital Chat",
   email: "Tim Email",
   cso: "Tim Mix",
   pencatatan: "Tim Mix",

@@ -460,7 +460,7 @@ test.describe("Forecast SIDAK (hermetic)", () => {
     await page.getByRole("combobox", { name: "Layanan" }).click();
     await page.getByRole("option", { name: "Chat", exact: true }).click();
     await expect(page.getByRole("combobox", { name: "Tim" })).toContainText(
-      "Tim Whatsapp",
+      "Tim Digital Chat",
     );
     await expect
       .poll(() =>

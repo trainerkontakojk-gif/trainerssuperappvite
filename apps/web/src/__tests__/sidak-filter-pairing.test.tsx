@@ -54,8 +54,8 @@ const mockFolders = [
   { id: "team-call-id", nama: "Tim Call", name: "Tim Call", parent_id: null },
   {
     id: "team-whatsapp-id",
-    nama: "Tim Whatsapp",
-    name: "Tim Whatsapp",
+    nama: "Tim Digital Chat",
+    name: "Tim Digital Chat",
     parent_id: null,
   },
   {
@@ -138,8 +138,8 @@ const chatOnlyDashboardData = {
   folders: [
     {
       id: "team-whatsapp-id",
-      nama: "Tim Whatsapp",
-      name: "Tim Whatsapp",
+      nama: "Tim Digital Chat",
+      name: "Tim Digital Chat",
       parent_id: null,
     },
     {
@@ -324,13 +324,13 @@ describe("SIDAK default filter pairing", () => {
       screen.getByRole("option", { name: "↳ Siti Nur Anisa" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: "Tim Whatsapp — Semua batch" }),
+      screen.getByRole("option", { name: "Tim Digital Chat — Semua batch" }),
     ).toBeInTheDocument();
     fireEvent.click(folderSelect);
 
     selectOption("Layanan", "Chat");
     expect(serviceSelect).toHaveTextContent("Chat");
-    expect(folderSelect).toHaveTextContent("Tim Whatsapp — Semua batch");
+    expect(folderSelect).toHaveTextContent("Tim Digital Chat — Semua batch");
   });
 
   it("Ranking: keeps grouped folder options after API shrinks to the selected folder, then switches to the paired root folder", async () => {
@@ -358,12 +358,12 @@ describe("SIDAK default filter pairing", () => {
       screen.getByRole("option", { name: "↳ Muhammad Fahmi Nasrulloh" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: "Tim Whatsapp — Semua batch" }),
+      screen.getByRole("option", { name: "Tim Digital Chat — Semua batch" }),
     ).toBeInTheDocument();
     fireEvent.click(folderSelect);
 
     selectOption("Layanan", "Chat");
     expect(serviceSelect).toHaveTextContent("Chat");
-    expect(folderSelect).toHaveTextContent("Tim Whatsapp — Semua batch");
+    expect(folderSelect).toHaveTextContent("Tim Digital Chat — Semua batch");
   });
 });
