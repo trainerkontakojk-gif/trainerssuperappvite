@@ -6,6 +6,7 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-27
 
+- fix(sidak): count findings of people who are SIDAK staff today in the months they were audited, across dashboard, ranking, and management report, while keeping them out of the active agent list, audit coverage, and both forecasts
 - fix(sidak): pair the chat service with the renamed "Tim Digital Chat" folder
 - docs(sidak): record the phantom-row rule version and rule indicator repair in the heatmap time plan
 - feat(sidak): report monthly audit coverage in management Excel and PDF exports

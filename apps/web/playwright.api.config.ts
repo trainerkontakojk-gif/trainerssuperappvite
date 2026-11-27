@@ -207,6 +207,10 @@ export default defineConfig({
       testMatch: "sidak-management-reports-api.spec.ts",
     },
     {
+      name: "sidak-staff-agent-months-real-backend",
+      testMatch: "sidak-staff-agent-months-api.spec.ts",
+    },
+    {
       name: "access-groups-view-guard-real-backend",
       testMatch: "access-groups-view-guard-api.spec.ts",
     },

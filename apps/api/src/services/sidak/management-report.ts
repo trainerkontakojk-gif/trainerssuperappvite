@@ -17,7 +17,6 @@ import {
 } from "@trainers/types";
 import { DEFAULT_SERVICE_WEIGHTS, getTemuanSessionKey } from "../../lib/scoring";
 import { buildCriticalAndFollowUps, getVisibleSidakLeaders } from "./management-report-phase2";
-import { isAgentExcluded } from "./agent-directory";
 import { buildAuditCoverage, getEligibleReportAgents } from "./management-report-coverage";
 import {
   countFindingTickets,
@@ -158,12 +157,7 @@ function sourceRowsInScope(rows: ReportSourceRow[]): ScopedSourceRow[] {
     typeof row.service_type === "string" &&
     typeof row.indicator_id === "string" &&
     row.profiler_peserta != null &&
-    row.qa_periods != null &&
-    !isAgentExcluded(
-      row.profiler_peserta.tim,
-      row.profiler_peserta.batch_name,
-      row.profiler_peserta.jabatan,
-    ),
+    row.qa_periods != null,
   );
 }
 

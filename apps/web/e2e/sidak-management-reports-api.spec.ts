@@ -41,7 +41,7 @@ let revokedLeaderRequestId: string;
 let participantId: string;
 let secondParticipantId: string;
 let outsideParticipantId: string | null = null;
-let excludedParticipantId: string | null = null;
+let staffParticipantId: string | null = null;
 let folderId: string;
 let profilerYearId: string | null = null;
 let profilerYearCreated = false;
@@ -151,10 +151,10 @@ test.beforeAll(async () => {
      VALUES (${quoted(folderName)}, ${quoted(`Agen Kedua ${namespace}`)}, 'Tim Uji Laporan', 'Agent', 2)
      RETURNING id;`,
   );
-  excludedParticipantId = sqlOne(
+  staffParticipantId = sqlOne(
     env,
     `INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, nomor_urut)
-     VALUES (${quoted(folderName)}, ${quoted(`Trainer Terlarang ${namespace}`)}, 'Tim Uji Laporan', 'Trainer', 3)
+     VALUES (${quoted(folderName)}, ${quoted(`Trainer Laporan ${namespace}`)}, 'Tim Uji Laporan', 'Trainer', 3)
      RETURNING id;`,
   );
   const indicators = runSql(
@@ -171,8 +171,8 @@ test.beforeAll(async () => {
     `(${quoted(participantId)},${quoted(periodIds.get(1)!)},${quoted(indicators[0]!)},'call',${phantomTicket},true,3,NULL,NULL,${year})`,
     `(${quoted(participantId)},${quoted(periodIds.get(2)!)},${quoted(indicators[0]!)},'call',${ticket},false,2,${quoted("Temuan actionable bulan Februari")},${quoted("Rekomendasi Februari")},${year})`,
     `(${quoted(secondParticipantId)},${quoted(periodIds.get(1)!)},${quoted(indicators[0]!)},'call',${quoted(`__PHANTOM__SECOND-${namespace}`)},true,3,NULL,NULL,${year})`,
-    `(${quoted(excludedParticipantId)},${quoted(periodIds.get(1)!)},${quoted(indicators[0]!)},'call',${quoted(`EXCLUDED-${namespace}`)},false,0,${quoted(`Temuan staf dikecualikan ${namespace}`)},${quoted("Rekomendasi staf")},${year})`,
-    `(${quoted(excludedParticipantId)},${quoted(periodIds.get(2)!)},${quoted(indicators[0]!)},'call',${quoted(`EXCLUDED-FEB-${namespace}`)},false,0,${quoted(`Temuan staf dikecualikan ${namespace}`)},${quoted("Rekomendasi staf")},${year})`,
+    `(${quoted(staffParticipantId)},${quoted(periodIds.get(1)!)},${quoted(indicators[0]!)},'call',${quoted(`STAFF-${namespace}`)},false,0,${quoted(`Temuan staf ${namespace}`)},${quoted("Rekomendasi staf")},${year})`,
+    `(${quoted(staffParticipantId)},${quoted(periodIds.get(2)!)},${quoted(indicators[0]!)},'call',${quoted(`STAFF-FEB-${namespace}`)},false,0,${quoted(`Temuan staf ${namespace}`)},${quoted("Rekomendasi staf")},${year})`,
     `(${quoted(participantId)},${quoted(periodIds.get(1)!)},${quoted(chatIndicatorId)},'chat',${quoted(`E2E-MANAGEMENT-CHAT-${namespace}`)},false,1,${quoted("Temuan chat untuk uji scope layanan")},${quoted("Rekomendasi chat")},${year})`,
   ];
   runSql(
@@ -208,7 +208,7 @@ test.beforeAll(async () => {
   unrestrictedAccessGroupId = sqlOne(env, `INSERT INTO access_groups (name,is_active) VALUES (${quoted(`management-unrestricted-service-${namespace}`)},true) RETURNING id;`);
   runSql(env, `INSERT INTO access_group_items (access_group_id,field_name,field_value,is_active) VALUES
     (${quoted(unrestrictedAccessGroupId)},'peserta_id',${quoted(participantId)},true),
-    (${quoted(unrestrictedAccessGroupId)},'peserta_id',${quoted(excludedParticipantId)},true);`);
+    (${quoted(unrestrictedAccessGroupId)},'peserta_id',${quoted(staffParticipantId)},true);`);
   unrestrictedLeaderRequestId = sqlOne(env, `INSERT INTO leader_access_requests (leader_user_id,module,status) VALUES (${quoted(unrestrictedServiceLeader.userId)},'sidak','approved') RETURNING id;`);
   runSql(env, `INSERT INTO leader_access_request_groups (request_id,access_group_id) VALUES (${quoted(unrestrictedLeaderRequestId)},${quoted(unrestrictedAccessGroupId)});`);
   app = (await import("../../api/src/app")).default;
@@ -227,7 +227,7 @@ test.afterAll(async () => {
   if (emptyAccessGroupId) runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(emptyAccessGroupId)}; DELETE FROM access_groups WHERE id=${quoted(emptyAccessGroupId)};`);
   if (unrestrictedAccessGroupId) runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(unrestrictedAccessGroupId)}; DELETE FROM access_groups WHERE id=${quoted(unrestrictedAccessGroupId)};`);
   if (outsideParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(outsideParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(outsideParticipantId)};`);
-  if (excludedParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(excludedParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(excludedParticipantId)};`);
+  if (staffParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(staffParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(staffParticipantId)};`);
   if (secondParticipantId) runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(secondParticipantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(secondParticipantId)};`);
   if (participantId) {
     runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(participantId)}; DELETE FROM profiler_peserta WHERE id=${quoted(participantId)};`);
@@ -268,13 +268,13 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
   const allServicesFollowUps = (await allServicesResponse.json()).data.followUps as Array<{ agentId: string; name: string }>;
   expect(allServicesFollowUps.filter((row) => row.agentId === participantId)).toHaveLength(1);
   expect(allServicesFollowUps.find((row) => row.agentId === participantId)?.name).toBe(`Agen Laporan ${namespace}`);
-  expect(allServicesFollowUps.some((row) => row.agentId === excludedParticipantId)).toBe(false);
+  expect(allServicesFollowUps.some((row) => row.agentId === staffParticipantId)).toBe(false);
   expect(data.critical.every((row: { category: string; is_phantom_padding: boolean }) => row.category === "critical" && row.is_phantom_padding !== true)).toBe(true);
   const january = data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 1);
   const february = data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 2);
   const march = data.monthly.find((row: { rowType: string; month: number }) => row.rowType === "month" && row.month === 3);
-  expect(january).toEqual(expect.objectContaining({ agentsAudited: 2, sessionsAudited: 3, findingsCount: 2, ticketsWithFindings: 1, delta: null }));
-  expect(february).toEqual(expect.objectContaining({ agentsAudited: 1, sessionsAudited: 1, findingsCount: 1, ticketsWithFindings: 1, delta: expect.objectContaining({ findings: -50, tickets: 0 }) }));
+  expect(january).toEqual(expect.objectContaining({ agentsAudited: 3, sessionsAudited: 4, findingsCount: 3, ticketsWithFindings: 2, delta: null }));
+  expect(february).toEqual(expect.objectContaining({ agentsAudited: 2, sessionsAudited: 2, findingsCount: 2, ticketsWithFindings: 2, delta: expect.objectContaining({ findings: -33.33, tickets: 0 }) }));
   expect(january.complianceRate).toEqual(expect.any(Number));
   expect(january.zeroErrorRate).toEqual(expect.any(Number));
   const dashboardResponse = await requestDashboard(periodIds.get(1)!);
@@ -288,10 +288,10 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
     complianceRate: dashboard.summary.complianceRate,
     zeroErrorRate: dashboard.summary.zeroErrorRate,
   }));
-  expect(data.agents[0].monthlyScores[1]).toBe(dashboard.topAgents.find((agent: { agentId: string }) => agent.agentId === participantId).score);
+  expect(data.agents.find((agent: { agentId: string }) => agent.agentId === participantId).monthlyScores[1]).toBe(dashboard.topAgents.find((agent: { agentId: string }) => agent.agentId === participantId).score);
   expect(march).toEqual(expect.objectContaining({ agentsAudited: null, sessionsAudited: null, findingsCount: null, ticketsWithFindings: null, avgAgentScore: null, complianceRate: null, zeroErrorRate: null, delta: null }));
-  expect(data.monthly).toContainEqual(expect.objectContaining({ rowType: "quarter", quarter: "Q1", findingsCount: 3 }));
-  expect(data.monthly).toContainEqual(expect.objectContaining({ rowType: "total", findingsCount: 3, ticketsWithFindings: 2, agentsAudited: 2 }));
+  expect(data.monthly).toContainEqual(expect.objectContaining({ rowType: "quarter", quarter: "Q1", findingsCount: 5 }));
+  expect(data.monthly).toContainEqual(expect.objectContaining({ rowType: "total", findingsCount: 5, ticketsWithFindings: 4, agentsAudited: 3 }));
   const rangeTotal = data.monthly.find((row: { rowType: string }) => row.rowType === "total");
   expect(data.leaders).toEqual(expect.arrayContaining([
     expect.objectContaining({ leaderId: leader.userId, leaderName: expect.any(String), agentsInScope: 1, serviceTypes: ["call"], scopeEmpty: false }),
@@ -300,7 +300,8 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
     expect.objectContaining({ leaderId: unrestrictedServiceLeader.userId, agentsInScope: 1, serviceTypes: ["call"], scopeEmpty: false }),
   ]));
   const unrestrictedLeader = data.leaders.find((item: { leaderId: string }) => item.leaderId === unrestrictedServiceLeader.userId);
-  expect(unrestrictedLeader.monthly).toContainEqual(expect.objectContaining({ rowType: "month", month: 1, agentsAudited: 1, findingsCount: 2 }));
+  // Scope = agent + staf: staf tetap dihitung di bulan auditnya, tetapi bukan agen dalam scope.
+  expect(unrestrictedLeader.monthly).toContainEqual(expect.objectContaining({ rowType: "month", month: 1, agentsAudited: 2, findingsCount: 3 }));
   expect(data.leaders).toHaveLength(4);
   const leaderMonthAudits = data.leaders.map((item: { monthly: Array<{ rowType: string; month: number; agentsAudited: number | null }> }) => item.monthly.find((row) => row.rowType === "month" && row.month === 1)?.agentsAudited ?? null);
   expect(leaderMonthAudits).toHaveLength(4);
@@ -313,7 +314,7 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
     agentsInScope: 1,
     serviceTypes: ["call"],
     scopeEmpty: false,
-    monthly: expect.arrayContaining([expect.objectContaining({ rowType: "month", month: 1, agentsAudited: 1 })]),
+    monthly: expect.arrayContaining([expect.objectContaining({ rowType: "month", month: 1, agentsAudited: 2 })]),
   }));
   const rangeDashboardResponse = await requestDashboardRange();
   expect(rangeDashboardResponse.status, await rangeDashboardResponse.clone().text()).toBe(200);
@@ -327,25 +328,26 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
   const paretoTotal = data.pareto.reduce((sum: number, row: { total: number }) => sum + row.total, 0);
   expect(paretoTotal).toBe(rangeTotal.findingsCount);
   expect(paretoTotal).toBe(rangeDashboard.summary.totalDefects);
-  expect(data.monthly.find((row: { rowType: string }) => row.rowType === "total").agentsAudited).toBe(2);
-  expect(data.teams).toContainEqual(expect.objectContaining({ team: "Tim Uji Laporan", batchName: "Semua batch", rowType: "month", month: 1, agentsAudited: 2 }));
-  expect(data.teams).toContainEqual(expect.objectContaining({ team: "Tim Uji Laporan", batchName: folderName, rowType: "month", month: 1, agentsAudited: 2 }));
+  // Staf SIDAK saat ini (jabatan Trainer) tetap dihitung di bulan auditnya
+  // (plan `sidak-staff-agent-months.md`): Januari dan Februari.
+  expect(data.monthly.find((row: { rowType: string }) => row.rowType === "total").agentsAudited).toBe(3);
+  expect(data.teams).toContainEqual(expect.objectContaining({ team: "Tim Uji Laporan", batchName: "Semua batch", rowType: "month", month: 1, agentsAudited: 3 }));
+  expect(data.teams).toContainEqual(expect.objectContaining({ team: "Tim Uji Laporan", batchName: folderName, rowType: "month", month: 1, agentsAudited: 3 }));
   expect(data.teams).toContainEqual(expect.objectContaining({ team: "Tim Uji Laporan", batchName: folderName, rowType: "month", month: 3, agentsAudited: null, avgAgentScore: null }));
   expect(data.agents).toEqual(expect.arrayContaining([
     expect.objectContaining({ agentId: participantId, findingsCount: 3, sessionsAudited: 3, monthlyScores: expect.objectContaining({ 1: expect.any(Number), 2: expect.any(Number), 3: null }) }),
     expect.objectContaining({ agentId: secondParticipantId, findingsCount: 0, sessionsAudited: 1, monthlyScores: expect.objectContaining({ 1: expect.any(Number), 2: null, 3: null }) }),
   ]));
   expect(data.pareto).toEqual(expect.arrayContaining([
-    expect.objectContaining({ total: 2, agentsAffected: 1 }),
+    expect.objectContaining({ total: 4, agentsAffected: 2 }),
   ]));
-  expect(data.details).toHaveLength(2);
-  const excludedData = JSON.stringify([data.monthly, data.teams, data.agents, data.pareto, data.details]);
-  expect(excludedData).not.toContain(excludedParticipantId);
-  expect(excludedData).not.toContain(`Trainer Terlarang ${namespace}`);
-  expect(excludedData).not.toContain(`Temuan staf dikecualikan ${namespace}`);
+  expect(data.details).toHaveLength(4);
+  expect(data.agents).toContainEqual(expect.objectContaining({ agentId: staffParticipantId, name: `Trainer Laporan ${namespace}`, findingsCount: 2 }));
   expect(data.details.map((row: { ketidaksesuaian: string }) => row.ketidaksesuaian).sort()).toEqual([
     "Temuan actionable bulan Februari",
     "Temuan actionable bulan Januari",
+    `Temuan staf ${namespace}`,
+    `Temuan staf ${namespace}`,
   ].sort());
   expect(JSON.stringify(data.details)).not.toContain("Temuan tanpa rekomendasi");
   expect(JSON.stringify(data.details)).not.toContain("__PHANTOM__MANAGEMENT");
@@ -634,8 +636,8 @@ test("management report errors remain errors and showArchived parity matches das
       zeroErrorRate: dashboard.summary.zeroErrorRate,
     }));
     const allSections = JSON.stringify([report.monthly, report.teams, report.agents, report.pareto, report.details]);
-    expect(allSections).not.toContain(excludedParticipantId);
-    expect(allSections).not.toContain(`Trainer Terlarang ${namespace}`);
+    expect(allSections).toContain(staffParticipantId);
+    expect(allSections).toContain(`Trainer Laporan ${namespace}`);
   }
 
   const reportNoAccess = await requestReport({ serviceType: "call", year, startMonth: 1, endMonth: 1 }, unapprovedLeader.token);
@@ -723,7 +725,7 @@ test("coverage counts scoped active agents and audit sessions across services", 
       `));
     }
     const [unauditedId, archivedId] = coverageParticipants;
-    const scopedIds = [secondParticipantId, excludedParticipantId!, ...coverageParticipants];
+    const scopedIds = [secondParticipantId, staffParticipantId!, ...coverageParticipants];
     runSql(env, `
       INSERT INTO access_group_items (access_group_id, field_name, field_value, is_active)
       VALUES ${scopedIds.map((id) => `(${quoted(secondAccessGroupId)},'peserta_id',${quoted(id)},true)`).join(",")};
@@ -772,7 +774,7 @@ test("coverage counts scoped active agents and audit sessions across services", 
     runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(participantId)} AND no_tiket IN (${extraTickets.map(quoted).join(",")});`);
     if (coverageParticipants.length) {
       const ids = coverageParticipants.map(quoted).join(",");
-      runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(secondAccessGroupId)} AND field_name='peserta_id' AND field_value IN (${ids}, ${quoted(secondParticipantId)}, ${quoted(excludedParticipantId!)}); DELETE FROM profiler_peserta WHERE id IN (${ids});`);
+      runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(secondAccessGroupId)} AND field_name='peserta_id' AND field_value IN (${ids}, ${quoted(secondParticipantId)}, ${quoted(staffParticipantId!)}); DELETE FROM profiler_peserta WHERE id IN (${ids});`);
     }
     for (const user of coverageUsers) {
       const { error } = await createAdmin(env).auth.admin.deleteUser(user.userId);

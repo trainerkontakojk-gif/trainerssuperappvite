@@ -71,6 +71,9 @@ export async function generateSidakTrendForecast(
       endMonth: req.filters.endMonth,
       agent_ids: req.filters.agentIds,
       allowedServiceTypes: req.filters.allowedServiceTypes,
+      // Staff are no longer audited, so their past findings would skew the
+      // projection of the team's coming months.
+      excludeStaff: true,
     }),
     req.forceRefresh
       ? { fingerprints: [] as string[], complete: true }

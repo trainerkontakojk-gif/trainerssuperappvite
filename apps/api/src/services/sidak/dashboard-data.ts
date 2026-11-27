@@ -166,6 +166,7 @@ async function fetchAllTemuan(opts: {
   folderNames?: string[] | null;
   excludedIds: string[];
   allowedSvcs?: ServiceType[] | null;
+  excludeStaff?: boolean;
 }): Promise<DashboardTemuanRow[]> {
   if (opts.service_type && opts.service_type !== "all") {
     if (
@@ -199,7 +200,8 @@ async function fetchAllTemuan(opts: {
     const p = pesertaById.get(row.peserta_id);
     if (!p) continue;
     if (folderNames && !folderNames.has(p.batch_name ?? "")) continue;
-    if (isAgentExcluded(p.tim, p.batch_name, p.jabatan)) continue;
+    if (opts.excludeStaff && isAgentExcluded(p.tim, p.batch_name, p.jabatan))
+      continue;
     result.push({ ...row, profiler_peserta: p });
   }
   return result;
@@ -217,9 +219,16 @@ export async function getDashboardData(params: {
   endMonth?: number;
   allowedServiceTypes?: ServiceType[];
   limit?: number;
+  /**
+   * Drops people who are SIDAK staff today (`isAgentExcluded`). Historical
+   * numbers keep every audited row, so a staff member still counts in the
+   * months they were audited as an agent; only forward-looking callers such
+   * as the team forecast pass this.
+   */
+  excludeStaff?: boolean;
 }): Promise<DashboardData> {
-  // SIDAK-excluded staff are dropped in fetchAllTemuan from the joined
-  // peserta columns; only soft-deleted ids go to the database filter.
+  // Only soft-deleted ids go to the database filter; staff are dropped in
+  // fetchAllTemuan from the joined peserta columns when `excludeStaff` is set.
   const [periods, indicators, weights, excludedIds, folderFilter] =
     await Promise.all([
       getPeriods(),
@@ -277,6 +286,7 @@ export async function getDashboardData(params: {
           folderNames,
           excludedIds,
           allowedSvcs,
+          excludeStaff: params.excludeStaff,
         });
   const rows = toDashboardTemuanRows(allTemuan);
 

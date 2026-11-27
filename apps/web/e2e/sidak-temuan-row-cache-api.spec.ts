@@ -56,7 +56,8 @@ const apiIndicator = randomUUID();
 const folders = { a: `e2e-rowcache-${ns}-a`, b: `e2e-rowcache-${ns}-b` };
 let folderBId = "";
 // A, B, C, E in folder a; D in folder b. A and B are in the leader's scope.
-// E is SIDAK-excluded (jabatan Trainer).
+// E is SIDAK staff today (jabatan Trainer): counted in its audited month, but
+// not in the active agent directory (plan `sidak-staff-agent-months.md`).
 const peserta: Record<"A" | "B" | "C" | "D" | "E", string> = {
   A: "",
   B: "",
@@ -615,14 +616,15 @@ test("every filter returns the same rows cold and warm", async () => {
   }
 
   const byName = (name: string) => results[name] as Body;
-  // A, B, C and D are audited; E is SIDAK-excluded.
+  // A, B, C, D and E are audited; E is staff, so only the directory drops it.
   expect(agentSet(byName("dashboard trainer").topAgents)).toEqual([
     "A",
     "B",
     "C",
     "D",
+    "E",
   ]);
-  expect(byName("dashboard trainer").summary.totalAgents).toBe(4);
+  expect(byName("dashboard trainer").summary.totalAgents).toBe(5);
   expect(agentSet(byName("dashboard leader").topAgents)).toEqual(["A", "B"]);
   expect(byName("dashboard leader").summary.totalAgents).toBe(2);
   expect(agentSet(byName("dashboard chat").topAgents)).toEqual([
@@ -630,6 +632,7 @@ test("every filter returns the same rows cold and warm", async () => {
     "B",
     "C",
     "D",
+    "E",
   ]);
   expect(byName("dashboard email").topAgents).toEqual([]);
   expect(agentSet(byName("dashboard month 2").topAgents)).toEqual([
@@ -641,12 +644,13 @@ test("every filter returns the same rows cold and warm", async () => {
     "A",
     "B",
     "C",
+    "E",
   ]);
   expect(agentSet(byName("dashboard folder b").topAgents)).toEqual(["D"]);
 
   const failing = indicatorIds.length;
-  // Month 1: A and C fail every indicator (E is excluded only from the
-  // dashboard); month 2: B and D. The phantom row never counts.
+  // Month 1: A, C and E fail every indicator; month 2: B and D. The phantom
+  // row never counts.
   expect(byName("trend leader").totalSummary.totalDefects).toBe(2 * failing);
   expect(byName("trend leader").totalSummary.auditedAgents).toBe(2);
   expect(byName("trend month 1 chat").totalSummary.totalDefects).toBe(
@@ -695,7 +699,7 @@ test("temuan and peserta written through the API show on the next read", async (
     agentSet(
       (await dashboard(trainer.token, `&period_ids=${periodIds[1]}`)).topAgents,
     ),
-  ).toEqual(["A", "B", "C", "D"]);
+  ).toEqual(["A", "B", "C", "D", "E"]);
 
   const [id] = runSql(
     env,

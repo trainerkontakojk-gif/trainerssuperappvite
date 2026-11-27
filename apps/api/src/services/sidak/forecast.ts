@@ -10,6 +10,7 @@ import {
   isServiceType,
 } from "../../lib/scoring";
 import { resolveFolderFiltersByIds } from "./access-scope";
+import { isAgentExcluded } from "./agent-directory";
 import type {
   ServiceType,
   SidakAgentForecastEntry,
@@ -148,6 +149,8 @@ export async function generateSidakAgentForecast(
   for (const [agentId, agentRows] of rowsByAgent) {
     const agent = agentRows[0]?.profiler_peserta;
     if (!agent) continue;
+    // People who are SIDAK staff today are no longer audited as agents.
+    if (isAgentExcluded(agent.tim, agent.batch_name, agent.jabatan)) continue;
 
     const rowsByPeriod = new Map<string, ForecastRow[]>();
     for (const row of agentRows) {

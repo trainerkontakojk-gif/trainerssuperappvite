@@ -24,9 +24,10 @@ import {
  * - baris tanpa nomor tiket = satu tiket per baris;
  * - sparkline per periode; total rentang = jumlah per periode.
  *
- * Rentang bulan juga mempersempit tabel agen dan Pareto, bukan hanya KPI;
- * staf yang dikecualikan SIDAK (mis. jabatan Trainer) tidak ikut dihitung
- * (`plans/markdown/sidak-dashboard-speed.md`).
+ * Rentang bulan juga mempersempit tabel agen dan Pareto, bukan hanya KPI
+ * (`plans/markdown/sidak-dashboard-speed.md`). Staf SIDAK saat ini (mis.
+ * jabatan Trainer) tetap dihitung di bulan yang punya baris auditnya
+ * (`plans/markdown/sidak-staff-agent-months.md`).
  *
  * Fixture memakai tahun 2098 dan folder unik per run supaya tidak tercampur
  * data lokal lain, lalu dibersihkan di `afterAll`.
@@ -167,7 +168,7 @@ test.beforeAll(async () => {
     row(2, 0, ticket("D"), 0, finding),
     row(2, 1, ticket("D"), 0, finding),
   ];
-  // Staf yang dikecualikan SIDAK: temuannya tidak boleh terhitung di mana pun.
+  // Staf SIDAK saat ini dengan audit Januari: dihitung di Januari (1 temuan, 1 tiket).
   rows.push(
     `(${quoted(created.excludedPesertaId!)},${quoted(created.periodIds[1])},${quoted(indicators[0]!)},'call',${ticket("X")},false,0,${finding},${YEAR})`,
   );
@@ -220,27 +221,27 @@ test.afterAll(async () => {
 test("rentang bulan: total per parameter dan per tiket, plus sparkline tiket", async () => {
   const data = await dashboard({ startMonth: "1", endMonth: "2" });
 
-  expect(data.summary.totalDefects).toBe(8);
-  expect(data.summary.totalTickets).toBe(5);
+  expect(data.summary.totalDefects).toBe(9);
+  expect(data.summary.totalTickets).toBe(6);
   expect(data.summary).not.toHaveProperty("avgDefectsPerAudit");
 
   expect(data.sparklines["total-defects"]).toEqual([
-    { label: "Jan 98", value: 6 },
+    { label: "Jan 98", value: 7 },
     { label: "Feb 98", value: 2 },
   ]);
   expect(data.sparklines["total-tickets"]).toEqual([
-    { label: "Jan 98", value: 4 },
+    { label: "Jan 98", value: 5 },
     { label: "Feb 98", value: 1 },
   ]);
   expect(data.sparklines).not.toHaveProperty("avg-defects");
-  expect(data.periodMetrics.map((m) => m.totalTickets)).toEqual([4, 1]);
+  expect(data.periodMetrics.map((m) => m.totalTickets)).toEqual([5, 1]);
 });
 
 test("satu periode: tiket unik, tanpa nomor dihitung per baris, complies tidak dihitung", async () => {
   const data = await dashboard({ period_ids: created.periodIds[1] });
 
-  expect(data.summary.totalDefects).toBe(6);
-  expect(data.summary.totalTickets).toBe(4);
+  expect(data.summary.totalDefects).toBe(7);
+  expect(data.summary.totalTickets).toBe(5);
 });
 
 test("rentang satu bulan: tabel agen dan Pareto hanya bulan itu", async () => {
@@ -253,11 +254,19 @@ test("rentang satu bulan: tabel agen dan Pareto hanya bulan itu", async () => {
   expect(data.paretoData.reduce((sum, p) => sum + p.count, 0)).toBe(2);
 });
 
-test("staf yang dikecualikan SIDAK tidak muncul di tabel agen", async () => {
+test("staf SIDAK saat ini tetap di tabel agen untuk bulan auditnya", async () => {
   const data = await dashboard({ startMonth: "1", endMonth: "2" });
 
-  expect(data.topAgents.map((a) => a.agentId)).toEqual([created.pesertaId]);
-  expect(data.topAgents[0]!.defects).toBe(8);
+  expect(
+    data.topAgents.map((a) => [a.agentId, a.defects]).sort(),
+  ).toEqual(
+    [
+      [created.pesertaId, 8],
+      [created.excludedPesertaId, 1],
+    ].sort(),
+  );
+  const february = await dashboard({ startMonth: "2", endMonth: "2" });
+  expect(february.topAgents.map((a) => a.agentId)).toEqual([created.pesertaId]);
 });
 
 test("is_countable paritas JS dan penulisan temuan melalui RLS", async () => {
