@@ -140,6 +140,11 @@ Setelah fase yang dikerjakan selesai dan E2E target aman, jalankan serial: E2E b
 - Tiga parameter terburuk: jumlah temuan countable terbanyak, lalu kategori critical lebih dulu, lalu nama.
 - Agen yang diaudit di dua layanan pada satu bulan tampil dua baris (agen+layanan). Parity dengan Dashboard diuji per filter satu layanan.
 - (2026-11-27) Fase 3 Cakupan Audit: target 5 sesi per agen per bulan berlaku sama untuk semua layanan untuk saat ini. Target ini adalah ukuran cakupan audit, terpisah dari sampling 5 sesi terburuk + padding 100 pada skor agen, dan tidak mengubah skor.
+- (2026-11-27) Fase 3 agen aktif (penyebut): peserta dalam scope pemanggil yang tidak dihapus, tidak dikecualikan SIDAK, dan tidak diarsipkan (kecuali `showArchived=true`), sebagai snapshot saat laporan ditarik.
+- (2026-11-27) Fase 3 satuan sesi diaudit: sama dengan pengelompokan dashboard (agen + periode + `no_tiket` dengan fallback), termasuk sesi bersih phantom-only.
+- (2026-11-27) Fase 3 cakupan hanya level total, tidak dipecah per layanan (peta tim→layanan tidak andal untuk tim Mix dan Pencatatan); sesi dijumlah lintas layanan, filter layanan tetap mempersempit sesi yang dihitung.
+- (2026-11-27) Fase 3 Excel: sheet ke-9 **Cakupan Audit** setelah Detail Temuan, sehingga urutan delapan sheet yang sudah dirilis tidak bergeser. Label target: `Target 5 sesi/agen/bulan`.
+- (2026-11-27) Fase 3 PDF: satu tabel ringkas (agen diaudit / agen aktif, % cakupan, jumlah agen <5 sesi, jumlah belum diaudit), tanpa daftar nama.
 
 **Masih terbuka**
 
