@@ -6,6 +6,8 @@ Format: newest date first, one `## YYYY-MM-DD` heading per day, one `- type(scop
 
 ## 2026-11-27
 
+- docs(sidak): record the phantom-row rule version and rule indicator repair in the heatmap time plan
+- feat(sidak): add audit coverage sheet and PDF summary to management report
 - docs(sidak): record the May 2026 rule version and rule indicator repair and the open phantom-row gap in the heatmap time plan
 - docs(sidak): record the Hermes sync's per-period rule version choice, the fail-closed period lookup, and the actual January–November time backfill path in the heatmap time plan
 - docs(sidak): record Fajar's Phase 3 audit-coverage decisions (active-agent denominator, dashboard session unit, total-only coverage, ninth Excel sheet, compact PDF table)
