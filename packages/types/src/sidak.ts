@@ -161,6 +161,27 @@ export type SidakManagementReportDetailRow = {
   qa_periods: { id?: string; month?: number; year?: number };
 };
 
+export interface SidakManagementReportCoverage {
+  targetSessionsPerMonth: number;
+  monthly: Array<{
+    month: number;
+    activeAgents: number;
+    auditedAgents: number;
+    coverageRate: number | null;
+    agentsAtTarget: number;
+    agentsBelowTarget: number;
+    unauditedAgents: number;
+  }>;
+  agents: Array<{
+    agentId: string;
+    name: string;
+    team: string;
+    batchName: string;
+    monthlySessions: Partial<Record<number, number>>;
+    monthsAtTarget: number;
+  }>;
+}
+
 export interface SidakManagementReportResponse {
   metadata: {
     mode: "layanan" | "individu";
@@ -194,7 +215,7 @@ export interface SidakManagementReportResponse {
   critical: SidakManagementReportCriticalRow[];
   followUps: SidakManagementReportFollowUpRow[];
   details: SidakManagementReportDetailRow[];
-
+  coverage: SidakManagementReportCoverage;
 }
 
 export const categorySchema = z.enum(["critical", "non_critical", "none"]);

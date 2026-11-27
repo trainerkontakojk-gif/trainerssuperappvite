@@ -4,7 +4,7 @@
 
 Tambahkan lapisan laporan manajemen pada `/sidak/reports-data` di atas daftar temuan yang sudah ada. Pengguna dapat memilih preset Bulanan, Kuartal (Q1–Q4), Semester, Tahunan, YTD, atau rentang kustom; preset hanya mengisi filter `Tahun`, `Dari bulan`, dan `Ke bulan` yang sama. Hasil dapat diunduh sebagai workbook Excel multi-sheet dan PDF ringkasan eksekutif.
 
-Excel memuat delapan sheet berikut, dalam urutan tetap:
+Excel memuat sembilan sheet berikut, dalam urutan tetap:
 
 1. **Ringkasan** — per layanan dan bulan: agen diaudit, sesi diaudit, temuan countable, tiket bertemuan, rata-rata skor agen, compliance, zero-error, dan delta terhadap periode sebelumnya. Sertakan subtotal kuartal yang beririsan dengan rentang dan total rentang.
 2. **Rekap Tim** — per `tim` × layanan × bulan dengan metrik yang sama seperti Ringkasan (agen diaudit, sesi, temuan, tiket bertemuan, rata-rata skor agen, compliance, zero-error, delta), subtotal kuartal, total rentang, dan baris rincian per `batch_name` di bawah setiap tim. Tim diambil dari `profiler_peserta.tim` dan `batch_name` saat laporan ditarik (belum ada histori tim).
@@ -14,12 +14,13 @@ Excel memuat delapan sheet berikut, dalam urutan tetap:
 6. **Critical** — daftar temuan riil yang kategorinya critical menurut rule version periode terkait, dilengkapi kolom Bulan.
 7. **Tindak Lanjut** — agen ber-skor rentang <95, turun pada dua bulan kalender berurutan yang sama-sama diaudit, atau mengalami parameter countable yang sama pada ≥2 bulan. Sertakan tiga parameter terburuk dan jumlah bulan berulang.
 8. **Detail Temuan** — baris actionable yang sama dengan Workspace Data saat ini. Pertahankan header ekspor `Seharusnya` demi kompatibilitas.
+9. **Cakupan Audit** — ringkasan bulanan total lintas layanan dan jumlah sesi per agen terhadap target lima sesi. Tampilkan agen tanpa audit dengan `–` pada bulan tanpa sesi.
 
 Baris metadata pada awal setiap sheet menyatakan mode, service, agent (mode individu), parameter (dengan keterangan bahwa filter ini hanya berlaku untuk Detail Temuan), `showArchived`, tahun, rentang bulan, service allowlist efektif, dan `data ditarik pada <timestamp>` Asia/Jakarta. Bulan tanpa audit harus kosong/`–`, bukan 0 atau 100, dan tidak masuk denominator rata-rata. Skor multi-bulan agen mengikuti dashboard: rata-rata skor agen per periode yang diaudit. Compliance tahunan/kuartalan utama memakai skor rata-rata periode ≥95; tampilkan juga `x/N bulan ≥95`. Delta untuk metrik hitungan adalah persentase relatif, untuk metrik persen/skor adalah poin persentase, mengikuti aturan Delta KPI dashboard. Bila denominator pembanding nol/tidak tersedia, delta ditampilkan `–`.
 
-PDF tidak berisi raw detail. Isinya KPI terhadap periode pembanding, tren enam bulan, top-10 parameter, dan daftar tindak lanjut. PDF juga memuat perbandingan antar tim dan antar leader. PDF kuartalan/tahunan menambahkan tren bulanan, perbandingan layanan, dan parameter yang membaik/memburuk. Nama agen boleh tampil di PDF (keputusan Fajar 2026-11-24).
+PDF tidak berisi raw detail. Isinya KPI terhadap periode pembanding, tren enam bulan, top-10 parameter, dan daftar tindak lanjut. PDF juga memuat perbandingan antar tim dan antar leader. PDF kuartalan/tahunan menambahkan tren bulanan, perbandingan layanan, dan parameter yang membaik/memburuk. Nama agen boleh tampil di PDF (keputusan Fajar 2026-11-24). Tabel Cakupan Audit hanya memuat ringkasan bulanan tanpa nama.
 
-Populasi harus konsisten dengan sumber angka dashboard: bagian Ringkasan/Rekap/Cakupan (bila fase 3) memakai audit presence termasuk sesi phantom-only; bagian Pareto/Critical/Tindak Lanjut memakai hanya temuan riil countable. Detail tetap mengikuti aturan Workspace Data: buang phantom dan hanya tampilkan baris dengan Temuan serta Rekomendasi terisi. Jangan membuat scoring di frontend, SQL, atau materialized cache.
+Populasi harus konsisten dengan sumber angka dashboard: bagian Ringkasan/Rekap dan pembilang Cakupan memakai audit presence termasuk sesi phantom-only; bagian Pareto/Critical/Tindak Lanjut memakai hanya temuan riil countable. Detail tetap mengikuti aturan Workspace Data: buang phantom dan hanya tampilkan baris dengan Temuan serta Rekomendasi terisi. Jangan membuat scoring di frontend, SQL, atau materialized cache.
 
 Batas akses sama dengan dashboard dan laporan data: autentikasi/capability, leader hanya tim yang diizinkan, `allowedServiceTypes`, peserta SIDAK yang dikecualikan, soft-delete dan `showArchived` sesuai kebijakan yang sudah ada. Gunakan Hono RPC typed (`hc<AppType>`) serta `fetchApi`/klien SIDAK saat ini, dan shared response types di `packages/types`. Error ke pengguna harus ramah. Tidak ada migrasi, snapshot periode, atau penguncian angka pada v1. Proses generate/download baru di UI memakai satu status union eksplisit melalui `useReducer`.
 
@@ -34,7 +35,7 @@ Batas akses sama dengan dashboard dan laporan data: autentikasi/capability, lead
 - Tabel periodik memuat bulan kalender yang diminta walaupun belum ada audit. Baris tanpa audit diproyeksikan kosong. Total rentang dan subtotal kuartal Ringkasan/Rekap Tim memakai bobot audit-periode Dashboard: `avgAgentScore = Σ(avgAgentScore × totalAudited) / Σ(totalAudited)`, `complianceRate = Σ(compliance) / Σ(totalAudited) × 100`, dan `zeroErrorRate = Σ(round(zero / 100 × totalAudited)) / Σ(totalAudited) × 100`. Persen/skor dibulatkan dua desimal; hitungan compliance tiap periode membandingkan skor agen yang belum dibulatkan dengan ambang `≥95`. `agentsAudited` pada agregat tetap jumlah agen unik, sama dengan dashboard `totalAgents`. Rekap Agen tetap memakai mean skor periodik per agen dan menampilkan `x/N bulan ≥95`; jangan memakai aturan skor agen unik untuk total tim/rentang.
 - Ringkasan menghasilkan baris bulan, subtotal per kuartal yang bersinggungan dengan rentang, dan total rentang. Temuan dan tiket dihitung per bulan lalu dijumlahkan; nomor tiket yang sama pada bulan berbeda tetap satu hitungan per periode sesuai `countFindingTickets()`.
 - Pareto memakai temuan countable saja; kategori diambil dari konteks historis periode, agen terdampak dihitung unik dalam rentang, dan ranking parameter deterministik (jumlah desc lalu nama). Critical memakai baris countable non-phantom yang kategorinya critical pada rule periodik. Tindak Lanjut dibatasi ke agen dengan temuan countable untuk kriteria temuan; nilai skor untuk kriteria <95 tetap diambil dari agregasi audit dashboard. Tiga parameter terburuk diurutkan dari hitungan temuan desc, kategori critical lebih dulu pada seri, lalu nama.
-- Rekap Tim memakai agregasi yang sama dengan Ringkasan, hanya dikelompokkan per `tim` (lalu `batch_name`) dan layanan; rata-rata skor tim = rata-rata skor agen yang diaudit di tim itu pada periode tersebut. Tim hanya mencakup agen dalam scope pemanggil, jadi leader hanya melihat tim/batch dari access group yang disetujui. Rollup per _leader_ tidak dibuat di v1 karena leader tidak dipetakan ke satu tim (akses lewat access group many-to-many; lihat `docs/LEADER_APPROVAL_ACCESS.md`).
+- Rekap Tim memakai agregasi yang sama dengan Ringkasan, hanya dikelompokkan per `tim` (lalu `batch_name`) dan layanan; rata-rata skor tim = rata-rata skor agen yang diaudit di tim itu pada periode tersebut. Tim hanya mencakup agen dalam scope pemanggil, jadi leader hanya melihat tim/batch dari access group yang disetujui.
 - Rekap Leader: untuk setiap leader dengan permintaan akses modul `sidak` yang approved dan masih berlaku saat laporan ditarik, ambil scope lewat `getLeaderScopeSnapshot(leaderId, "sidak")` (`apps/api/src/services/access/leader-scope.ts`, yang juga dipakai `resolveDataScope`), lalu iris dengan scope pemanggil dan `allowedServiceTypes` leader itu. Agregasi memakai baris temuan yang sudah diambil sekali untuk request, difilter di memori per himpunan `peserta_id`; jangan fetch ulang per leader. Visibilitas: admin/trainer melihat semua leader; leader hanya melihat blok miliknya sendiri; role lain tidak mendapat sheet ini. Leader yang scope-nya kosong ditampilkan dengan keterangan `scope kosong`, bukan disembunyikan. Scope adalah snapshot saat laporan ditarik (belum ada histori access group), sama seperti tim. Tidak ada perubahan skema.
 - Skor pada Rekap Agen dan peringkat dihitung per agen+layanan. Catatan parity: `getDashboardData` mengelompokkan per agen (`groupTemuanByAgent`) dan memberi skor setiap periode memakai `service_type` baris pertama periode itu. Jadi parity skor per agen dengan dashboard hanya dijamin untuk filter satu layanan. Untuk "Semua Layanan", E2E parity membandingkan total/rata-rata per layanan. Agen yang diaudit di lebih dari satu layanan dalam satu periode dicatat sebagai temuan legacy dashboard; jangan ditiru diam-diam dan jangan mengubah dashboard tanpa keputusan Fajar. Periode yang tidak diaudit tetap kosong. Untuk mencegah skor historis tercampur antar versi, expose perubahan versi sebagai catatan/flag, bukan menghitung ulang seluruh histori memakai rule terbaru.
 
@@ -108,12 +109,14 @@ Fase 2 menyisipkan sheet **Rekap Leader** (setelah Rekap Tim) serta **Critical**
 2. Browser E2E mengunduh PDF sesungguhnya dan memeriksa bahwa teks memuat KPI vs pembanding, tren 6 bulan, top-10 parameter, perbandingan tim, tindak lanjut dengan nama agen, filter/timestamp; kuartal/tahun juga memuat tren bulanan, perbandingan layanan, serta parameter improving/worsening. Pastikan PDF tidak memuat tiket/temuan/rekomendasi raw dari detail.
 3. **Kriteria penerimaan:** Rekap Leader tidak pernah membocorkan scope leader lain ke pemanggil leader dan angkanya konsisten dengan scope `resolveDataScope`; semua pemicu tindak lanjut menghasilkan agent scoped yang tepat tanpa duplikasi; Critical tidak menampilkan phantom/non-countable; PDF valid, tidak memuat raw detail, memiliki bagian wajib dan format periode yang dipilih; seluruh unduhan gagal secara jelas tanpa file parsial.
 
-### Fase 3 — Cakupan Audit (opsional)
+### Fase 3 — Cakupan Audit
+
+**Status: Selesai (2026-11-27).** E2E API membuktikan populasi aktif, target bulanan, scope leader, filter layanan, dan paritas Fase 1–2. E2E browser membuktikan sheet kesembilan beserta metadata dan ringkasan PDF tanpa nama.
 
 **File yang direncanakan**
 
-- Ubah `apps/api/src/services/sidak/management-report.ts` dan `packages/types/src/sidak.ts` untuk audit versus populasi agen aktif, sesi per agen versus target 5, serta agen tidak diaudit.
-- Ubah `apps/web/src/routes/sidak/management-report-excel.ts` untuk bagian Cakupan Audit (lokasi sheet/penambahan sheet harus dikonfirmasi sebelum kontrak urutan sheet digeser) dan/atau `reports-data.tsx` untuk ringkasan yang sesuai.
+- Gunakan `apps/api/src/services/sidak/management-report-coverage.ts` dari `management-report.ts` dan tambah kontrak coverage di `packages/types/src/sidak.ts` untuk audit versus populasi agen aktif, sesi per agen versus target 5, serta agen tidak diaudit.
+- Tambahkan sheet kesembilan Cakupan Audit setelah Detail Temuan di `apps/web/src/routes/sidak/management-report-excel.ts` dan tabel ringkas di `apps/web/src/utils/sidakManagementReportPdf.ts`.
 - Tambah/ubah `apps/web/e2e/sidak-management-reports-api.spec.ts` dan `apps/web/e2e/sidak-management-reports.spec.ts`.
 
 **Urutan kerja dan bukti**
@@ -148,8 +151,7 @@ Setelah fase yang dikerjakan selesai dan E2E target aman, jalankan serial: E2E b
 
 **Masih terbuka**
 
-1. Satuan "sesi diaudit": konfirmasi sama dengan grouping dashboard per agen+periode+tiket/fallback. Untuk Cakupan Audit Fase 3: definisi peserta aktif dan apakah target 5 sesi berlaku sama pada semua layanan. Diputuskan sebelum Fase 3.
-2. Jika E2E tidak dapat membuktikan kontrak tertentu, catat dengan kalimat **“needs Fajar approval for non-E2E test”** disertai kontrak tepat dan alternatif sekecil mungkin sebelum menambahkan/menjalankan tes non-E2E. Saat ini belum ada kontrak yang diketahui tidak dapat dibuktikan melalui E2E backend/browser.
+1. Jika E2E tidak dapat membuktikan kontrak tertentu, catat dengan kalimat **“needs Fajar approval for non-E2E test”** disertai kontrak tepat dan alternatif sekecil mungkin sebelum menambahkan/menjalankan tes non-E2E. Saat ini belum ada kontrak yang diketahui tidak dapat dibuktikan melalui E2E backend/browser.
 
 ## Risks
 

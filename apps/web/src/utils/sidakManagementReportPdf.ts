@@ -101,6 +101,24 @@ function writeKpis(pdf: PdfDocument, data: SidakManagementReportResponse): void 
   }
 }
 
+function writeCoverage(pdf: PdfDocument, { coverage }: SidakManagementReportResponse): void {
+  pdf.heading("Cakupan Audit", undefined, 22);
+  pdf.table({
+    columns: [
+      { header: "Bulan", weight: 1.2, minWidth: 26 },
+      { header: "Agen diaudit / aktif", weight: 1.4, minWidth: 32, align: "right" },
+      { header: "% cakupan", weight: 1, minWidth: 22, align: "right" },
+      { header: `Agen <${coverage.targetSessionsPerMonth} sesi`, weight: 1.1, minWidth: 24, align: "right" },
+      { header: "Belum diaudit", weight: 1.1, minWidth: 26, align: "right" },
+    ],
+    rows: coverage.monthly.map((row) => [
+      MONTH_NAMES[row.month - 1]!,
+      `${numberText(row.auditedAgents)} / ${numberText(row.activeAgents)}`,
+      percentText(row.coverageRate), numberText(row.agentsBelowTarget), numberText(row.unauditedAgents),
+    ]),
+  });
+}
+
 function writeSixMonthTrend(pdf: PdfDocument, data: SidakManagementReportResponse): void {
   pdf.heading("Tren 6 Bulan", undefined, 22);
   const services = [...new Set(data.trendMonthly.map((row) => row.serviceType))];
@@ -248,6 +266,7 @@ export async function downloadSidakManagementReportPdf(data: SidakManagementRepo
   pdf.begin();
   writeFilter(pdf, data);
   writeKpis(pdf, data);
+  writeCoverage(pdf, data);
   writeSixMonthTrend(pdf, data);
   writePeriodMonthlyTrend(pdf, data);
   writeParameterSections(pdf, data);

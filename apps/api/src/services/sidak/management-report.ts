@@ -17,7 +17,8 @@ import {
 } from "@trainers/types";
 import { DEFAULT_SERVICE_WEIGHTS, getTemuanSessionKey } from "../../lib/scoring";
 import { buildCriticalAndFollowUps, getVisibleSidakLeaders } from "./management-report-phase2";
-import { getAgents, isAgentExcluded } from "./agent-directory";
+import { isAgentExcluded } from "./agent-directory";
+import { buildAuditCoverage, getEligibleReportAgents } from "./management-report-coverage";
 import {
   countFindingTickets,
   SIDAK_COMPLIANCE_TARGET,
@@ -824,12 +825,8 @@ export async function getSidakManagementReport(
   const leaderPesertaIds = new Set(visibleLeaders.flatMap((leader) =>
     leader.pesertaIds.filter((id) => scope.agentIds === null || scope.agentIds.includes(id)),
   ));
-  const eligibleLeaderAgents = leaderPesertaIds.size > 0
-    ? await getAgents({ agent_ids: [...leaderPesertaIds], showArchived: input.showArchived })
-    : [];
-  const eligibleLeaderPesertaIds = new Set(eligibleLeaderAgents
-    .filter((agent) => !isAgentExcluded(agent.tim, agent.batch_name, agent.jabatan))
-    .map((agent) => agent.id));
+  const eligibleLeaderAgents = await getEligibleReportAgents([...leaderPesertaIds], input.showArchived);
+  const eligibleLeaderPesertaIds = new Set(eligibleLeaderAgents.map((agent) => agent.id));
   const rowsForLeader = [...sourceRows, ...previousSourceRows];
   for (const leader of visibleLeaders) {
     const allowedIds = new Set(leader.pesertaIds.filter((id) => scope.agentIds === null || scope.agentIds.includes(id)));
@@ -915,6 +912,16 @@ export async function getSidakManagementReport(
   const { critical, followUps } = await buildCriticalAndFollowUps({
     services, months, year: input.year, sourceRows, periodByYearMonth, agentCache, contextFor, indicators,
   });
+  const coverage = await buildAuditCoverage({
+    agentIds: scopedAgentIds,
+    showArchived: input.showArchived,
+    services,
+    periods: months.map((month) => ({
+      month,
+      periodId: periodByYearMonth.get(`${input.year}:${month}`)?.id,
+    })),
+    sessionsByAgentPeriod: sessionsPerAgent,
+  });
   const dataTimestamp = new Date().toISOString();
   const currentMonth = now.month;
   const temporaryMonths = input.year === now.year && input.startMonth <= currentMonth && input.endMonth >= currentMonth
@@ -956,5 +963,6 @@ export async function getSidakManagementReport(
     critical,
     followUps,
     details: currentDetails,
+    coverage,
   };
 }

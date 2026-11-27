@@ -51,6 +51,41 @@ function asBlank(value: number | null | undefined): number | string {
   return value === null || value === undefined ? DASH : value;
 }
 
+function appendCoverage(
+  sheet: import("exceljs").Worksheet,
+  data: SidakManagementReportResponse,
+) {
+  appendMetadata(sheet, data);
+  const { targetSessionsPerMonth, monthly, agents } = data.coverage;
+  sheet.addRow([`Target ${targetSessionsPerMonth} sesi/agen/bulan`]);
+  setHeader(sheet, [
+    "Bulan", "Agen aktif", "Agen diaudit", "Cakupan (%)",
+    `Agen ≥${targetSessionsPerMonth} sesi`, `Agen <${targetSessionsPerMonth} sesi`, "Belum diaudit",
+  ]);
+  for (const row of monthly) {
+    sheet.addRow([
+      `${MONTH_NAMES[row.month - 1]} ${data.metadata.year}`,
+      row.activeAgents, row.auditedAgents, asBlank(row.coverageRate),
+      row.agentsAtTarget, row.agentsBelowTarget, row.unauditedAgents,
+    ]);
+  }
+
+  sheet.addRow([]);
+  setHeader(sheet, ["Nama Agen", "Tim", "Batch",
+    ...monthly.map(({ month }) => MONTH_NAMES[month - 1]!),
+    `Bulan ≥${targetSessionsPerMonth} sesi`,
+  ]);
+  for (const agent of agents) {
+    sheet.addRow([
+      agent.name, agent.team, agent.batchName,
+      ...monthly.map(({ month }) => asBlank(agent.monthlySessions[month])),
+      `${agent.monthsAtTarget}/${monthly.length}`,
+    ]);
+  }
+  const columnCount = Math.max(7, monthly.length + 4);
+  setWidths(sheet, [30, 24, 24, ...Array<number>(columnCount - 3).fill(18)]);
+}
+
 function downloadBuffer(buffer: ArrayBuffer, fileName: string) {
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -215,6 +250,8 @@ export async function downloadManagementReportExcel(
     ]);
   }
   setWidths(details, [16, 14, 24, 20, 22, 36, 56, 56, 12]);
+
+  appendCoverage(workbook.addWorksheet("Cakupan Audit"), data);
 
   const buffer = await workbook.xlsx.writeBuffer();
   downloadBuffer(buffer as ArrayBuffer, `laporan-manajemen-sidak-${data.metadata.year}-${data.metadata.startMonth}-${data.metadata.endMonth}.xlsx`);

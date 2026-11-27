@@ -93,6 +93,16 @@ async function requestDashboardRange(startMonth = 1, endMonth = 2) {
   });
 }
 
+function unusedPastYear(): number {
+  return Number(sqlOne(env, `
+    SELECT candidate
+    FROM generate_series(2000, extract(year FROM clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::int - 1) candidate
+    WHERE NOT EXISTS (SELECT 1 FROM qa_periods WHERE year = candidate)
+    ORDER BY candidate DESC
+    LIMIT 1;
+  `));
+}
+
 test.beforeAll(async () => {
   Object.assign(process.env, {
     NODE_ENV: "test",
@@ -104,7 +114,7 @@ test.beforeAll(async () => {
     OPENAI_API_KEY: "e2e-only",
   });
   installLoopbackFetchGuard();
-  year = Number(sqlOne(env, `SELECT candidate FROM generate_series(2000,2100) candidate WHERE NOT EXISTS (SELECT 1 FROM qa_periods WHERE year=candidate) ORDER BY abs(candidate - extract(year FROM clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::int) LIMIT 1;`));
+  year = unusedPastYear();
   trainer = await createUserWithJwt(env, "trainer", `management-report-${namespace}`);
   admin = await createUserWithJwt(env, "admin", `management-report-${namespace}`);
   leader = await createUserWithJwt(env, "leader", `management-report-${namespace}`);
@@ -342,7 +352,7 @@ test("management report aggregates audit, teams, agents, Pareto, and actionable 
 });
 
 test("follow-up decline requires three adjacent audited calendar months", async () => {
-  const followUpYear = Number(sqlOne(env, `SELECT candidate FROM generate_series(2000,2100) candidate WHERE NOT EXISTS (SELECT 1 FROM qa_periods WHERE year=candidate) ORDER BY abs(candidate - extract(year FROM clock_timestamp() AT TIME ZONE 'Asia/Jakarta')::int) LIMIT 1;`));
+  const followUpYear = unusedPastYear();
   const months = [1, 2, 3, 4];
   const followUpPeriods = new Map<number, string>();
   const participantIds: string[] = [];
@@ -680,5 +690,94 @@ test("management report tracks the published rule version effective in each mont
     expect(report.agents.find((agent: { agentId: string }) => agent.agentId === participantId).monthlyScores[month]).toBe(
       dashboard.topAgents.find((agent: { agentId: string }) => agent.agentId === participantId).score,
     );
+  }
+});
+
+test("coverage counts scoped active agents and audit sessions across services", async () => {
+  const input = { year, startMonth: 1, endMonth: 2 };
+  const coverageParticipants: string[] = [];
+  const coverageUsers: Awaited<ReturnType<typeof createUserWithJwt>>[] = [];
+  const extraTickets = [`__PHANTOM__COVERAGE-1-${namespace}`, `__PHANTOM__COVERAGE-2-${namespace}`];
+
+  async function getReport(filters: Record<string, unknown>, token = secondLeader.token) {
+    const response = await requestReport({ ...input, ...filters }, token);
+    expect(response.status, await response.clone().text()).toBe(200);
+    return (await response.json()).data;
+  }
+
+  try {
+    const narrowLeaderBefore = await getReport({}, leader.token);
+    for (const status of ["unaudited", "archived", "deleted"]) {
+      let accountId = "NULL";
+      if (status !== "unaudited") {
+        const user = await createUserWithJwt(env, "agent", `coverage-${status}-${namespace}`);
+        coverageUsers.push(user);
+        accountId = quoted(user.userId);
+        const update = status === "archived" ? "status='inactive'" : "is_deleted=true";
+        runSql(env, `UPDATE profiles SET ${update} WHERE id=${accountId};`);
+      }
+      coverageParticipants.push(sqlOne(env, `
+        INSERT INTO profiler_peserta (batch_name, nama, tim, jabatan, akun_id)
+        VALUES (${quoted(folderName)}, ${quoted(`Coverage ${status} ${namespace}`)}, 'Tim Uji Laporan', 'Agent', ${accountId})
+        RETURNING id;
+      `));
+    }
+    const [unauditedId, archivedId] = coverageParticipants;
+    const scopedIds = [secondParticipantId, excludedParticipantId!, ...coverageParticipants];
+    runSql(env, `
+      INSERT INTO access_group_items (access_group_id, field_name, field_value, is_active)
+      VALUES ${scopedIds.map((id) => `(${quoted(secondAccessGroupId)},'peserta_id',${quoted(id)},true)`).join(",")};
+    `);
+    const chatIndicatorId = sqlOne(env, "SELECT id FROM qa_indicators WHERE service_type='chat' AND is_active ORDER BY sort_order, name LIMIT 1;");
+    runSql(env, `
+      INSERT INTO qa_temuan (peserta_id, period_id, indicator_id, service_type, no_tiket, is_phantom_padding, nilai, tahun)
+      VALUES ${extraTickets.map((ticket) =>
+        `(${quoted(participantId)},${quoted(periodIds.get(1)!)},${quoted(chatIndicatorId)},'chat',${quoted(ticket)},true,3,${year})`,
+      ).join(",")};
+    `);
+    await resetSidakReferenceCache();
+
+    const allServices = await getReport({});
+    const callOnly = await getReport({ serviceType: "call" });
+    const includingArchived = await getReport({ showArchived: true });
+    const narrowLeader = await getReport({}, leader.token);
+    const individual = await getReport({ pesertaId: unauditedId });
+    const january = { month: 1, activeAgents: 3, auditedAgents: 2, coverageRate: 66.67, agentsAtTarget: 1, agentsBelowTarget: 1, unauditedAgents: 1 };
+    const february = { month: 2, activeAgents: 3, auditedAgents: 1, coverageRate: 33.33, agentsAtTarget: 0, agentsBelowTarget: 1, unauditedAgents: 2 };
+    expect(allServices.coverage).toEqual({
+      targetSessionsPerMonth: 5,
+      monthly: [january, february],
+      agents: expect.arrayContaining([
+        expect.objectContaining({ agentId: participantId, monthlySessions: { 1: 5, 2: 1 }, monthsAtTarget: 1 }),
+        expect.objectContaining({ agentId: secondParticipantId, monthlySessions: { 1: 1 }, monthsAtTarget: 0 }),
+        expect.objectContaining({ agentId: unauditedId, monthlySessions: {}, monthsAtTarget: 0 }),
+      ]),
+    });
+    expect(allServices.coverage.agents).toHaveLength(3);
+    expect(callOnly.coverage.monthly).toEqual([{ ...january, agentsAtTarget: 0, agentsBelowTarget: 2 }, february]);
+    expect(callOnly.coverage.agents).toContainEqual(expect.objectContaining({ agentId: participantId, monthlySessions: { 1: 2, 2: 1 } }));
+    expect(includingArchived.coverage.monthly[0]).toEqual({ ...january, activeAgents: 4, coverageRate: 50, unauditedAgents: 2 });
+    expect(includingArchived.coverage.agents.map((agent: { agentId: string }) => agent.agentId).sort())
+      .toEqual([participantId, secondParticipantId, unauditedId, archivedId].sort());
+    expect(narrowLeader.coverage.agents).toEqual([
+      expect.objectContaining({ agentId: participantId, monthlySessions: { 1: 2, 2: 1 } }),
+    ]);
+    expect(narrowLeader.coverage.monthly[0]).toEqual({ ...january, activeAgents: 1, auditedAgents: 1, coverageRate: 100, agentsAtTarget: 0, unauditedAgents: 0 });
+    expect(individual.coverage.agents).toEqual([expect.objectContaining({ agentId: unauditedId })]);
+    expect(individual.coverage.monthly[0]).toEqual({ ...january, activeAgents: 1, auditedAgents: 0, coverageRate: 0, agentsAtTarget: 0, agentsBelowTarget: 0 });
+    for (const section of ["monthly", "trendMonthly", "teams", "agents", "pareto", "leaders", "critical", "followUps", "details"]) {
+      expect(narrowLeader[section], section).toEqual(narrowLeaderBefore[section]);
+    }
+  } finally {
+    runSql(env, `DELETE FROM qa_temuan WHERE peserta_id=${quoted(participantId)} AND no_tiket IN (${extraTickets.map(quoted).join(",")});`);
+    if (coverageParticipants.length) {
+      const ids = coverageParticipants.map(quoted).join(",");
+      runSql(env, `DELETE FROM access_group_items WHERE access_group_id=${quoted(secondAccessGroupId)} AND field_name='peserta_id' AND field_value IN (${ids}, ${quoted(secondParticipantId)}, ${quoted(excludedParticipantId!)}); DELETE FROM profiler_peserta WHERE id IN (${ids});`);
+    }
+    for (const user of coverageUsers) {
+      const { error } = await createAdmin(env).auth.admin.deleteUser(user.userId);
+      expect(error).toBeNull();
+    }
+    await resetSidakReferenceCache();
   }
 });

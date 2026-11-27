@@ -27,6 +27,17 @@ const managementData = {
   ],
   critical: [{ service_type: "call", qa_periods: { month: 1, year: 2026 }, profiler_peserta: { nama: "Alya Uji", batch_name: "Batch 7" }, qa_indicators: { name: "Kepatuhan prosedur" }, no_tiket: "TKT-1", ketidaksesuaian: "RAW_CRITICAL_FINDING_SHOULD_NOT_APPEAR", sebaiknya: "RAW_CRITICAL_RECOMMENDATION_SHOULD_NOT_APPEAR", nilai: 2, is_phantom_padding: false, category: "critical" }],
   followUps: [{ agentId: "agent-1", name: "Alya Uji", team: "Tim Uji", batchName: "Batch 7", reasons: ["score_below_target", "repeated_parameter"], worstParameters: [{ parameter: "Kepatuhan prosedur", category: "critical", count: 2 }], repeatMonthCount: 1 }],
+  coverage: {
+    targetSessionsPerMonth: 5,
+    monthly: Array.from({ length: 12 }, (_, index) => {
+      const audited = index === 0 || index === 11;
+      return { month: index + 1, activeAgents: 2, auditedAgents: audited ? 1 : 0, coverageRate: audited ? 50 : 0, agentsAtTarget: 0, agentsBelowTarget: audited ? 1 : 0, unauditedAgents: audited ? 1 : 2 };
+    }),
+    agents: [
+      { agentId: "agent-1", name: "Alya Uji", team: "Tim Uji", batchName: "Batch 7", monthlySessions: { 1: 1, 12: 1 }, monthsAtTarget: 0 },
+      { agentId: "agent-2", name: "Agen Belum Diaudit Uji", team: "Tim Uji", batchName: "Batch 7", monthlySessions: {}, monthsAtTarget: 0 },
+    ],
+  },
   details: [
     { service_type: "call", qa_periods: { month: 1, year: 2026 }, profiler_peserta: { nama: "Alya Uji", batch_name: "Batch 7" }, qa_indicators: { name: "Kepatuhan prosedur" }, no_tiket: "TKT-1", ketidaksesuaian: "Contoh temuan", sebaiknya: "Contoh rekomendasi", nilai: 2, is_phantom_padding: false },
     { service_type: "call", qa_periods: { month: 1, year: 2026 }, profiler_peserta: { nama: "Alya Uji", batch_name: "Batch 7" }, qa_indicators: { name: "Ghost" }, no_tiket: "GHOST", ketidaksesuaian: "Phantom finding", sebaiknya: "Phantom recommendation", nilai: 2, is_phantom_padding: true },
@@ -39,7 +50,7 @@ test.beforeAll(async () => {
   await assertLocalDevOnlyTargetAt(ORIGIN);
 });
 
-test("preset periode mengisi filter dan ekspor workbook delapan sheet berurutan", async ({ page }) => {
+test("preset periode mengisi filter dan ekspor workbook sembilan sheet berurutan", async ({ page }) => {
   requestUrls.length = 0;
   sidakRpcUrls.length = 0;
   requestBodies.length = 0;
@@ -91,7 +102,7 @@ test("preset periode mengisi filter dan ekspor workbook delapan sheet berurutan"
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Excel Manajemen" }).click();
   const workbook = await readDownloadedWorkbook(await downloadPromise);
-  expect(Object.keys(workbook)).toEqual(["Ringkasan", "Rekap Tim", "Rekap Leader", "Rekap Agen", "Pareto", "Critical", "Tindak Lanjut", "Detail Temuan"]);
+  expect(Object.keys(workbook)).toEqual(["Ringkasan", "Rekap Tim", "Rekap Leader", "Rekap Agen", "Pareto", "Critical", "Tindak Lanjut", "Detail Temuan", "Cakupan Audit"]);
   expect(workbook["Rekap Leader"]?.flat().join(" ")).toContain("Leader Uji");
   expect(workbook["Rekap Leader"]?.flat().join(" ")).toContain("scope kosong");
   expect(workbook.Critical?.flat().join(" ")).toContain("Kepatuhan prosedur");
@@ -103,6 +114,17 @@ test("preset periode mengisi filter dan ekspor workbook delapan sheet berurutan"
     expect(workbook[name]?.[0]?.[0]).toContain("Filter:");
     expect(workbook[name]?.flat().join(" ")).toContain("data ditarik pada 1 Mar 2026 07.00.00 (Asia/Jakarta)");
   }
+  const coverage = workbook["Cakupan Audit"] ?? [];
+  expect(coverage[0]).toEqual(workbook.Ringkasan?.[0]);
+  expect(coverage).toContainEqual(["Target 5 sesi/agen/bulan"]);
+  expect(coverage).toContainEqual(["Januari 2026", "2", "1", "50", "0", "1", "1"]);
+  expect(coverage).toContainEqual(["Februari 2026", "2", "0", "0", "0", "0", "2"]);
+  expect(coverage.find((row) => row[0] === "Alya Uji")).toEqual(
+    ["Alya Uji", "Tim Uji", "Batch 7", "1", ...Array(10).fill("–"), "1", "0/12"],
+  );
+  expect(coverage.find((row) => row[0] === "Agen Belum Diaudit Uji")).toEqual(
+    ["Agen Belum Diaudit Uji", "Tim Uji", "Batch 7", ...Array(12).fill("–"), "0/12"],
+  );
   expect(workbook.Ringkasan?.flat().join(" ")).toContain("2026");
   const blankMonthRow = workbook.Ringkasan?.find((row) => row.includes("Februari 2026"));
   expect(blankMonthRow).toContain("–");
@@ -140,6 +162,15 @@ test("preset periode mengisi filter dan ekspor workbook delapan sheet berurutan"
   for (const section of ["LAPORAN MANAJEMEN SIDAK", "Filter", "Periode pembanding", "KPI", "Tren 6 Bulan", "Tren Bulanan Periode", "Top 10 Parameter", "Perbandingan Tim", "Perbandingan Leader", "Tindak Lanjut", "Alya Uji", "1 Mar 2026 07.00.00"]) {
     expect(pdfText).toContain(section);
   }
+  const coverageSection = pdfText.match(/Cakupan Audit([\s\S]*?)Tren 6 Bulan/)?.[1] ?? "";
+  expect(coverageSection).toContain("Agen diaudit / aktif");
+  expect(coverageSection).toContain("% cakupan");
+  expect(coverageSection).toContain("Agen <5 sesi");
+  expect(coverageSection).toContain("Belum diaudit");
+  expect(coverageSection).toMatch(/Januari\s+1 \/ 2\s+50%\s+1\s+1/);
+  expect(coverageSection).toMatch(/Februari\s+0 \/ 2\s+0%\s+0\s+2/);
+  expect(coverageSection).not.toContain("Alya Uji");
+  expect(pdfText).not.toContain("Agen Belum Diaudit Uji");
   expect(pdfText).not.toContain("RAW_CRITICAL_FINDING_SHOULD_NOT_APPEAR");
   expect(pdfText).not.toContain("RAW_CRITICAL_RECOMMENDATION_SHOULD_NOT_APPEAR");
   expect(pdfText).not.toContain("Contoh temuan");
