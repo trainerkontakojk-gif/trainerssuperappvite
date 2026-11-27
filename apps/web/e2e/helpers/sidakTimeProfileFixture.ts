@@ -29,7 +29,12 @@ export function emptyTimeProfile(
     durations:
       !serviceType || source?.kind === "durasi"
         ? {
-            buckets: { singkat: 0, sedang: 0, panjang: 0 },
+            buckets: {
+              singkat: 0,
+              sedang: 0,
+              panjang: 0,
+              sangat_panjang: 0,
+            },
             total: 0,
             missingDuration: 0,
             reviewBelowOneMinute: 0,

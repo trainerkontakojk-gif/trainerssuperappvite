@@ -78,14 +78,25 @@ Dasar: profil read-only kolom H Jan–Nov 2026 dari cache XLSX Hermes (`qa-sync-
 | Sore                    | 14:00–16:59                 | ±20%                 |
 | Di luar jam operasional | 00:00–06:59 dan 17:00–23:59 | ±3%                  |
 
-**Durasi call** (n = 1.379; median 8m51s, p25 6m07s, p75 12m19s, p90 17m10s):
+**Durasi call — profil awal 25 November** (n = 1.379; median 8m51s, p25 6m07s, p75 12m19s, p90 17m10s). Angka awal ini tidak berhasil direproduksi pada verifikasi Fase 7.
 
 | Kategori              | Rentang                                                 | Porsi saat profiling |
 | --------------------- | ------------------------------------------------------- | -------------------- |
 | Singkat               | < 5 menit                                               | 15%                  |
 | Sedang                | 5 menit – < 15 menit                                    | 70%                  |
 | Panjang               | ≥ 15 menit                                              | 15%                  |
-| Penanda "perlu dicek" | < 1 menit (bukan kategori keempat; tetap masuk Singkat) | 3%                   |
+| Penanda "perlu dicek" | < 1 menit (bagian dari Singkat)                         | 3%                   |
+
+**Ambang yang disetujui 27 November (Lane C).** Profil durasi Call di mode Agent menampilkan empat kategori, baik saat Call dipilih maupun di Semua layanan, termasuk tab Heatmap detail agen. Setiap batas bawah termasuk dalam kategori berikutnya.
+
+| Kategori       | Rentang               |
+| -------------- | --------------------- |
+| Singkat        | < 5 menit             |
+| Sedang         | 5 sampai < 10 menit   |
+| Panjang        | 10 sampai < 15 menit  |
+| Sangat panjang | ≥ 15 menit            |
+
+Durasi < 1 menit tetap masuk Singkat dan ikut penanda Perlu dicek. Durasi kosong tetap tercatat sebagai Belum diisi.
 
 Untuk chat, "Di luar jam" praktis berisi balasan komentar (lihat aturan Hermes); chat live di luar jam yang belum dibetulkan tercatat sebagai "Belum diisi".
 
@@ -156,7 +167,7 @@ COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
 - CHECK membuat salah tulis Hermes (durasi ke chat, jam ke call/email/CSO/BKO) mustahil, bukan sekadar dilarang di dokumen.
 - RLS/policy/grant tidak berubah (policy existing column-agnostic). Index tidak ditambah di MVP; agregasi memakai filter tanggal + service yang sudah ada.
 
-### Kontrak bersama (`packages/types/src/sidak.ts`)
+### Kontrak bersama (`packages/types/src/sidak-time.ts` dan `packages/types/src/sidak.ts`)
 
 - `jamSchema`: string `HH:MM` atau `HH:MM:SS` 24 jam (00–23, 00–59); format lain ditolak, tidak ada tebakan AM/PM.
 - `durasiDetikSchema`: integer 0–86399.
@@ -200,7 +211,7 @@ COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
   };
   ```
   Mengubah label atau arti JAM cukup di peta ini.
-- `SIDAK_JAM_BUCKETS` (pagi/siang/sore/luar, batas dalam menit sejak 00:00) dan `SIDAK_DURASI_BUCKETS` (singkat/sedang/panjang, batas dalam detik) + `SIDAK_DURASI_REVIEW_BELOW_SECONDS = 60`. Fungsi `classifyJam()` / `classifyDurasi()` dipakai API dan web.
+- `SIDAK_JAM_BUCKETS` (pagi/siang/sore/luar, batas dalam menit sejak 00:00) dan `SIDAK_DURASI_BUCKETS` (singkat/sedang/panjang/sangat_panjang, batas 300/600/900 detik) + `SIDAK_DURASI_REVIEW_BELOW_SECONDS = 60`. API memakai `classifyJam()` dan `classifyDurasi()` untuk agregasi. Web memakai konstanta bersama untuk label dan rentang.
 
 ### API
 
@@ -231,7 +242,7 @@ COMMENT ON COLUMN public.qa_temuan.durasi_detik IS
       missingTime: number;
     }> | null; // diisi hanya bila service_type kosong; tidak ada sel gabungan lintas layanan
     durations: {
-      buckets: Record<"singkat" | "sedang" | "panjang", number>;
+      buckets: Record<"singkat" | "sedang" | "panjang" | "sangat_panjang", number>;
       reviewBelowOneMinute: number;
       total: number;
       missingDuration: number;
@@ -249,7 +260,7 @@ Jalankan `ui-ux-pro-max` sebelum implementasi dan `impeccable` audit/polish sebe
   - **Satu layanan dipilih (chat/pencatatan/SLIK):** matriks Senin–Minggu × kolom `<07`, `07`…`16`, `≥17` (dua kolom tepi menampung jam di luar operasional) + ringkasan Pagi/Siang/Sore/Di luar jam (jumlah + persen, rentang jam tertulis) + kalimat arti JAM layanan itu (`meaning`).
   - **Semua layanan:** tanpa matriks. Tabel kategori per layanan (baris = layanan + labelnya, kolom = Pagi/Siang/Sore/Di luar jam/Belum diisi) dan ajakan "Pilih satu layanan untuk melihat pola per hari dan jam".
   - Kalimat batasan interpretasi (lihat Requirement).
-  - Layanan Call/semua: kartu "Durasi panggilan" Singkat/Sedang/Panjang + penanda "< 1 menit perlu dicek".
+  - Layanan Call/semua: kartu "Durasi panggilan" Singkat/Sedang/Panjang/Sangat panjang + penanda "< 1 menit perlu dicek".
   - Layanan email/CSO/BKO: status "Analisa jam tidak dipakai untuk layanan ini" + `reason` dari `SIDAK_TIME_SOURCE` — dibedakan tegas dari "belum diisi".
 - **Mode QA**: section jam tidak tampil; catatan singkat "Jam hanya tersedia di mode Agent".
 - **Detail agent → tab Heatmap**: komponen yang sama, ter-scope `agent_id`.
@@ -317,7 +328,7 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
 
 - [x] RED: `sidak-heatmap-time-profile-api.spec.ts`:
   - Batas bucket: 06:59 luar, 07:00 pagi, 10:59 pagi, 11:00 siang, 13:59 siang, 14:00 sore, 16:59 sore, 17:00 luar.
-  - Batas durasi: 59 detik singkat + review, 299 singkat, 300 sedang, 899 sedang, 900 panjang.
+  - Batas durasi awal: 59 detik singkat + review, 299 singkat, 300 sedang, 899 sedang, 900 panjang. Lihat revisi 27 November untuk ambang sekarang.
   - `service_type` kosong → `hours = null`, `hoursByService` per layanan; data pencatatan + chat di jam yang sama tidak pernah dijumlah ke satu sel; `hoursByService` tidak memuat email/CSO/BKO.
   - `hours.label` sama dengan `SIDAK_TIME_SOURCE`.
   - Email/CSO/BKO: masuk `notApplicable`, tidak pernah `missingTime`.
@@ -408,6 +419,16 @@ Railway auto-deploy API saat push ke `main`, jadi migration prod harus masuk **s
   - Masih terbuka: angka profiling awal (2.561 jam, 1.379 durasi) tidak bisa direproduksi; profil ulang workbook memberi 2.958 dan 1.348. Ada baris sheet tanpa pasangan SIDAK (11 chat, 33 SLIK, 54 call) dan bobot call beda (1.276 baris sheet = 1.838 temuan prod). 3f328335 durasinya tetap NULL karena dua nilai sumber bertentangan. Tampilan UI per role belum dicek; E2E tidak boleh diarahkan ke prod.
   - Cek UI 2026-11-26 (akun admin Fajar, `/sidak/heatmap`, Semua layanan, 2026, dibuka lewat browser T3): setiap sel "Jam temuan per layanan" dan "Durasi panggilan" sama persis dengan hitungan ulang read-only dari prod memakai filter yang sama dengan endpoint (non-phantom, `is_countable`, `tanggal_layanan` 2026). Chat 719/646/562/4 (37 kosong), pencatatan 35/16/40/6 (1), SLIK 140/80/79/5 (1); call singkat 209, sedang 1.222, panjang 322, < 1 menit 8, kosong 99; total 5.381.
   - Role lain (leader/agent) belum dicek karena hanya akun admin yang tersedia di browser.
+
+### Revisi ambang durasi Call — 2026-11-27
+
+- [x] RED di E2E API pada batas 300, 600, dan 900 detik beserta detik sebelum batas. Respons lama mengembalikan tiga kategori dan gagal pada ekspektasi empat kategori. Penanda di bawah 60 detik dan hitungan durasi kosong tetap tercakup.
+- [x] GREEN dengan klasifikasi di tipe bersama, agregasi API, dan render kartu web. Ambang diterapkan ke detik tersimpan saat dibaca.
+- [x] E2E browser menguji empat label dan rentang pada kartu durasi, termasuk keterbacaan di viewport 390 dan 1280 piksel.
+- [x] Review `thermo-nuclear` dan audit tampilan kartu Call di desktop dan ponsel. Jalankan pemeriksaan workspace serta E2E terkait.
+  - `pnpm --dir apps/web exec playwright test sidak-heatmap-time-profile-api.spec.ts --config=playwright.api.config.ts --project sidak-time-real-backend --reporter=line --workers=1`: 2 lulus (exit 0), Supabase lokal.
+  - `pnpm --dir apps/web exec playwright test sidak-heatmap-time.spec.ts sidak-heatmap.spec.ts sidak-agent-heatmap.spec.ts --reporter=line --workers=1`: 32 lulus dan 1 timeout (exit 1), pada pencarian judul legenda intensitas kalender. Snapshot trace setelah timeout memuat judul dan kategori legenda yang diharapkan. Uji legenda yang sama lulus secara terisolasi di baseline `cbfcfd8c` (exit 0).
+  - `pnpm typecheck --concurrency=1`, `pnpm lint --concurrency=1`, dan `pnpm build --concurrency=1`: exit 0. Lint menghasilkan peringatan dan nol error.
 
 ## STOP conditions
 

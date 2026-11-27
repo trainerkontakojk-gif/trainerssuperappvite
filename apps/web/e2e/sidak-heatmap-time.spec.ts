@@ -74,7 +74,7 @@ function timeProfile(query: URLSearchParams): SidakHeatmapTimeProfileResponse {
     durations:
       !serviceType || serviceType === "call"
         ? {
-            buckets: { singkat: 3, sedang: 8, panjang: 1 },
+            buckets: { singkat: 3, sedang: 4, panjang: 4, sangat_panjang: 1 },
             total: 12,
             missingDuration: 2,
             reviewBelowOneMinute: 1,
@@ -197,7 +197,35 @@ test("Agent profiles show the correct view per service and never mix hourly matr
   await expect(
     section.getByRole("heading", { name: "Durasi panggilan" }),
   ).toBeVisible();
+  await expect(section.getByText("Singkat", { exact: true })).toBeVisible();
+  await expect(section.getByText("< 5 menit", { exact: true })).toBeVisible();
+  await expect(section.getByText("Sedang", { exact: true })).toBeVisible();
+  await expect(
+    section.getByText("5 sampai < 10 menit", { exact: true }),
+  ).toBeVisible();
+  await expect(section.getByText("Panjang", { exact: true })).toBeVisible();
+  await expect(
+    section.getByText("10 sampai < 15 menit", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    section.getByText("Sangat panjang", { exact: true }),
+  ).toBeVisible();
+  await expect(section.getByText("≥ 15 menit", { exact: true })).toBeVisible();
   await expect(section.getByText(/< 1 menit.*perlu dicek/)).toBeVisible();
+  for (const [device, width] of [
+    ["desktop", 1280],
+    ["mobile", 390],
+  ] as const) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(width);
+    await section.screenshot({
+      path: info.outputPath(`call-duration-${device}.png`),
+      animations: "disabled",
+    });
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
   for (const [label, service] of [
     ["Email", "email"],
     ["CSO", "cso"],

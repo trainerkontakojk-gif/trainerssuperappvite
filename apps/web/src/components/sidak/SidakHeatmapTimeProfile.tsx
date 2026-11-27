@@ -19,7 +19,12 @@ import {
 import { WEEKDAY_FULL } from "./heatmap-insights";
 
 const jamKeys = ["pagi", "siang", "sore", "luar"] as const;
-const durationKeys = ["singkat", "sedang", "panjang"] as const;
+const durationKeys = [
+  "singkat",
+  "sedang",
+  "panjang",
+  "sangat_panjang",
+] as const;
 const hours = [
   "<07",
   "07",

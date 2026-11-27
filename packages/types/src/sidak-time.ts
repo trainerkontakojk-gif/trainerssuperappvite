@@ -61,8 +61,13 @@ export const SIDAK_JAM_BUCKETS = {
 
 export const SIDAK_DURASI_BUCKETS = {
   singkat: { label: "Singkat", range: "< 5 menit", to: 5 * 60 },
-  sedang: { label: "Sedang", range: "5–< 15 menit", to: 15 * 60 },
-  panjang: { label: "Panjang", range: "≥ 15 menit" },
+  sedang: { label: "Sedang", range: "5 sampai < 10 menit", to: 10 * 60 },
+  panjang: {
+    label: "Panjang",
+    range: "10 sampai < 15 menit",
+    to: 15 * 60,
+  },
+  sangat_panjang: { label: "Sangat panjang", range: "≥ 15 menit" },
 } as const;
 export const SIDAK_DURASI_REVIEW_BELOW_SECONDS = 60;
 
@@ -80,7 +85,8 @@ export function classifyDurasi(
 ): keyof typeof SIDAK_DURASI_BUCKETS {
   if (seconds < SIDAK_DURASI_BUCKETS.singkat.to) return "singkat";
   if (seconds < SIDAK_DURASI_BUCKETS.sedang.to) return "sedang";
-  return "panjang";
+  if (seconds < SIDAK_DURASI_BUCKETS.panjang.to) return "panjang";
+  return "sangat_panjang";
 }
 
 export type SidakJamBuckets = Record<keyof typeof SIDAK_JAM_BUCKETS, number>;

@@ -395,7 +395,12 @@ function summarizeHours(rows: TimeRow[], label: string, countBy: SidakHeatmapCou
 }
 
 function summarizeDurations(rows: TimeRow[], countBy: SidakHeatmapCountBy) {
-  const buckets: SidakDurasiBuckets = { singkat: 0, sedang: 0, panjang: 0 };
+  const buckets: SidakDurasiBuckets = {
+    singkat: 0,
+    sedang: 0,
+    panjang: 0,
+    sangat_panjang: 0,
+  };
   const groups = groupTimeRows(rows, ({ durasi_detik }) =>
     durasi_detik === null ? null : classifyDurasi(durasi_detik),
   );
@@ -407,7 +412,11 @@ function summarizeDurations(rows: TimeRow[], countBy: SidakHeatmapCountBy) {
   );
   return {
     buckets,
-    total: buckets.singkat + buckets.sedang + buckets.panjang,
+    total:
+      buckets.singkat +
+      buckets.sedang +
+      buckets.panjang +
+      buckets.sangat_panjang,
     missingDuration: countTimeRows(groups.get(null) ?? [], countBy),
     reviewBelowOneMinute: countTimeRows(reviewRows, countBy),
   };

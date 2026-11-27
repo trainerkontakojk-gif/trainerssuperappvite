@@ -141,7 +141,7 @@ test.beforeAll(async () => {
       }),
       row("pencatatan", { jam_layanan: "07:00" }),
       row("slik"),
-      ...[59, 299, 300, 899, 900, null].map((durasi_detik) =>
+      ...[59, 299, 300, 599, 600, 899, 900, null].map((durasi_detik) =>
         row("call", { durasi_detik }),
       ),
       ...["email", "cso", "bko"].map((service) => row(service)),
@@ -213,12 +213,12 @@ test("separates service meanings, fixed bucket edges and missing values", async 
     },
   ]);
   expect(all.durations).toEqual({
-    buckets: { singkat: 2, sedang: 2, panjang: 1 },
-    total: 5,
+    buckets: { singkat: 2, sedang: 2, panjang: 2, sangat_panjang: 1 },
+    total: 7,
     missingDuration: 1,
     reviewBelowOneMinute: 1,
   });
-  expect(all.notApplicable).toBe(9);
+  expect(all.notApplicable).toBe(11);
   for (const service_type of ["email", "cso", "bko"]) {
     expect(await data({ service_type })).toMatchObject({
       hours: null,
